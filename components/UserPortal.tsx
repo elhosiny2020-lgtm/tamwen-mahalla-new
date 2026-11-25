@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard,
   Flame,
@@ -38,8 +38,19 @@ import {
   CheckCircle2,
   Pin,
   PinOff,
+  Menu,
+  X,
 } from 'lucide-react';
-import { AuditLog, BakeryRecord, Branch, Department, RegistrationRequest, User } from '@/types';
+import {
+  AuditLog,
+  BakeryRecord,
+  Branch,
+  DebtTransactionRecord,
+  Department,
+  InspectionRecord,
+  RegistrationRequest,
+  User,
+} from '@/types';
 import {
   INITIAL_BRANCHES,
   INITIAL_DEPARTMENTS,
@@ -47,18 +58,34 @@ import {
   INITIAL_USERS,
   INITIAL_REGISTRATION_REQUESTS,
   INITIAL_AUDIT_LOGS,
+  INITIAL_INSPECTIONS,
+  INITIAL_DEBT_TRANSACTIONS,
   getStoredBranches,
   getStoredDepartments,
   getStoredBakeries,
+  saveStoredBakeries,
   getStoredUsers,
   getStoredRegistrationRequests,
   getStoredAuditLogs,
+  getStoredInspections,
+  saveStoredInspections,
+  getStoredDebtTransactions,
+  saveStoredDebtTransactions,
 } from '@/lib/mock-db';
 import { evaluateDocumentExpiry } from '@/lib/bakery-math';
-import { toArabicNumerals, formatArabicNumber, compareTableValues, formatDateArabic } from '@/lib/utils';
+import {
+  toArabicNumerals,
+  formatArabicNumber,
+  formatDateArabic,
+  normalizeSearchText,
+} from '@/lib/utils';
 import AdminDashboard from './AdminDashboard';
 import BakeryManagementSystem from './BakeryManagementSystem';
-import SortableTh from './SortableTh';
+import BakeryInspectionModule from './BakeryInspectionModule';
+import BakeryDebtsModule from './BakeryDebtsModule';
+import DepartmentWorkspace from './DepartmentWorkspace';
+import AnimatedStatCard from './AnimatedStatCard';
+import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 
 interface UserPortalProps {
   currentUser: User;
@@ -94,6 +121,8 @@ function renderDeptIcon(iconName: string, className: string) {
   }
 }
 
+const ACTIVE_TAB_STORAGE_KEY = 'gharbia_supply_active_dept_tab_v1';
+
 export default function UserPortal({ currentUser, activeBranchId }: UserPortalProps) {
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
   const [allDepartments, setAllDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
@@ -101,8 +130,26 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   const [allUsers, setAllUsers] = useState<User[]>(INITIAL_USERS);
   const [regRequests, setRegRequests] = useState<RegistrationRequest[]>(INITIAL_REGISTRATION_REQUESTS);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
+  const [inspections, setInspections] = useState<InspectionRecord[]>(INITIAL_INSPECTIONS);
+  const [debtTransactions, setDebtTransactions] = useState<DebtTransactionRecord[]>(INITIAL_DEBT_TRANSACTIONS);
   const [todayRef, setTodayRef] = useState<string>('2026-11-25');
+
+  const [activeDeptId, setActiveDeptId] = useState<string>('d-02');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [sidebarSearch, setSidebarSearch] = useState<string>('');
+  const [pinnedDeptIds, setPinnedDeptIds] = useState<string[]>(['d-01', 'd-02', 'd-03', 'd-15', 'd-16', 'd-22']);
+
+  // Complaints table state
+  const [compSearch, setCompSearch] = useState('');
   const [compSort, setCompSort] = useState<{ key: string; asc: boolean }>({ key: 'date', asc: false });
+  const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
+  const [compPinnedCols, setCompPinnedCols] = useState<string[]>(['citizen']);
+
+  // Debt statement focus when opened directly from DEBTS sidebar tab
+  const [standaloneStatementBakeryId, setStandaloneStatementBakeryId] = useState<string>(INITIAL_BAKERIES[0]?.id || '');
+  const [portalSelectedBakery, setPortalSelectedBakery] = useState<BakeryRecord | null>(null);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -112,10 +159,29 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       setAllUsers(getStoredUsers());
       setRegRequests(getStoredRegistrationRequests());
       setAuditLogs(getStoredAuditLogs());
+      setInspections(getStoredInspections());
+      setDebtTransactions(getStoredDebtTransactions());
       setTodayRef(new Date().toISOString().slice(0, 10));
+
+      try {
+        const savedTab = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+        if (savedTab) setActiveDeptId(savedTab);
+      } catch {
+        // Ignore storage errors
+      }
     });
     return () => cancelAnimationFrame(frameId);
   }, []);
+
+  const handleSelectDept = (deptId: string) => {
+    setActiveDeptId(deptId);
+    setMobileMenuOpen(false);
+    try {
+      sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, deptId);
+    } catch {
+      // Ignore storage errors
+    }
+  };
 
   const currentBranch = branches.find(
     (b) => b.id === (activeBranchId || currentUser.primaryBranchId)
@@ -132,16 +198,74 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     [allDepartments, currentUser]
   );
 
-  const [activeDeptId, setActiveDeptId] = useState<string>('d-02');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true); // مطوية افتراضياً
-  const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(false);
-  const [sidebarSearch, setSidebarSearch] = useState<string>('');
-  const [pinnedDeptIds, setPinnedDeptIds] = useState<string[]>(['d-01', 'd-02', 'd-03', 'd-22']);
-
   const [complaintsList] = useState([
-    { id: 'comp-1', citizen: 'أحمد محمود الششتاوي', phone: '٠١٠١١١١٢٢٢٢', issue: 'مراجعة أوزان رغيف الخبز بقرية الهياتم', status: 'جاري الفحص والتفتيش', date: '٢٠٢٦-١١-٢٤' },
-    { id: 'comp-2', citizen: 'فاطمة علي أبو النجا', phone: '٠١٢٣٣٣٣٤٤٤٤', issue: 'تحديث بيانات بطاقة تموينية بمركز المحلة', status: 'تم الحل وإعادة التفعيل', date: '٢٠٢٦-١١-٢٣' },
+    { id: 'comp-1', citizen: 'أحمد محمود الششتاوي', phone: '01011112222', issue: 'مراجعة أوزان رغيف الخبز بقرية الهياتم', status: 'جاري الفحص والتفتيش', date: '2026-11-24' },
+    { id: 'comp-2', citizen: 'فاطمة علي أبو النجا', phone: '01233334444', issue: 'تحديث بيانات بطاقة تموينية بمركز المحلة', status: 'تم الحل وإعادة التفعيل', date: '2026-11-23' },
+    { id: 'comp-3', citizen: 'سعيد عبد الرحمن الدسوقي', phone: '01122334455', issue: 'متابعة مواعيد تشغيل مخبز بقرية صفط تراب', status: 'تمت المعاينة والمطابقة', date: '2026-11-22' },
   ]);
+
+  const [compNotice, setCompNotice] = useState('');
+
+  const filteredComplaints = useMemo(() => {
+    const q = normalizeSearchText(compSearch);
+    return complaintsList.filter((c) => {
+      if (!q) return true;
+      return normalizeSearchText(`${c.citizen} ${c.phone} ${c.issue} ${c.status} ${c.date}`).includes(q);
+    });
+  }, [complaintsList, compSearch]);
+
+  const complaintColumns: SmartTableColumn<(typeof complaintsList)[number]>[] = [
+    {
+      key: 'citizen',
+      label: 'المواطن',
+      headerText: 'المواطن',
+      type: 'name',
+      defaultWidth: 185,
+      render: (c) => <span className="font-extrabold text-[#102A43]">{c.citizen}</span>,
+    },
+    {
+      key: 'phone',
+      label: 'رقم الهاتف',
+      headerText: 'رقم الهاتف',
+      type: 'numeric',
+      align: 'center',
+      defaultWidth: 135,
+      measureValue: (c) => toArabicNumerals(c.phone),
+      render: (c) => <span className="text-slate-700">{toArabicNumerals(c.phone)}</span>,
+    },
+    {
+      key: 'issue',
+      label: 'موضوع البلاغ أو الشكوى',
+      headerText: 'موضوع البلاغ أو الشكوى',
+      type: 'longText',
+      defaultWidth: 280,
+      measureValue: (c) => toArabicNumerals(c.issue),
+      render: (c) => <span className="text-slate-800">{toArabicNumerals(c.issue)}</span>,
+    },
+    {
+      key: 'date',
+      label: 'التاريخ',
+      headerText: 'التاريخ',
+      type: 'date',
+      align: 'center',
+      defaultWidth: 135,
+      measureValue: (c) => formatDateArabic(c.date),
+      render: (c) => <span className="text-slate-700">{formatDateArabic(c.date)}</span>,
+    },
+    {
+      key: 'status',
+      label: 'حالة الشكوى',
+      headerText: 'حالة الشكوى',
+      type: 'badge',
+      align: 'center',
+      defaultWidth: 160,
+      render: (c) => (
+        <span className="bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-0.5 rounded text-[10px] font-extrabold">
+          {c.status}
+        </span>
+      ),
+    },
+  ];
 
   const activeDept = allDepartments.find((d) => d.id === activeDeptId) || allowedDepartments[0];
 
@@ -155,10 +279,10 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   };
 
   const filteredSidebarDepts = useMemo(() => {
-    const q = sidebarSearch.trim().toLowerCase();
+    const q = normalizeSearchText(sidebarSearch);
     const list = q
       ? allowedDepartments.filter(
-          (d) => d.arabicName.toLowerCase().includes(q) || d.description.toLowerCase().includes(q)
+          (d) => normalizeSearchText(`${d.arabicName} ${d.description}`).includes(q)
         )
       : allowedDepartments;
 
@@ -185,348 +309,667 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       totalUsers: allUsers.length,
       totalBranches: branches.length,
       totalDebts,
-      totalViolations: 14,
-      totalTransactions: auditLogs.length + activeBaks.length * 12,
+      totalViolations: inspections.filter((r) => r.type === 'مخالفة' || r.type === 'محضر رسمي').length,
+      totalTransactions: auditLogs.length + debtTransactions.length + inspections.length,
       totalAlerts: docAlertsCount,
       pendingReviews: pendingReqs + activeBaks.filter((b) => b.activityStatus !== 'نشط').length,
     };
-  }, [bakeries, allUsers, branches, regRequests, auditLogs, todayRef]);
+  }, [bakeries, allUsers, branches, regRequests, auditLogs, inspections, debtTransactions, todayRef]);
 
-  return (
-    <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-7rem)] font-sans">
-      {/* Smart Animated Collapsible Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ width: sidebarCollapsed ? '80px' : '280px' }}
-        transition={{ duration: 0.25, ease: 'easeInOut' }}
-        onMouseEnter={() => !isSidebarPinned && setSidebarCollapsed(false)}
-        onMouseLeave={() => !isSidebarPinned && setSidebarCollapsed(true)}
-        className="bg-[#102A43] text-white rounded-2xl shadow-xl border border-[#164E83] shrink-0 print:hidden overflow-hidden p-3.5"
-      >
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
-          {!sidebarCollapsed && (
-            <div className="flex items-center gap-2.5">
-              <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-[#C6A15B]">
-                <Image
-                  src="/assets/aistudio/logo_4234585c.jpg"
-                  alt="شعار الوزارة"
-                  fill
-                  sizes="32px"
-                  className="object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="truncate">
-                <span className="text-[10px] font-black text-[#C6A15B] block">الإدارة التموينية الحالية</span>
-                <h3 className="text-xs font-black text-white truncate max-w-[140px]">
-                  {currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'}
-                </h3>
-              </div>
+  const handleStandaloneAddInspection = (record: Omit<InspectionRecord, 'id'>) => {
+    const updated = [{ ...record, id: `ins-${Date.now()}` }, ...inspections];
+    setInspections(updated);
+    saveStoredInspections(updated);
+  };
+
+  const handleStandaloneUpdateInspection = (id: string, status: InspectionRecord['status']) => {
+    const updated = inspections.map((r) => (r.id === id ? { ...r, status } : r));
+    setInspections(updated);
+    saveStoredInspections(updated);
+  };
+
+  const handleStandaloneAddDebt = (tx: Omit<DebtTransactionRecord, 'id'>) => {
+    const updatedTx = [{ ...tx, id: `dbt-${Date.now()}` }, ...debtTransactions];
+    setDebtTransactions(updatedTx);
+    saveStoredDebtTransactions(updatedTx);
+    const updatedBakeries = bakeries.map((b) => {
+      if (b.id !== tx.bakeryId) return b;
+      const delta = tx.direction === 'debit' ? tx.amountEgp : -tx.amountEgp;
+      return { ...b, remainingDebtEgp: Math.max(0, (b.remainingDebtEgp || 0) + delta) };
+    });
+    setBakeries(updatedBakeries);
+    saveStoredBakeries(updatedBakeries);
+  };
+
+  const renderSidebarTabs = (isMobile = false) => (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/15">
+        {(!sidebarCollapsed || isMobile) && (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-[#C6A15B]">
+              <Image
+                src="/assets/aistudio/logo_4234585c.jpg"
+                alt="شعار الوزارة"
+                fill
+                sizes="32px"
+                className="object-cover"
+                referrerPolicy="no-referrer"
+              />
             </div>
-          )}
+            <div className="truncate">
+              <span className="text-[10px] font-black text-[#C6A15B] block">القائمة الرئيسية للأقسام</span>
+              <h3 className="text-[11px] font-black text-white truncate max-w-[155px]">
+                {currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'}
+              </h3>
+            </div>
+          </div>
+        )}
 
-          <div className="flex items-center gap-1 mx-auto lg:mx-0">
-            {!sidebarCollapsed && (
-              <button
-                type="button"
-                onClick={() => setIsSidebarPinned(!isSidebarPinned)}
-                className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
-                  isSidebarPinned ? 'bg-[#C6A15B] text-[#102A43]' : 'bg-[#164E83] text-slate-300 hover:text-white'
-                }`}
-                title={isSidebarPinned ? 'إلغاء تثبيت القائمة' : 'تثبيت القائمة مفتوحة'}
-              >
-                {isSidebarPinned ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
-              </button>
-            )}
+        <div className="flex items-center gap-1 mx-auto lg:mx-0 shrink-0">
+          {isMobile ? (
             <button
               type="button"
-              onClick={() => {
-                setSidebarCollapsed(!sidebarCollapsed);
-                if (!sidebarCollapsed) setIsSidebarPinned(false);
-              }}
-              className="p-2 bg-[#164E83] hover:bg-[#1e609e] text-[#C6A15B] rounded-xl transition-colors cursor-pointer"
-              title={sidebarCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-2 bg-[#164E83] text-white rounded-xl cursor-pointer"
+              title="إغلاق القائمة"
             >
-              {sidebarCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
+              <X className="w-4 h-4" />
             </button>
-          </div>
-        </div>
-
-        {/* Search inside sidebar */}
-        {!sidebarCollapsed && (
-          <div className="relative mb-3">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
-            <input
-              type="text"
-              value={sidebarSearch}
-              onChange={(e) => setSidebarSearch(e.target.value)}
-              placeholder="بحث سريع في الأقسام..."
-              className="w-full pr-9 pl-3 py-2 bg-[#164E83]/50 border border-white/15 rounded-xl text-xs text-white font-bold placeholder:text-slate-300 focus:outline-none focus:border-[#C6A15B]"
-            />
-          </div>
-        )}
-
-        <nav className="space-y-1 max-h-[calc(100vh-15rem)] overflow-y-auto pr-0.5">
-          {filteredSidebarDepts.map((dept) => {
-            const isActive = activeDeptId === dept.id;
-            const isPinned = pinnedDeptIds.includes(dept.id);
-            return (
-              <div
-                key={dept.id}
-                onClick={() => setActiveDeptId(dept.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#C6A15B] text-[#102A43] shadow-md font-black'
-                    : 'text-slate-200 hover:bg-[#164E83]/60 hover:text-white'
-                }`}
-                title={dept.arabicName}
+          ) : (
+            <>
+              {!sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarPinned(!isSidebarPinned)}
+                  className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                    isSidebarPinned ? 'bg-[#C6A15B] text-[#102A43]' : 'bg-[#164E83] text-slate-300 hover:text-white'
+                  }`}
+                  title={isSidebarPinned ? 'إلغاء تثبيت القائمة' : 'تثبيت القائمة مفتوحة'}
+                >
+                  {isSidebarPinned ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarCollapsed(!sidebarCollapsed);
+                  if (!sidebarCollapsed) setIsSidebarPinned(false);
+                }}
+                className="p-2 bg-[#164E83] hover:bg-[#1e609e] text-[#C6A15B] rounded-xl transition-colors cursor-pointer"
+                title={sidebarCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
               >
-                <div className="flex items-center gap-2.5 truncate">
-                  {renderDeptIcon(
-                    dept.iconName,
-                    `w-4 h-4 shrink-0 ${isActive ? 'text-[#102A43]' : 'text-[#C6A15B]'}`
-                  )}
-                  {!sidebarCollapsed && <span className="truncate">{dept.arabicName}</span>}
-                </div>
+                {sidebarCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
-                {!sidebarCollapsed && (
-                  <button
-                    type="button"
-                    onClick={(e) => togglePinDept(e, dept.id)}
-                    className={`p-1 rounded hover:bg-black/10 ${
-                      isPinned
-                        ? isActive
-                          ? 'text-[#102A43]'
-                          : 'text-[#C6A15B]'
-                        : 'text-slate-400 opacity-50 hover:opacity-100'
-                    }`}
-                    title={isPinned ? 'إلغاء تثبيت القسم' : 'تثبيت في المفضلة'}
-                  >
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                  </button>
+      {/* Quick Search Inside Sidebar */}
+      {(!sidebarCollapsed || isMobile) && (
+        <div className="relative mb-3">
+          <Search className="w-3.5 h-3.5 text-slate-300 absolute right-3 top-3" />
+          <input
+            type="text"
+            value={sidebarSearch}
+            onChange={(e) => setSidebarSearch(e.target.value)}
+            placeholder="بحث سريع في تبويبات الأقسام..."
+            className="w-full pr-9 pl-3 py-2 bg-[#164E83]/50 border border-white/15 rounded-xl text-[11px] text-white font-bold placeholder:text-slate-300 focus:outline-none focus:border-[#C6A15B]"
+          />
+        </div>
+      )}
+
+      {/* Separated Independent Animated Tabs */}
+      <nav
+        aria-label="تبويبات الأقسام الرئيسية"
+        className="space-y-1.5 max-h-[calc(100vh-14.5rem)] overflow-y-auto compact-table-scroll pl-0.5"
+      >
+        {filteredSidebarDepts.map((dept) => {
+          const isActive = activeDeptId === dept.id;
+          const isPinned = pinnedDeptIds.includes(dept.id);
+
+          return (
+            <motion.button
+              key={dept.id}
+              type="button"
+              onClick={() => handleSelectDept(dept.id)}
+              whileHover={{ x: -3 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[11px] font-black transition-colors cursor-pointer text-right border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A15B] ${
+                isActive
+                  ? 'text-[#102A43] border-[#C6A15B] shadow-md'
+                  : 'bg-[#164E83]/25 border-white/10 text-slate-100 hover:bg-[#164E83]/60 hover:border-white/25'
+              }`}
+              title={dept.arabicName}
+            >
+              {/* Animated Active Tab Background & Indicator */}
+              {isActive && (
+                <motion.span
+                  layoutId={isMobile ? 'mobileActiveTabBg' : 'desktopActiveTabBg'}
+                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                  className="absolute inset-0 rounded-xl bg-gradient-to-l from-[#C6A15B] via-[#d8b878] to-[#C6A15B] z-0"
+                />
+              )}
+              {isActive && (
+                <motion.span
+                  layoutId={isMobile ? 'mobileActiveTabBar' : 'desktopActiveTabBar'}
+                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                  className="absolute right-0 top-1.5 bottom-1.5 w-1 rounded-l-full bg-[#102A43] z-10"
+                />
+              )}
+
+              <div className="relative z-10 flex items-center gap-2.5 truncate">
+                <span
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                    isActive ? 'bg-[#102A43] text-[#C6A15B]' : 'bg-[#0B1F33]/60 text-[#C6A15B]'
+                  }`}
+                >
+                  {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5')}
+                </span>
+                {(!sidebarCollapsed || isMobile) && (
+                  <span className="truncate leading-tight">{dept.arabicName}</span>
                 )}
               </div>
-            );
-          })}
-        </nav>
+
+              {(!sidebarCollapsed || isMobile) && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => togglePinDept(e, dept.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      togglePinDept(e as unknown as React.MouseEvent, dept.id);
+                    }
+                  }}
+                  className={`relative z-10 p-1 rounded hover:bg-black/10 shrink-0 ${
+                    isPinned
+                      ? isActive
+                        ? 'text-[#102A43]'
+                        : 'text-[#C6A15B]'
+                      : 'text-slate-400 opacity-45 hover:opacity-100'
+                  }`}
+                  title={isPinned ? 'إلغاء التثبيت بالمفضلة' : 'تثبيت بالمفضلة'}
+                >
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                </span>
+              )}
+            </motion.button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-5 min-h-[calc(100vh-7rem)] font-sans">
+      {/* Mobile Sidebar Trigger */}
+      <div className="lg:hidden flex items-center justify-between bg-[#102A43] text-white px-4 py-2.5 rounded-xl border border-[#164E83] print:hidden">
+        <div className="flex items-center gap-2 text-xs font-black">
+          {renderDeptIcon(activeDept?.iconName || 'LayoutDashboard', 'w-4 h-4 text-[#C6A15B]')}
+          <span>{activeDept?.arabicName}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(true)}
+          className="px-3 py-1.5 bg-[#C6A15B] text-[#102A43] rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer"
+        >
+          <Menu className="w-4 h-4" />
+          <span>الأقسام</span>
+        </button>
+      </div>
+
+      {/* Mobile Drawer Sidebar */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 lg:hidden flex justify-start"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-[290px] max-w-[85vw] bg-gradient-to-b from-[#0B1F33] via-[#102A43] to-[#0B1F33] text-white p-4 shadow-2xl border-l border-[#C6A15B]/30 h-full"
+            >
+              {renderSidebarTabs(true)}
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Right-Hand Animated Tabbed Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{ width: sidebarCollapsed ? '84px' : '276px' }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        onMouseEnter={() => !isSidebarPinned && setSidebarCollapsed(false)}
+        onMouseLeave={() => !isSidebarPinned && setSidebarCollapsed(true)}
+        className="hidden lg:block bg-gradient-to-b from-[#0B1F33] via-[#102A43] to-[#0B1F33] text-white rounded-2xl shadow-lg border border-[#164E83] shrink-0 print:hidden overflow-hidden p-3 self-start sticky top-20"
+      >
+        {renderSidebarTabs(false)}
       </motion.aside>
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 min-w-0">
-        {activeDept?.code === 'BAK' && (
-          <BakeryManagementSystem
-            currentUser={currentUser}
-            branchName={currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'}
-          />
-        )}
+      {/* Main Content Viewport (section — avoids nested <main> landmark) */}
+      <section className="flex-1 min-w-0">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeDept?.id || 'default'}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {activeDept?.code === 'BAK' && (
+              <BakeryManagementSystem
+                currentUser={currentUser}
+                branchName={currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'}
+              />
+            )}
 
-        {activeDept?.code === 'DASH' && (
-          <div className="space-y-6">
-            {/* Hero Sovereign Banner */}
-            <div className="bg-[#102A43] text-white rounded-2xl p-6 sm:p-8 shadow-lg border border-[#164E83] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-white shrink-0 border-2 border-[#C6A15B] shadow-md">
-                  <Image
-                    src="/assets/aistudio/logo_4234585c.jpg"
-                    alt="شعار وزارة التموين"
-                    fill
-                    sizes="64px"
-                    className="object-cover"
-                    referrerPolicy="no-referrer"
+            {activeDept?.code === 'DASH' && (
+              <div className="space-y-5">
+                {/* Hero Sovereign Banner */}
+                <div className="bg-gradient-to-l from-[#0B1F33] via-[#102A43] to-[#164E83] text-white rounded-2xl p-6 shadow-md border border-[#164E83] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-white shrink-0 border-2 border-[#C6A15B] shadow-md">
+                      <Image
+                        src="/assets/aistudio/logo_4234585c.jpg"
+                        alt="شعار وزارة التموين"
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-black text-[#C6A15B] mb-1">
+                        جمهورية مصر العربية · وزارة التموين والتجارة الداخلية · محافظة الغربية
+                      </p>
+                      <h2 className="text-xl sm:text-2xl font-black">
+                        لوحة القيادة المركزية الموحدة — {currentBranch?.arabicName}
+                      </h2>
+                      <p className="text-[11px] text-slate-200 font-bold mt-1">
+                        منصة حكومية رقمية متكاملة لإدارة البيانات والخدمات التموينية، وتعزيز كفاءة المتابعة والرقابة، ودعم اتخاذ القرار.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDept('d-02')}
+                    className="px-5 py-3 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] font-black rounded-xl text-[11px] flex items-center gap-2 shrink-0 shadow-md cursor-pointer"
+                  >
+                    <Flame className="w-4 h-4" />
+                    <span>فتح منظومة الرقابة على المخابز</span>
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* 8 Animated Colored Enterprise KPI Cards across all 6 themes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <AnimatedStatCard
+                    title="إجمالي المخابز المسجلة"
+                    value={ultraMetrics.totalBakeries}
+                    unit="مخبز بلدي مدعم"
+                    indicator="إجماليات المركز"
+                    icon={Flame}
+                    theme="navy"
+                    delay={0}
+                    onClick={() => handleSelectDept('d-02')}
+                  />
+                  <AnimatedStatCard
+                    title="إجمالي المستخدمين"
+                    value={ultraMetrics.totalUsers}
+                    unit="حساب معتمد"
+                    indicator="كادر إداري"
+                    icon={Users}
+                    theme="purple"
+                    delay={0.04}
+                    onClick={() => handleSelectDept('d-22')}
+                  />
+                  <AnimatedStatCard
+                    title="الإدارات التموينية بالمحافظة"
+                    value={ultraMetrics.totalBranches}
+                    unit="إدارة تموينية"
+                    indicator="محافظة الغربية"
+                    icon={Building2}
+                    theme="teal"
+                    delay={0.08}
+                    onClick={() => handleSelectDept('d-22')}
+                  />
+                  <AnimatedStatCard
+                    title="إجمالي المديونيات المتبقية"
+                    value={ultraMetrics.totalDebts}
+                    format="currency"
+                    indicator="مؤشر مالي"
+                    icon={CreditCard}
+                    theme="gold"
+                    delay={0.12}
+                    onClick={() => handleSelectDept('d-03')}
+                  />
+                  <AnimatedStatCard
+                    title="المخالفات والمحاضر الرقابية"
+                    value={ultraMetrics.totalViolations}
+                    unit="محضر ومخالفة"
+                    indicator="حملات التفتيش"
+                    icon={ShieldAlert}
+                    theme="red"
+                    delay={0.16}
+                    onClick={() => handleSelectDept('d-16')}
+                  />
+                  <AnimatedStatCard
+                    title="المعاملات والحركات الموثقة"
+                    value={ultraMetrics.totalTransactions}
+                    unit="عملية مسجلة"
+                    indicator="عمليات مكتملة"
+                    icon={History}
+                    theme="green"
+                    delay={0.2}
+                    onClick={() => handleSelectDept('d-23')}
+                  />
+                  <AnimatedStatCard
+                    title="تنبيهات التراخيص والعقود"
+                    value={ultraMetrics.totalAlerts}
+                    unit="مستند للتجديد"
+                    indicator="تنبيهات عاجلة"
+                    icon={AlertTriangle}
+                    theme="red"
+                    delay={0.24}
+                    onClick={() => handleSelectDept('d-02')}
+                  />
+                  <AnimatedStatCard
+                    title="عمليات قيد المراجعة"
+                    value={ultraMetrics.pendingReviews}
+                    unit="طلب / مخبز"
+                    indicator="متابعة إدارية"
+                    icon={CheckCircle2}
+                    theme="purple"
+                    delay={0.28}
+                    onClick={() => handleSelectDept('d-22')}
                   />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-[#C6A15B] mb-1">
-                    جمهورية مصر العربية · وزارة التموين والتجارة الداخلية · محافظة الغربية
-                  </p>
-                  <h2 className="text-xl sm:text-2xl font-black">
-                    لوحة القيادة المركزية (ULTRA DASHBOARD) — {currentBranch?.arabicName}
-                  </h2>
-                  <p className="text-xs text-slate-200 font-bold mt-1">
-                    منصة رقمية موحدة لإدارة البيانات والخدمات التموينية، وتعزيز كفاءة المتابعة والرقابة، ودعم اتخاذ القرار.
-                  </p>
+
+                {/* Departments Directory Grid */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="text-[15px] font-black text-[#102A43]">الأقسام الرئيسية لمنظومة الإدارة الرقمية المتكاملة</h3>
+                      <p className="text-[11px] font-bold text-slate-600">اضغط على أي قسم للانتقال المباشر إلى سجلاته وإحصائياته الحية</p>
+                    </div>
+                    <span className="num-cell text-[11px] font-black text-[#164E83]">
+                      {toArabicNumerals(allowedDepartments.length)} قسماً مصرحاً
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {allowedDepartments.map((dept) => (
+                      <div
+                        key={dept.id}
+                        onClick={() => handleSelectDept(dept.id)}
+                        className="p-4 rounded-xl border border-slate-200 hover:border-[#102A43] bg-[#F4F7FB]/50 hover:bg-white transition-all cursor-pointer flex flex-col justify-between"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[#102A43] text-[#C6A15B] flex items-center justify-center shrink-0">
+                            {renderDeptIcon(dept.iconName, 'w-5 h-5')}
+                          </div>
+                          <div>
+                            <h4 className="text-[13px] font-black text-[#102A43]">{dept.arabicName}</h4>
+                            <p className="text-[11px] font-bold text-slate-600 mt-0.5 leading-relaxed">{dept.description}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3.5 pt-2.5 border-t border-slate-200/70 flex items-center justify-between text-[10.5px] font-black text-[#164E83]">
+                          <span>
+                            {dept.code === 'BAK' ? `${toArabicNumerals(ultraMetrics.totalBakeries)} مخبز مسجل` : 'قسم مفعل بالبيانات'}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span>فتح القسم</span>
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              </div>
+            )}
+
+            {activeDept?.code === 'DEBTS' && (
+              <BakeryDebtsModule
+                userId={currentUser.id}
+                currentUser={currentUser}
+                bakeries={bakeries.filter((b) => !b.isArchived)}
+                transactions={debtTransactions}
+                activeFocus="dbt-all"
+                selectedStatementBakeryId={standaloneStatementBakeryId}
+                todayRef={todayRef}
+                onSelectStatementBakeryId={(id) => setStandaloneStatementBakeryId(id)}
+                onAddTransaction={handleStandaloneAddDebt}
+                onSelectBakeryDetails={(b) => setPortalSelectedBakery(b)}
+              />
+            )}
+
+            {(activeDept?.code === 'INSP' || activeDept?.code === 'VIOL') && (
+              <BakeryInspectionModule
+                bakeries={bakeries.filter((b) => !b.isArchived)}
+                inspections={inspections}
+                currentUser={currentUser}
+                activeFocus={activeDept.code === 'INSP' ? 'ins-campaigns' : 'ins-violations'}
+                todayRef={todayRef}
+                onAddInspection={handleStandaloneAddInspection}
+                onUpdateStatus={handleStandaloneUpdateInspection}
+                onSelectBakeryDetails={(b) => setPortalSelectedBakery(b)}
+              />
+            )}
+
+            {(activeDept?.code === 'ROLES' || activeDept?.code === 'USERS' || activeDept?.code === 'AUDIT') && (
+              <AdminDashboard userId={currentUser.id} />
+            )}
+
+            {activeDept?.code === 'COMP' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <AnimatedStatCard
+                    title="إجمالي شكاوى المواطنين"
+                    value={complaintsList.length}
+                    unit="شكوى مسجلة"
+                    icon={MessageSquareWarning}
+                    theme="navy"
+                  />
+                  <AnimatedStatCard
+                    title="شكاوى قيد الفحص"
+                    value={complaintsList.filter((c) => c.status.includes('جاري')).length}
+                    unit="جاري المتابعة"
+                    icon={AlertTriangle}
+                    theme="gold"
+                  />
+                  <AnimatedStatCard
+                    title="شكاوى تم حلها"
+                    value={complaintsList.filter((c) => !c.status.includes('جاري')).length}
+                    unit="منجز ومغلق"
+                    icon={CheckCircle2}
+                    theme="green"
+                  />
+                </div>
+
+                {compNotice && (
+                  <div className="bg-[#102A43] text-[#C6A15B] px-4 py-2 rounded-xl text-[11px] font-black">
+                    {compNotice}
+                  </div>
+                )}
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-[13px] font-black text-[#102A43]">شكاوى وبلاغات المواطنين الواردة</h3>
+                    <div className="relative min-w-[230px]">
+                      <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={compSearch}
+                        onChange={(e) => setCompSearch(e.target.value)}
+                        placeholder="بحث باسم المواطن أو رقم الهاتف..."
+                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
+                      />
+                    </div>
+                  </div>
+                  <SmartAutoFitTable
+                    tableId="user_complaints"
+                    userId={currentUser.id}
+                    rows={filteredComplaints}
+                    totalCount={complaintsList.length}
+                    getRowId={(c) => c.id}
+                    columns={complaintColumns}
+                    sortKey={compSort.key}
+                    sortAsc={compSort.asc}
+                    onSort={(k) => setCompSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+                    selectable
+                    selectedIds={selectedCompIds}
+                    onToggleSelect={(id) =>
+                      setSelectedCompIds((prev) =>
+                        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+                      )
+                    }
+                    onClearSelection={() => setSelectedCompIds([])}
+                    pinnedKeys={compPinnedCols}
+                    onPinAll={() => setCompPinnedCols(['citizen', 'phone'])}
+                    onUnpinAll={() => setCompPinnedCols([])}
+                    onTogglePinColumn={(k) =>
+                      setCompPinnedCols((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]))
+                    }
+                    onResetPinDefaults={() => setCompPinnedCols(['citizen'])}
+                    onNotify={(msg) => {
+                      setCompNotice(msg);
+                      setTimeout(() => setCompNotice(''), 2800);
+                    }}
+                    emptyMessage="لا توجد شكاوى مطابقة حالياً."
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeDept &&
+              activeDept.code !== 'DASH' &&
+              activeDept.code !== 'BAK' &&
+              activeDept.code !== 'DEBTS' &&
+              activeDept.code !== 'INSP' &&
+              activeDept.code !== 'VIOL' &&
+              activeDept.code !== 'COMP' &&
+              activeDept.code !== 'ROLES' &&
+              activeDept.code !== 'USERS' &&
+              activeDept.code !== 'AUDIT' && (
+                <DepartmentWorkspace
+                  userId={currentUser.id}
+                  dept={activeDept}
+                  currentBranch={currentBranch}
+                  bakeries={bakeries}
+                  users={allUsers}
+                  branches={branches}
+                  inspections={inspections}
+                  debtTransactions={debtTransactions}
+                  auditLogs={auditLogs}
+                  onOpenBakeries={() => handleSelectDept('d-02')}
+                />
+              )}
+          </motion.div>
+        </AnimatePresence>
+      </section>
+
+      {/* نافذة ملف المخبز السريعة عند الضغط على رقم ماكينة POS أو اسم صاحب المخبز في جداول UserPortal */}
+      {portalSelectedBakery && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setPortalSelectedBakery(null)}
+        >
+          <div
+            className="bg-white rounded-2xl border-2 border-[#102A43] shadow-2xl max-w-2xl w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#102A43] text-white px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <span className="text-[10.5px] font-black text-[#C6A15B] block">
+                  ملف المخبز الموحد — مرتبط برقم ماكينة POS ({toArabicNumerals(portalSelectedBakery.posNumber)})
+                </span>
+                <h3 className="text-base font-black">{portalSelectedBakery.name}</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveDeptId('d-02')}
-                className="px-5 py-3 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] font-black rounded-xl text-xs flex items-center gap-2 shrink-0 shadow-md cursor-pointer"
+                onClick={() => setPortalSelectedBakery(null)}
+                className="px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-black cursor-pointer"
               >
-                <Flame className="w-4 h-4" />
-                <span>فتح منظومة إدارة المخابز والحصص</span>
-                <ArrowLeft className="w-4 h-4" />
+                إغلاق ✕
               </button>
             </div>
-
-            {/* 8 Luxury Enterprise KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { title: 'إجمالي المخابز المسجلة', val: toArabicNumerals(ultraMetrics.totalBakeries), desc: 'مخابز بلدية مدعمة بمركز المحلة', icon: Flame, actionDept: 'd-02' },
-                { title: 'إجمالي المستخدمين', val: toArabicNumerals(ultraMetrics.totalUsers), desc: 'حسابات موظفين ومفتشين معتمدة', icon: Users, actionDept: 'd-22' },
-                { title: 'إجمالي الإدارات التموينية', val: toArabicNumerals(ultraMetrics.totalBranches), desc: 'إدارات تموين محافظة الغربية', icon: Building2, actionDept: 'd-22' },
-                { title: 'إجمالي المديونيات المتبقية', val: `${formatArabicNumber(ultraMetrics.totalDebts)} ج.م`, desc: 'مستحقات وغرامات قيد التحصيل', icon: CreditCard, actionDept: 'd-03' },
-                { title: 'إجمالي المخالفات والمحاضر', val: toArabicNumerals(ultraMetrics.totalViolations), desc: 'محاضر رقابية وحملات تفتيشية', icon: ShieldAlert, actionDept: 'd-16' },
-                { title: 'إجمالي المعاملات الموثقة', val: toArabicNumerals(ultraMetrics.totalTransactions), desc: 'عمليات صرف وتدقيق بالسجل', icon: History, actionDept: 'd-23' },
-                { title: 'التنبيهات والمستندات المنتهية', val: toArabicNumerals(ultraMetrics.totalAlerts), desc: 'تراخيص وعقود تحتاج للتجديد', icon: AlertTriangle, actionDept: 'd-02' },
-                { title: 'عمليات تحتاج إلى مراجعة', val: toArabicNumerals(ultraMetrics.pendingReviews), desc: 'طلبات اعتماد ومخابز قيد الفحص', icon: CheckCircle2, actionDept: 'd-22' },
-              ].map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div
-                    key={i}
-                    onClick={() => setActiveDeptId(card.actionDept)}
-                    className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-[#164E83] shadow-sm transition-all cursor-pointer flex items-start justify-between"
-                  >
-                    <div>
-                      <span className="text-xs font-black text-slate-600 block">{card.title}</span>
-                      <div className="text-2xl font-black font-mono tabular-nums text-[#102A43] my-1.5">
-                        {card.val}
-                      </div>
-                      <span className="text-[11px] font-bold text-slate-500">{card.desc}</span>
-                    </div>
-                    <div className="w-11 h-11 rounded-xl bg-[#F4F7FB] text-[#102A43] border border-slate-200 flex items-center justify-center shrink-0">
-                      <Icon className="w-5 h-5 text-[#164E83]" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 12 Main Enterprise Departments Directory Grid */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <h3 className="text-base font-black text-[#102A43]">الأقسام الرئيسية لمنظومة الإدارة الرقمية المتكاملة</h3>
-                  <p className="text-xs font-bold text-slate-500">اضغط على أي قسم للانتقال المباشر إلى سجلاته ومعاملاته</p>
+            <div className="p-5 space-y-4 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-bold block">اسم صاحب المخبز</span>
+                  <span className="font-black text-[#102A43] text-sm">{portalSelectedBakery.ownerName}</span>
                 </div>
-                <span className="text-xs font-mono font-black text-[#164E83]">{toArabicNumerals(allowedDepartments.length)} قسماً مصرحاً</span>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-bold block">رقم ماكينة POS</span>
+                  <span className="num-cell font-black text-[#164E83] text-sm">
+                    {toArabicNumerals(portalSelectedBakery.posNumber)}
+                  </span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-bold block">رقم المخبز / الحالة</span>
+                  <span className="num-cell font-black text-emerald-800 text-sm">
+                    #{toArabicNumerals(portalSelectedBakery.bakeryNumber)} ({portalSelectedBakery.operationStatus})
+                  </span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-bold block">القرية / الوحدة المحلية</span>
+                  <span className="font-black text-slate-800">
+                    {portalSelectedBakery.village} — {portalSelectedBakery.localUnit}
+                  </span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-bold block">الحصة الفعلية / التأمينية</span>
+                  <span className="num-cell font-black text-[#102A43]">
+                    {toArabicNumerals(portalSelectedBakery.actualQuota)} / {toArabicNumerals(portalSelectedBakery.insuranceQuota)} شيكارة
+                  </span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-slate-500 font-bold block">المديونية المتبقية بالسجل</span>
+                  <span className="num-cell font-black text-red-700">
+                    {formatArabicNumber(portalSelectedBakery.remainingDebtEgp || 0)} ج.م
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {allowedDepartments.map((dept) => (
-                  <div
-                    key={dept.id}
-                    onClick={() => setActiveDeptId(dept.id)}
-                    className="p-4 rounded-xl border border-slate-200 hover:border-[#102A43] bg-[#F4F7FB]/50 hover:bg-white transition-all cursor-pointer flex flex-col justify-between"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#102A43] text-[#C6A15B] flex items-center justify-center shrink-0">
-                        {renderDeptIcon(dept.iconName, 'w-5 h-5')}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black text-[#102A43]">{dept.arabicName}</h4>
-                        <p className="text-xs font-bold text-slate-600 mt-0.5 leading-relaxed">{dept.description}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-2.5 border-t border-slate-200/70 flex items-center justify-between text-[11px] font-black text-[#164E83]">
-                      <span>{dept.code === 'BAK' ? `${toArabicNumerals(ultraMetrics.totalBakeries)} مخبز مسجل` : 'قسم مفعل'}</span>
-                      <span className="flex items-center gap-1">
-                        <span>فتح القسم</span>
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {(activeDept?.code === 'ROLES' || activeDept?.code === 'USERS' || activeDept?.code === 'AUDIT') && (
-          <AdminDashboard />
-        )}
-
-        {activeDept?.code === 'COMP' && (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
-            <h3 className="text-sm font-black text-[#102A43]">شكاوى وبلاغات المواطنين الواردة</h3>
-            <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-[#102A43] text-white sticky top-0 z-10">
-                  <tr>
-                    <SortableTh label="المواطن" sortKey="citizen" activeSortKey={compSort.key} sortAsc={compSort.asc} onSort={(k) => setCompSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="رقم الهاتف" sortKey="phone" activeSortKey={compSort.key} sortAsc={compSort.asc} onSort={(k) => setCompSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="موضوع البلاغ أو الشكوى" sortKey="issue" activeSortKey={compSort.key} sortAsc={compSort.asc} onSort={(k) => setCompSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="التاريخ" sortKey="date" activeSortKey={compSort.key} sortAsc={compSort.asc} onSort={(k) => setCompSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="حالة الشكوى" sortKey="status" activeSortKey={compSort.key} sortAsc={compSort.asc} onSort={(k) => setCompSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {[...complaintsList]
-                    .sort((a, b) =>
-                      compareTableValues(
-                        a[compSort.key as keyof typeof a],
-                        b[compSort.key as keyof typeof b],
-                        compSort.asc
-                      )
-                    )
-                    .map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-50">
-                        <td className="font-bold text-[#102A43]">{c.citizen}</td>
-                        <td className="num-cell text-center text-slate-700">{toArabicNumerals(c.phone)}</td>
-                        <td className="text-slate-800">{toArabicNumerals(c.issue)}</td>
-                        <td className="num-cell text-center text-slate-600">{formatDateArabic(c.date)}</td>
-                        <td className="text-center whitespace-nowrap">
-                          <span className="bg-blue-50 text-blue-900 border border-blue-200 px-2 py-0.5 rounded text-[10.5px] font-bold">
-                            {c.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeDept?.code !== 'DASH' &&
-          activeDept?.code !== 'BAK' &&
-          activeDept?.code !== 'COMP' &&
-          activeDept?.code !== 'ROLES' &&
-          activeDept?.code !== 'USERS' &&
-          activeDept?.code !== 'AUDIT' && (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-5 shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-[#102A43] text-[#C6A15B] flex items-center justify-center">
-                    {renderDeptIcon(activeDept?.iconName || 'LayoutDashboard', 'w-5 h-5')}
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-[#102A43]">{activeDept?.arabicName}</h2>
-                    <p className="text-xs font-bold text-slate-500">{activeDept?.description}</p>
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setActiveDeptId('d-02')}
-                  className="px-4 py-2 bg-[#102A43] text-white rounded-xl text-xs font-black cursor-pointer shadow-sm"
+                  onClick={() => {
+                    const bId = portalSelectedBakery.id;
+                    setPortalSelectedBakery(null);
+                    setStandaloneStatementBakeryId(bId);
+                    handleSelectDept('d-15');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#164E83] hover:bg-[#102A43] text-white font-black cursor-pointer"
                 >
-                  الانتقال إلى منظومة المخابز
+                  فتح كشف الحساب المالي والمديونيات
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPortalSelectedBakery(null);
+                    handleSelectDept('d-02');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] font-black cursor-pointer"
+                >
+                  فتح في منظومة الرقابة على المخابز
                 </button>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 bg-[#F4F7FB] rounded-xl border border-slate-200">
-                  <span className="text-xs font-bold text-slate-500 block">الإدارة المختصة</span>
-                  <strong className="text-sm font-black text-[#102A43]">
-                    {currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'}
-                  </strong>
-                </div>
-                <div className="p-4 bg-[#F4F7FB] rounded-xl border border-slate-200">
-                  <span className="text-xs font-bold text-slate-500 block">إجمالي المخابز المرتبطة بالفرع</span>
-                  <strong className="text-sm font-black font-mono text-[#164E83]">
-                    {toArabicNumerals(ultraMetrics.totalBakeries)} مخبز
-                  </strong>
-                </div>
-                <div className="p-4 bg-[#F4F7FB] rounded-xl border border-slate-200">
-                  <span className="text-xs font-bold text-slate-500 block">إجمالي المديونيات المسجلة</span>
-                  <strong className="text-sm font-black font-mono text-emerald-800">
-                    {formatArabicNumber(ultraMetrics.totalDebts)} ج.م
-                  </strong>
-                </div>
-              </div>
             </div>
-          )}
-      </main>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

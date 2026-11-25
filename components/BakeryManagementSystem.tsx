@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   PlusCircle,
   Calculator,
@@ -15,6 +15,7 @@ import {
   Volume2,
   VolumeX,
   CheckCircle2,
+  XCircle,
   AlertTriangle,
   Edit3,
   Eye,
@@ -32,6 +33,14 @@ import {
   MapPin,
   Users,
   Save,
+  Pin,
+  PinOff,
+  Flame,
+  Wheat,
+  ShieldCheck,
+  Layers,
+  FileWarning,
+  BellRing,
 } from 'lucide-react';
 import {
   BakeryRecord,
@@ -82,13 +91,21 @@ import {
   formatArabicNumber,
   formatArabicDecimal,
   toArabicNumerals,
+  normalizeSearchText,
   compareTableValues,
 } from '@/lib/utils';
+import {
+  AutoFitColumnSchema,
+  getBakeryColumnAutoFitType,
+} from '@/lib/table-autofit';
+import { useSmartAutoFit } from '@/hooks/useSmartAutoFit';
 import { bakeryStep1Schema, bakeryStep2Schema } from '@/lib/zod-schemas';
 import BakeryNavigationGrid, { BakerySubTab } from './BakeryNavigationGrid';
 import BakeryInspectionModule from './BakeryInspectionModule';
 import BakeryDebtsModule from './BakeryDebtsModule';
-import SortableTh from './SortableTh';
+import AnimatedStatCard from './AnimatedStatCard';
+import TableStats from './TableStats';
+import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 
 export type { BakerySubTab };
 
@@ -112,6 +129,10 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
   const [collapseRepeatedGeo, setCollapseRepeatedGeo] = useState<boolean>(true);
   const [todayRef, setTodayRef] = useState<string>('2026-11-25');
   const [clientNowIso, setClientNowIso] = useState<string>(DEFAULT_LAST_RECALC_TIMESTAMP);
+  const [selectedBakeryIds, setSelectedBakeryIds] = useState<string[]>([]);
+  const [subPinnedCols, setSubPinnedCols] = useState<string[]>(['name', 'ownerName', 'bakeryName', 'village']);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const registryScrollRef = useRef<HTMLDivElement | null>(null);
 
   // Per-table sort states for true numeric/date sorting across ALL sub-tables
   const [quotasSort, setQuotasSort] = useState<{ key: string; asc: boolean }>({ key: 'actualQuota', asc: false });
@@ -126,12 +147,16 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
   const [villagesSort, setVillagesSort] = useState<{ key: string; asc: boolean }>({ key: 'totalActualQuota', asc: false });
   const [ownersSearch, setOwnersSearch] = useState<string>('');
 
+  const toggleSubPin = (key: string) => {
+    setSubPinnedCols((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
+
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
       const storedBakeries = getStoredBakeries();
       setBakeries(storedBakeries);
       setAuditChanges(getStoredBakeryAuditChanges());
-      setColumns(getStoredBakeryColumns());
+      setColumns(getStoredBakeryColumns(currentUser.id));
       setColumnGroups(getStoredBakeryColumnGroups());
       setLastRecalc(getLastBakeryRecalcTimestamp());
       setAlertActions(getStoredAlertActions());
@@ -142,7 +167,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
       setClientNowIso(nowIso);
     });
     return () => cancelAnimationFrame(frameId);
-  }, []);
+  }, [currentUser.id]);
 
   // Sound settings
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -336,26 +361,26 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
   // Filtered and Sorted Bakeries (Section 8)
   const filteredBakeries = useMemo(() => {
-    const q = searchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
+    const q = normalizeSearchText(searchQuery);
 
     const filtered = activeBakeriesList.filter((b) => {
       if (q) {
-        const haystack = [
-          b.name,
-          b.ownerName,
-          b.bakeryNumber,
-          b.posNumber,
-          b.ownerNationalId,
-          b.phone,
-          b.village,
-          b.localUnit,
-          b.breadType,
-          b.activityStatus,
-          b.address,
-        ]
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .toLowerCase();
+        const haystack = normalizeSearchText(
+          [
+            b.name,
+            b.ownerName,
+            b.managerName || '',
+            b.bakeryNumber,
+            b.posNumber,
+            b.ownerNationalId,
+            b.phone,
+            b.village,
+            b.localUnit,
+            b.breadType,
+            b.activityStatus,
+            b.address,
+          ].join(' ')
+        );
         if (!haystack.includes(q)) return false;
       }
 
@@ -391,9 +416,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
       return true;
     });
 
-    return filtered.sort((a, b) =>
-      compareTableValues(a[sortField], b[sortField], sortAsc)
-    );
+    return [...filtered].sort((a, b) => compareTableValues(a[sortField], b[sortField], sortAsc));
   }, [
     activeBakeriesList,
     searchQuery,
@@ -780,7 +803,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
     a.download = `${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('تم تصدير الملف بصيغة Excel / CSV المعتمدة باللغة العربية بنجاح');
+    showToast('تم تصدير الملف بصيغة إكسل المعتمدة باللغة العربية بنجاح');
   };
 
   // Handle Alert Renewal or Postpone (Section 7)
@@ -839,13 +862,177 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
     showToast(`تم تسجيل تأجيل المتابعة لمخبز (${bakery.name}) مع حفظ السبب`);
   };
 
-  // Sorted Visible Columns for Registry Table
+  // Sorted Visible Columns for Registry Table (49 columns total)
   const visibleColumns = useMemo(
     () => [...columns].filter(c => c.visible).sort((a, b) => a.order - b.order),
     [columns]
   );
 
-  // Group Super-Headers computed from consecutive visible columns
+  // Lookup custom column header label (reflects customizer across tables, reports, export, print)
+  const getColLabel = (key: string, fallback: string) => {
+    const found = columns.find((c) => c.key === key);
+    return toArabicNumerals(found?.customLabel || fallback);
+  };
+
+  // Build Smart Auto-Fit Schema for the 49-Column Registry Table
+  const registrySchemaCols: AutoFitColumnSchema[] = useMemo(() => {
+    const sampleRows = filteredBakeries.slice(0, 60);
+    return visibleColumns.map((col) => {
+      const colType = getBakeryColumnAutoFitType(col.key);
+      const isDecimalCol =
+        col.key === 'avgPerCapita2023' ||
+        col.key === 'avgPerCapita2024' ||
+        col.key === 'avgPerCapita2025' ||
+        col.key === 'avgPerCapitaOverall' ||
+        col.key === 'cumulativeAvgDifference' ||
+        col.key === 'dailyShareActual2025' ||
+        col.key === 'insuranceQuota';
+      const isCurrencyCol =
+        col.key === 'insuranceAmountEgp' ||
+        col.key === 'totalInsuranceValueEgp' ||
+        col.key === 'sackPriceEgp' ||
+        col.key === 'remainingDebtEgp';
+      const isIntegerCol =
+        col.key === 'serialNumber' ||
+        col.key === 'actualQuota' ||
+        col.key === 'dailySacksCount' ||
+        col.key === 'dailyCapacitySacks' ||
+        col.key === 'productionFactor' ||
+        col.key === 'breadTypesCount' ||
+        col.key === 'dailyLoavesCount' ||
+        col.key === 'villagePopulation' ||
+        col.key === 'beneficiaries2023' ||
+        col.key === 'beneficiaries2024' ||
+        col.key === 'beneficiaries2025';
+      const isDateCol = col.key.includes('Date');
+
+      return {
+        key: col.key,
+        label: toArabicNumerals(col.customLabel),
+        type: colType,
+        defaultWidth: col.width,
+        pinned: col.pinned,
+        sampleValues: sampleRows.map((b) => {
+          const raw = b[col.key as keyof BakeryRecord];
+          if (isDecimalCol) return formatArabicDecimal(Number(raw || 0), 3);
+          if (isCurrencyCol) return `${formatArabicNumber(Number(raw || 0))} ج.م`;
+          if (isIntegerCol) return formatArabicNumber(Number(raw || 0));
+          if (col.key === 'licenseExpiryDate') {
+            const ev = evaluateDocumentExpiry(b.licenseExpiryDate, b.licenseNumber, todayRef);
+            return `${formatDateArabic(b.licenseExpiryDate)} ${ev.status}`;
+          }
+          if (isDateCol) return formatDateArabic(String(raw || ''));
+          return raw !== undefined && raw !== null ? toArabicNumerals(String(raw)) : '—';
+        }),
+      };
+    });
+  }, [visibleColumns, filteredBakeries, todayRef]);
+
+  const registryAutoFit = useSmartAutoFit({
+    tableId: 'bakery_registry_49',
+    userId: currentUser.id,
+    columns: registrySchemaCols,
+    containerRef: registryScrollRef,
+    onNotify: showToast,
+  });
+
+  // Compute RTL cumulative right sticky offsets for pinned columns from live Smart Auto-Fit widths
+  const { pinnedOffsetsMap, lastPinnedKey } = useMemo(() => {
+    const offsets: Record<string, number> = {};
+    let currentRight = 34;
+    let lastKey: string | null = null;
+    visibleColumns.forEach((col) => {
+      if (col.pinned) {
+        offsets[col.key] = currentRight;
+        currentRight += registryAutoFit.widthsMap[col.key] || col.width || 100;
+        lastKey = col.key;
+      }
+    });
+    return { pinnedOffsetsMap: offsets, lastPinnedKey: lastKey };
+  }, [visibleColumns, registryAutoFit.widthsMap]);
+
+  // Column Pinning, Reordering & Reset Handlers (persisted per user)
+  const handlePinAllColumns = () => {
+    // Smart wide-table freeze: pin key identifying columns up to ~460px so horizontal scroll remains functional
+    let cumulative = 34;
+    const maxSafePinWidth = 460;
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const pinnedKeys = new Set<string>();
+    sorted.forEach((c) => {
+      if (!c.visible) return;
+      const w = registryAutoFit.widthsMap[c.key] || c.width || 110;
+      if (cumulative + w <= maxSafePinWidth) {
+        pinnedKeys.add(c.key);
+        cumulative += w;
+      }
+    });
+    const updated = columns.map((c) => ({ ...c, pinned: pinnedKeys.has(c.key) }));
+    setColumns(updated);
+    saveStoredBakeryColumns(updated, currentUser.id);
+    showToast(`تم تفعيل التثبيت الذكي لعدد (${formatArabicNumber(pinnedKeys.size)}) أعمدة تعريفية مع بقاء التمرير الأفقي فعالاً`);
+  };
+
+  const handleUnpinAllColumns = () => {
+    const updated = columns.map((c) => ({ ...c, pinned: false }));
+    setColumns(updated);
+    saveStoredBakeryColumns(updated, currentUser.id);
+    showToast('تم إلغاء تثبيت جميع الأعمدة والعودة للعرض الطبيعي');
+  };
+
+  const handleTogglePinColumn = (key: string) => {
+    const updated = columns.map((c) => (c.key === key ? { ...c, pinned: !c.pinned } : c));
+    setColumns(updated);
+    saveStoredBakeryColumns(updated, currentUser.id);
+  };
+
+  const handleToggleVisibleColumn = (key: string) => {
+    const visibleCount = columns.filter((c) => c.visible).length;
+    const target = columns.find((c) => c.key === key);
+    if (!target) return;
+    if (target.visible && visibleCount <= 1) return;
+    const updated = columns.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c));
+    setColumns(updated);
+    saveStoredBakeryColumns(updated, currentUser.id);
+  };
+
+  const handleMoveColumn = (key: string, direction: 'up' | 'down') => {
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((c) => c.key === key);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= sorted.length) return;
+    const swapped = [...sorted];
+    const tmp = swapped[idx];
+    swapped[idx] = swapped[targetIdx];
+    swapped[targetIdx] = tmp;
+    const normalized = swapped.map((c, i) => ({ ...c, order: i + 1 }));
+    setColumns(normalized);
+    saveStoredBakeryColumns(normalized, currentUser.id);
+  };
+
+  const handleResetColumns = () => {
+    setColumns(DEFAULT_BAKERY_COLUMNS);
+    saveStoredBakeryColumns(DEFAULT_BAKERY_COLUMNS, currentUser.id);
+    setColumnGroups(DEFAULT_BAKERY_COLUMN_GROUPS);
+    saveStoredBakeryColumnGroups(DEFAULT_BAKERY_COLUMN_GROUPS);
+    showToast('تم استعادة الإعدادات الافتراضية لـ ٤٩ عموداً والمجموعات الخمس');
+  };
+
+  const toggleSelectBakery = (id: string) => {
+    setSelectedBakeryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAllVisible = () => {
+    const pageIds = paginatedBakeries.map((b) => b.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedBakeryIds.includes(id));
+    if (allSelected) {
+      setSelectedBakeryIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedBakeryIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
+  };
+
+  // Group Super-Headers computed dynamically from consecutive visible columns (supports reordering & hiding)
   const columnGroupSpans = useMemo(() => {
     const spans: { groupKey: BakeryColumnConfig['groupKey']; label: string; colSpan: number }[] = [];
     visibleColumns.forEach((col) => {
@@ -897,10 +1084,72 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
       existing.totalDebt += b.remainingDebtEgp || 0;
       map.set(b.village, existing);
     });
-    return Array.from(map.values()).sort((a, b) =>
-      compareTableValues(a[villagesSort.key as keyof typeof a], b[villagesSort.key as keyof typeof b], villagesSort.asc)
-    );
-  }, [activeBakeriesList, villagesSort]);
+    return Array.from(map.values());
+  }, [activeBakeriesList]);
+
+  // Precomputed rows for averages, licenses, contracts & alerts SmartAutoFitTables
+  const averagesRows = useMemo(
+    () =>
+      activeBakeriesList.map((b) => ({
+        ...b,
+        diff24_23: round3(b.avgPerCapita2024 - b.avgPerCapita2023),
+        diff25_24: round3(b.avgPerCapita2025 - b.avgPerCapita2024),
+      })),
+    [activeBakeriesList]
+  );
+
+  const licenseRows = useMemo(
+    () =>
+      activeBakeriesList.map((b) => {
+        const ev = evaluateDocumentExpiry(b.licenseExpiryDate, b.licenseNumber, todayRef);
+        return { bakery: b, ...b, daysRemaining: ev.daysRemaining, status: ev.status, severity: ev.severity };
+      }),
+    [activeBakeriesList, todayRef]
+  );
+
+  const taxRows = useMemo(
+    () =>
+      activeBakeriesList.map((b) => {
+        const ev = evaluateDocumentExpiry(b.taxCardExpiryDate, b.taxCardNumber, todayRef);
+        return { bakery: b, ...b, daysRemaining: ev.daysRemaining, status: ev.status, severity: ev.severity };
+      }),
+    [activeBakeriesList, todayRef]
+  );
+
+  const contractRows = useMemo(
+    () =>
+      activeBakeriesList.map((b) => {
+        const ev = evaluateDocumentExpiry(b.leaseExpiryDate, b.leaseContractNumber, todayRef);
+        return { bakery: b, ...b, daysRemaining: ev.daysRemaining, status: ev.status, severity: ev.severity };
+      }),
+    [activeBakeriesList, todayRef]
+  );
+
+  const alertRows = useMemo(
+    () =>
+      allAlerts.map((al) => ({
+        ...al,
+        bakeryName: al.bakery.name,
+        ownerName: al.bakery.ownerName,
+        village: al.bakery.village,
+      })),
+    [allAlerts]
+  );
+
+  const reportRows = useMemo(
+    () =>
+      activeBakeriesList.map((b) => {
+        const lic = evaluateDocumentExpiry(b.licenseExpiryDate, b.licenseNumber, todayRef);
+        const lease = evaluateDocumentExpiry(b.leaseExpiryDate, b.leaseContractNumber, todayRef);
+        return {
+          ...b,
+          licStatus: lic.status,
+          leaseStatus: lease.status,
+          combinedDocStatus: `رخصة: ${lic.status} | عقد: ${lease.status}`,
+        };
+      }),
+    [activeBakeriesList, todayRef]
+  );
 
   // Handlers for Inspection & Debt modules
   const handleAddInspection = (record: Omit<InspectionRecord, 'id'>) => {
@@ -959,6 +1208,10 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
     if (tab === 'add') {
       setEditingBakeryId(null);
       setWizardStep(1);
+    } else if (focus === 'registry-search') {
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
     } else if (focus === 'rep-periodic') {
       setSelectedReportId(4);
     } else if (focus === 'rep-all') {
@@ -1001,7 +1254,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           <button
             type="button"
             onClick={() => handleOpenAction(bakery, 'details')}
-            className="px-1.5 py-1 bg-[#102A43] hover:bg-[#164E83] text-white rounded text-[10.5px] font-bold transition-colors whitespace-nowrap cursor-pointer"
+            className="px-1.5 py-1 bg-[#102A43] hover:bg-[#164E83] text-white rounded text-[10px] font-bold transition-colors whitespace-nowrap cursor-pointer"
             title="عرض الملف الكامل"
           >
             عرض
@@ -1033,7 +1286,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           <button
             type="button"
             onClick={() => setOpenMenuBakeryId(isOpen ? null : bakery.id)}
-            className="px-1.5 py-1 bg-[#C6A15B]/20 hover:bg-[#C6A15B]/35 text-[#102A43] border border-[#C6A15B]/50 rounded text-[10.5px] font-bold transition-colors flex items-center gap-0.5 whitespace-nowrap cursor-pointer"
+            className="px-1.5 py-1 bg-[#C6A15B]/20 hover:bg-[#C6A15B]/35 text-[#102A43] border border-[#C6A15B]/50 rounded text-[10px] font-bold transition-colors flex items-center gap-0.5 whitespace-nowrap cursor-pointer"
             title="المزيد من الإجراءات"
           >
             <MoreHorizontal className="w-3.5 h-3.5" />
@@ -1042,7 +1295,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
         {isOpen && (
           <div className="fixed sm:absolute left-4 sm:left-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 py-1.5 text-xs text-[#102A43]">
-            <div className="px-3 py-1.5 border-b border-slate-100 font-black text-[11px] text-[#164E83] truncate">
+            <div className="px-3 py-1.5 border-b border-slate-100 font-black text-[10px] text-[#164E83] truncate">
               {bakery.name} (#{bakery.bakeryNumber})
             </div>
             <button
@@ -1146,7 +1399,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
       {/* Official Header Banner for Bakery Department */}
       <div className="bg-[#102A43] text-white rounded-2xl p-6 shadow-md border border-[#164E83] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 print:hidden">
         <div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[#C6A15B] font-bold mb-1">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#C6A15B] font-extrabold mb-1">
             <span>محافظة الغربية</span>
             <span>·</span>
             <span>مديرية التموين والتجارة الداخلية بالغربية</span>
@@ -1156,8 +1409,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
             منظومة إدارة ورقابة المخابز والحصص والتراخيص والعقود المتكاملة
           </h1>
-          <p className="text-xs text-slate-300 mt-1">
-            النظام المحاسبي والرقابي الموحد · المعادلات الحسابية السبع · متابعة متوسطات (2023–2024–2025) · مركز التنبيهات الذكي
+          <p className="text-[11px] font-bold text-slate-200 mt-1">
+            النظام المحاسبي والرقابي الموحد · المعادلات الحسابية السبع · متابعة متوسطات (٢٠٢٣–٢٠٢٤–٢٠٢٥) · مركز التنبيهات الذكي
           </p>
         </div>
 
@@ -1165,15 +1418,15 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           <button
             type="button"
             onClick={() => setShowColumnModal(true)}
-            className="px-3.5 py-2 bg-[#164E83] hover:bg-[#1e609e] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-white/15 transition-all cursor-pointer whitespace-nowrap"
+            className="px-4 py-2.5 bg-[#164E83] hover:bg-[#1e609e] text-white rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 border border-white/15 transition-all cursor-pointer whitespace-nowrap"
           >
             <SlidersHorizontal className="w-4 h-4 text-[#C6A15B]" />
-            <span>تعديل رؤوس الجداول</span>
+            <span>تخصيص رؤوس الأعمدة</span>
           </button>
           <button
             type="button"
             onClick={handleRecalculateAllBakeries}
-            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+            className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
           >
             <RefreshCw className="w-4 h-4" />
             <span>إعادة حساب جميع المخابز</span>
@@ -1185,7 +1438,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               setWizardStep(1);
               setActiveSubTab('add');
             }}
-            className="px-4 py-2 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap"
+            className="px-4 py-2.5 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] rounded-xl text-[11px] font-black flex items-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap"
           >
             <PlusCircle className="w-4 h-4" />
             <span>إضافة مخبز جديد</span>
@@ -1195,12 +1448,12 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="p-3.5 bg-emerald-900 text-white rounded-xl shadow-lg border border-emerald-700 flex items-center justify-between text-xs font-bold print:hidden">
+        <div className="p-3.5 bg-emerald-900 text-white rounded-xl shadow-lg border border-emerald-700 flex items-center justify-between text-[11px] font-extrabold print:hidden">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#C6A15B] shrink-0" />
             <span>{toastMsg}</span>
           </div>
-          <button onClick={() => setToastMsg('')} className="text-emerald-200 hover:text-white">✕</button>
+          <button onClick={() => setToastMsg('')} className="text-emerald-200 hover:text-white cursor-pointer">✕</button>
         </div>
       )}
 
@@ -1219,32 +1472,155 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
          ===================================================================== */}
       {activeSubTab === 'dashboard' && (
         <div className="space-y-5">
-          {/* 14 Required KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            {[
-              { label: 'إجمالي عدد المخابز', val: formatArabicNumber(kpiStats.total), unit: 'مخبز مسجل', color: 'text-[#102A43]' },
-              { label: 'المخابز النشطة', val: formatArabicNumber(kpiStats.active), unit: 'يعمل بانتظام', color: 'text-emerald-700' },
-              { label: 'المخابز المتوقفة', val: formatArabicNumber(kpiStats.stopped), unit: 'توقف / صيانة', color: 'text-red-700' },
-              { label: 'إجمالي الحصص الفعلية', val: formatArabicNumber(kpiStats.totalActualQuota), unit: 'شيكارة / يوم', color: 'text-[#164E83]' },
-              { label: 'إجمالي الحصص التأمينية', val: formatArabicDecimal(kpiStats.totalInsuranceQuota, 3), unit: 'شيكارة تأمينية', color: 'text-[#102A43]' },
-              { label: 'الإنتاج اليومي المتوقع', val: formatArabicNumber(kpiStats.totalDailyLoaves), unit: 'رغيف مدعم / يوم', color: 'text-emerald-800' },
-              { label: 'متوسط الفرد ٢٠٢٣', val: formatArabicDecimal(kpiStats.avg2023, 3), unit: 'رغيف / فرد', color: 'text-[#164E83]' },
-              { label: 'متوسط الفرد ٢٠٢٤', val: formatArabicDecimal(kpiStats.avg2024, 3), unit: 'رغيف / فرد', color: 'text-[#164E83]' },
-              { label: 'متوسط الفرد ٢٠٢٥', val: formatArabicDecimal(kpiStats.avg2025, 3), unit: 'رغيف / فرد', color: 'text-[#102A43]' },
-              { label: 'تراخيص منتهية', val: formatArabicNumber(kpiStats.expiredLicenses), unit: 'رخصة منتهية', color: 'text-red-700' },
-              { label: 'تراخيص قريبة الانتهاء', val: formatArabicNumber(kpiStats.expiringLicenses), unit: 'خلال ٣٠ يوماً', color: 'text-amber-700' },
-              { label: 'بطاقات ضريبية منتهية', val: formatArabicNumber(kpiStats.expiredTaxCards), unit: 'بطاقة ضريبية', color: 'text-red-700' },
-              { label: 'عقود إيجار منتهية', val: formatArabicNumber(kpiStats.expiredContracts), unit: 'عقد إيجار', color: 'text-red-700' },
-              { label: 'مستندات مطلوب تجديدها', val: formatArabicNumber(kpiStats.totalDocsToRenew), unit: 'إجمالي التنبيهات', color: 'text-amber-800' },
-            ].map((stat, idx) => (
-              <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
-                <span className="text-[11px] font-bold text-slate-500">{stat.label}</span>
-                <div className={`text-lg font-black tabular-nums my-1 ${stat.color}`}>
-                  {stat.val}
-                </div>
-                <span className="text-[10px] text-slate-500">{stat.unit}</span>
-              </div>
-            ))}
+          {/* 14 Animated Colored KPI Cards (6 Official Themes, Real DB Values) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+            <AnimatedStatCard
+              title="إجمالي عدد المخابز"
+              value={kpiStats.total}
+              unit="مخبز مسجل"
+              icon={Flame}
+              theme="navy"
+              compact
+              delay={0}
+              onClick={() => handleNavSelect('registry', 'registry')}
+            />
+            <AnimatedStatCard
+              title="المخابز النشطة"
+              value={kpiStats.active}
+              unit="يعمل بانتظام"
+              icon={CheckCircle2}
+              theme="green"
+              compact
+              delay={0.03}
+              onClick={() => handleNavSelect('registry', 'registry')}
+            />
+            <AnimatedStatCard
+              title="المخابز المتوقفة"
+              value={kpiStats.stopped}
+              unit="توقف / صيانة"
+              icon={XCircle}
+              theme="red"
+              compact
+              delay={0.06}
+            />
+            <AnimatedStatCard
+              title="الحصص الفعلية"
+              value={kpiStats.totalActualQuota}
+              unit="شيكارة / يوم"
+              icon={Wheat}
+              theme="gold"
+              compact
+              delay={0.09}
+              onClick={() => handleNavSelect('quotas', 'quotas-actual')}
+            />
+            <AnimatedStatCard
+              title="الحصص التأمينية"
+              value={kpiStats.totalInsuranceQuota}
+              format="decimal"
+              decimals={3}
+              unit="شيكارة تأمينية"
+              icon={ShieldCheck}
+              theme="teal"
+              compact
+              delay={0.12}
+              onClick={() => handleNavSelect('quotas', 'quotas-insurance')}
+            />
+            <AnimatedStatCard
+              title="الإنتاج اليومي"
+              value={kpiStats.totalDailyLoaves}
+              unit="رغيف مدعم / يوم"
+              icon={Layers}
+              theme="green"
+              compact
+              delay={0.15}
+              onClick={() => handleNavSelect('quotas', 'quotas-loaves')}
+            />
+            <AnimatedStatCard
+              title="متوسط الفرد ٢٠٢٣"
+              value={kpiStats.avg2023}
+              format="decimal"
+              decimals={3}
+              unit="رغيف / فرد"
+              icon={TrendingUp}
+              theme="purple"
+              compact
+              delay={0.18}
+              onClick={() => handleNavSelect('averages', 'avg-all')}
+            />
+            <AnimatedStatCard
+              title="متوسط الفرد ٢٠٢٤"
+              value={kpiStats.avg2024}
+              format="decimal"
+              decimals={3}
+              unit="رغيف / فرد"
+              icon={TrendingUp}
+              theme="teal"
+              compact
+              delay={0.21}
+              onClick={() => handleNavSelect('averages', 'avg-all')}
+            />
+            <AnimatedStatCard
+              title="متوسط الفرد ٢٠٢٥"
+              value={kpiStats.avg2025}
+              format="decimal"
+              decimals={3}
+              unit="رغيف / فرد"
+              icon={TrendingUp}
+              theme="navy"
+              compact
+              delay={0.24}
+              onClick={() => handleNavSelect('averages', 'avg-all')}
+            />
+            <AnimatedStatCard
+              title="تراخيص منتهية"
+              value={kpiStats.expiredLicenses}
+              unit="رخصة منتهية"
+              icon={FileWarning}
+              theme="red"
+              compact
+              delay={0.26}
+              onClick={() => handleNavSelect('licenses', 'doc-licenses')}
+            />
+            <AnimatedStatCard
+              title="تراخيص قريبة الانتهاء"
+              value={kpiStats.expiringLicenses}
+              unit="خلال ٣٠ يوماً"
+              icon={AlertTriangle}
+              theme="gold"
+              compact
+              delay={0.28}
+              onClick={() => handleNavSelect('licenses', 'doc-licenses')}
+            />
+            <AnimatedStatCard
+              title="بطاقات ضريبية منتهية"
+              value={kpiStats.expiredTaxCards}
+              unit="بطاقة ضريبية"
+              icon={FileBadge}
+              theme="red"
+              compact
+              delay={0.3}
+              onClick={() => handleNavSelect('licenses', 'doc-tax')}
+            />
+            <AnimatedStatCard
+              title="عقود إيجار منتهية"
+              value={kpiStats.expiredContracts}
+              unit="عقد إيجار"
+              icon={FileSignature}
+              theme="purple"
+              compact
+              delay={0.32}
+              onClick={() => handleNavSelect('contracts', 'doc-contracts')}
+            />
+            <AnimatedStatCard
+              title="مستندات للتجديد"
+              value={kpiStats.totalDocsToRenew}
+              unit="إجمالي التنبيهات"
+              icon={BellRing}
+              theme="gold"
+              compact
+              delay={0.34}
+              onClick={() => handleNavSelect('alerts', 'doc-alerts')}
+            />
           </div>
 
           {/* Visual Charts Grid */}
@@ -1252,19 +1628,19 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {/* توزيع المخابز والحصص حسب قرى مركز المحلة الكبرى */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                <h3 className="text-sm font-black text-[#102A43]">توزيع الحصص الفعلية والإنتاج اليومي حسب القرى</h3>
-                <span className="text-xs text-slate-500">إدارة تموين مركز المحلة الكبرى</span>
+                <h3 className="text-[13px] font-black text-[#102A43]">توزيع الحصص الفعلية والإنتاج اليومي حسب القرى</h3>
+                <span className="text-[11px] font-bold text-slate-600">إدارة تموين مركز المحلة الكبرى</span>
               </div>
               <div className="space-y-3">
                 {activeBakeriesList.map((b) => {
                   const pct = Math.min(100, Math.round((b.actualQuota / Math.max(1, kpiStats.totalActualQuota)) * 100));
                   return (
                     <div key={b.id} className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="font-bold text-[#102A43]">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-extrabold text-[#102A43]">
                           {b.village} — {b.name}
                         </span>
-                        <span className="font-bold tabular-nums text-[#164E83]">
+                        <span className="num-cell font-extrabold text-[#164E83]">
                           {formatArabicNumber(b.actualQuota)} شيكارة ({formatArabicNumber(b.dailyLoavesCount)} رغيف)
                         </span>
                       </div>
@@ -1284,8 +1660,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             <div className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                  <h3 className="text-sm font-black text-[#102A43]">مقارنة متوسط نصيب الفرد اليومي (٢٠٢٣ – ٢٠٢٤ – ٢٠٢٥)</h3>
-                  <span className="text-xs text-slate-500">٣ منازل عشرية</span>
+                  <h3 className="text-[13px] font-black text-[#102A43]">مقارنة متوسط نصيب الفرد اليومي (٢٠٢٣ – ٢٠٢٤ – ٢٠٢٥)</h3>
+                  <span className="text-[11px] font-bold text-slate-600">٣ منازل عشرية</span>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mb-6">
                   {[
@@ -1294,11 +1670,11 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                     { yr: 'عام ٢٠٢٥', val: kpiStats.avg2025 },
                   ].map((item) => (
                     <div key={item.yr} className="bg-[#F4F7FB] p-3.5 rounded-xl border border-slate-200 text-center">
-                      <span className="text-xs font-bold text-slate-600 block">{item.yr}</span>
-                      <span className="text-lg font-black tabular-nums text-[#102A43] block my-1">
+                      <span className="text-[11px] font-extrabold text-slate-700 block">{item.yr}</span>
+                      <span className="num-cell text-xl font-black text-[#102A43] block my-1">
                         {formatArabicDecimal(item.val, 3)}
                       </span>
-                      <span className="text-[10px] text-slate-500">رغيف / مستفيد يومياً</span>
+                      <span className="text-xs font-bold text-slate-600">رغيف / مستفيد يومياً</span>
                     </div>
                   ))}
                 </div>
@@ -1306,15 +1682,15 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
               <div className="bg-[#F4F7FB] p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                  <h4 className="text-xs font-black text-[#102A43]">موقف التراخيص والعقود والمستندات</h4>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
+                  <h4 className="text-[11px] font-black text-[#102A43]">موقف التراخيص والعقود والمستندات</h4>
+                  <p className="text-xs font-bold text-slate-600 mt-0.5">
                     يوجد حالياً ({formatArabicNumber(kpiStats.totalDocsToRenew)}) مستند بحاجة إلى مراجعة أو تجديد ضمن نطاق المركز.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleNavSelect('alerts', 'doc-alerts')}
-                  className="px-4 py-2 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-xs font-bold shrink-0 cursor-pointer"
+                  className="px-4 py-2 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-[11px] font-extrabold shrink-0 cursor-pointer"
                 >
                   فتح مركز التنبيهات ({formatArabicNumber(allAlerts.length)})
                 </button>
@@ -1328,28 +1704,26 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           2. سجل بيانات المخابز الشامل (Sections 3, 8, 9, 10)
          ===================================================================== */}
       {activeSubTab === 'registry' && (
-        <div className="space-y-4">
-          {/* Unified Search & 11 Advanced Filters Engine */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+        <div className="space-y-3.5">
+          {/* Unified Search & Advanced Filters Engine */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3.5">
             <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  placeholder="بحث فوري: اسم المخبز، صاحب المخبز، رقم المخبز، رقم POS، الرقم القومي، الهاتف، القرية، الوحدة المحلية..."
+                  placeholder="بحث فوري (أرقام عربية أو إنجليزية): اسم المخبز، المالك، رقم المخبز، رقم الماكينة، الرقم القومي، الهاتف، القرية..."
                   className="w-full pr-10 pl-4 py-2.5 bg-[#F4F7FB] border border-slate-300 rounded-xl text-xs text-[#102A43] focus:outline-none focus:ring-2 focus:ring-[#164E83] focus:bg-white"
                 />
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-[#102A43] bg-[#F4F7FB] px-3 py-2 rounded-xl border border-slate-200">
-                  عدد النتائج: <strong className="font-mono tabular-nums">{filteredBakeries.length}</strong> مخبز
-                </span>
                 <button
                   type="button"
                   onClick={handleResetFilters}
@@ -1364,7 +1738,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>تصدير Excel (CSV)</span>
+                  <span>تصدير إكسل</span>
                 </button>
               </div>
             </div>
@@ -1372,14 +1746,14 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {/* Advanced Filter Dropdowns */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-2 border-t border-slate-100">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">القرية</label>
+                <label className="block text-[10px] font-extrabold text-slate-600 mb-1">القرية</label>
                 <select
                   value={filterVillage}
                   onChange={(e) => {
                     setFilterVillage(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold"
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
                 >
                   <option value="all">جميع القرى</option>
                   {MAHALLA_VILLAGES.map(v => (
@@ -1389,14 +1763,14 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">الوحدة المحلية</label>
+                <label className="block text-[10px] font-extrabold text-slate-600 mb-1">الوحدة المحلية</label>
                 <select
                   value={filterLocalUnit}
                   onChange={(e) => {
                     setFilterLocalUnit(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold"
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
                 >
                   <option value="all">جميع الوحدات المحلية</option>
                   {MAHALLA_LOCAL_UNITS.map(u => (
@@ -1406,14 +1780,14 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">حالة النشاط</label>
+                <label className="block text-[10px] font-extrabold text-slate-600 mb-1">حالة النشاط</label>
                 <select
                   value={filterActivityStatus}
                   onChange={(e) => {
                     setFilterActivityStatus(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold"
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
                 >
                   <option value="all">الكل</option>
                   <option value="نشط">نشط</option>
@@ -1424,31 +1798,31 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">نوع الخبز</label>
+                <label className="block text-[10px] font-extrabold text-slate-600 mb-1">نوع الخبز</label>
                 <select
                   value={filterBreadType}
                   onChange={(e) => {
                     setFilterBreadType(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold"
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
                 >
                   <option value="all">جميع الأنواع</option>
-                  <option value="بلدي مدعم (ماو)">بلدي مدعم (ماو - 660)</option>
-                  <option value="بلدي مدعم (ملدن)">بلدي مدعم (ملدن - 725)</option>
+                  <option value="بلدي مدعم (ماو)">بلدي مدعم (ماو — ٦٦٠)</option>
+                  <option value="بلدي مدعم (ملدن)">بلدي مدعم (ملدن — ٧٢٥)</option>
                   <option value="طباقي">طباقي</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">تصنيف المخبز</label>
+                <label className="block text-[10px] font-extrabold text-slate-600 mb-1">تصنيف المخبز</label>
                 <select
                   value={filterCategory}
                   onChange={(e) => {
                     setFilterCategory(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold"
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
                 >
                   <option value="all">جميع التصنيفات</option>
                   <option value="ممتاز أ">ممتاز أ</option>
@@ -1458,35 +1832,69 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">فلتر الرقابة الذكي</label>
+                <label className="block text-[10px] font-extrabold text-slate-600 mb-1">فلتر الرقابة الذكي</label>
                 <select
                   value={filterSpecialCondition}
                   onChange={(e) => {
                     setFilterSpecialCondition(e.target.value as 'all' | 'expired_docs' | 'expiring_soon' | 'incomplete');
                     setCurrentPage(1);
                   }}
-                  className="w-full px-2.5 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-xs font-bold text-[#102A43]"
+                  className="w-full px-2.5 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-[11px] font-extrabold text-[#102A43]"
                 >
                   <option value="all">جميع السجلات</option>
                   <option value="expired_docs">مخابز لديها مستندات منتهية</option>
-                  <option value="expiring_soon">مستندات تنتهي خلال 30 يوماً</option>
+                  <option value="expiring_soon">مستندات تنتهي خلال ٣٠ يوماً</option>
                   <option value="incomplete">مخابز ذات بيانات ناقصة</option>
                 </select>
               </div>
             </div>
           </div>
 
+          {/* Live TableStats Bar + Pinning Manager + Header Customizer + Smart Auto-Fit Toolbar */}
+          <TableStats
+            totalRecords={activeBakeriesList.length}
+            displayedRecords={paginatedBakeries.length}
+            filteredRecords={filteredBakeries.length}
+            selectedRecords={selectedBakeryIds.length}
+            totalColumns={columns.length}
+            visibleColumns={visibleColumns.length}
+            columns={[...columns]
+              .sort((a, b) => a.order - b.order)
+              .map((c) => ({
+                key: c.key,
+                label: c.customLabel,
+                pinned: c.pinned,
+                visible: c.visible,
+              }))}
+            onPinAll={handlePinAllColumns}
+            onUnpinAll={handleUnpinAllColumns}
+            onTogglePinColumn={handleTogglePinColumn}
+            onToggleVisibleColumn={handleToggleVisibleColumn}
+            onMoveColumn={handleMoveColumn}
+            onResetPinDefaults={handleResetColumns}
+            onOpenHeaderCustomizer={() => setShowColumnModal(true)}
+            onClearSelection={() => setSelectedBakeryIds([])}
+            autoFitMode={registryAutoFit.autoFitMode}
+            hasSavedWidths={registryAutoFit.hasSavedWidths}
+            onAutoFitAll={() => registryAutoFit.applyAutoFit('auto')}
+            onAutoFitHeaders={() => registryAutoFit.applyAutoFit('headers')}
+            onAutoFitData={() => registryAutoFit.applyAutoFit('data')}
+            onDistributeEqual={() => registryAutoFit.applyAutoFit('equal')}
+            onResetWidths={registryAutoFit.resetWidths}
+            onSaveWidths={registryAutoFit.saveCurrentWidths}
+          />
+
           {/* Group Color Legend & Compact Controls Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 text-[11px] font-bold">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 text-[10.5px] font-extrabold">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2 py-0.5 rounded bg-[#102A43] text-white">{columnGroups.basic}</span>
-              <span className="px-2 py-0.5 rounded bg-[#164E83] text-white">{columnGroups.operation}</span>
-              <span className="px-2 py-0.5 rounded bg-emerald-900 text-white">{columnGroups.quota}</span>
-              <span className="px-2 py-0.5 rounded bg-amber-800 text-white">{columnGroups.population}</span>
-              <span className="px-2 py-0.5 rounded bg-slate-800 text-white">{columnGroups.documents}</span>
+              <span className="px-2.5 py-0.5 rounded bg-[#102A43] text-white">{toArabicNumerals(columnGroups.basic)}</span>
+              <span className="px-2.5 py-0.5 rounded bg-[#164E83] text-white">{toArabicNumerals(columnGroups.operation)}</span>
+              <span className="px-2.5 py-0.5 rounded bg-emerald-900 text-white">{toArabicNumerals(columnGroups.quota)}</span>
+              <span className="px-2.5 py-0.5 rounded bg-amber-800 text-white">{toArabicNumerals(columnGroups.population)}</span>
+              <span className="px-2.5 py-0.5 rounded bg-slate-800 text-white">{toArabicNumerals(columnGroups.documents)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-1.5 text-[11px] text-[#102A43] cursor-pointer select-none">
+              <label className="flex items-center gap-1.5 text-[10.5px] text-[#102A43] cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={collapseRepeatedGeo}
@@ -1496,14 +1904,14 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <span>دمج بصري للقرى/الوحدات المتكررة</span>
               </label>
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-500">صفوف الصفحة:</span>
+                <span className="text-slate-600">صفوف الصفحة:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => {
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="px-2 py-1 border border-slate-300 rounded text-xs font-mono"
+                  className="px-2.5 py-1 border border-slate-300 rounded text-[11px] font-extrabold"
                 >
                   <option value={5}>٥</option>
                   <option value={10}>١٠</option>
@@ -1514,13 +1922,16 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             </div>
           </div>
 
-          {/* Comprehensive Bakeries Data Grid with Grouped Super-Headers, Sticky Thead & True Numeric Sorting */}
+          {/* Comprehensive 49-Column Bakeries Data Grid with Smart Auto-Fit, Dynamic Grouped Super-Headers, Sticky RTL Pinning & True Numeric Sorting */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="overflow-auto max-h-[68vh] compact-table-scroll">
-              <table className="w-full text-right border-collapse">
-                <thead className="sticky top-0 z-20 shadow-xs">
-                  {/* Grouped Super-Header Row (Logical Column Merging) */}
+            <div ref={registryScrollRef} className="overflow-auto max-h-[68vh] compact-table-scroll">
+              <table className="min-w-full w-max text-right">
+                <thead className="sticky top-0 z-30 shadow-xs">
+                  {/* Grouped Super-Header Row (Dynamic colSpan on reorder/hide) */}
                   <tr className="table-group-header text-white border-b border-white/20">
+                    <th className="bg-[#0B1F33] text-[#C6A15B] text-center sticky right-0 z-40 border-l border-white/20 w-[34px] min-w-[34px] max-w-[34px]">
+                      تحديد
+                    </th>
                     {columnGroupSpans.map((span, idx) => {
                       const spanBg =
                         span.groupKey === 'basic'
@@ -1542,13 +1953,25 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                         </th>
                       );
                     })}
-                    <th className="bg-[#0B1F33] text-[#C6A15B] text-center sticky left-0 z-30 border-r border-white/20">
+                    <th className="bg-[#0B1F33] text-[#C6A15B] text-center sticky left-0 z-40 border-r border-white/20 w-[114px] min-w-[114px]">
                       التحكم السريع
                     </th>
                   </tr>
 
-                  {/* Column Headers Row (2-Line Concise Labels & Sort Arrows) */}
+                  {/* Column Headers Row (2-Line Auto-Fit Labels, Individual Pin/Unpin & Sort Arrows) */}
                   <tr className="bg-[#102A43] text-white border-b border-slate-300">
+                    <th className="bg-[#102A43] text-center sticky right-0 z-40 border-l border-white/15 w-[34px] min-w-[34px] max-w-[34px]">
+                      <input
+                        type="checkbox"
+                        checked={
+                          paginatedBakeries.length > 0 &&
+                          paginatedBakeries.every((b) => selectedBakeryIds.includes(b.id))
+                        }
+                        onChange={toggleSelectAllVisible}
+                        title="تحديد كافة المخابز المعروضة في الصفحة"
+                        className="w-3.5 h-3.5 accent-[#C6A15B] cursor-pointer"
+                      />
+                    </th>
                     {visibleColumns.map((col) => {
                       const groupBg =
                         col.groupKey === 'basic'
@@ -1561,16 +1984,23 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                           ? 'bg-amber-900'
                           : 'bg-slate-800';
                       const isActiveSort = sortField === col.key;
+                      const isPinned = col.pinned && pinnedOffsetsMap[col.key] !== undefined;
+                      const isLastPinned = lastPinnedKey === col.key;
 
-                      // Concise 2-line header for Beneficiaries & Averages 2023/2024/2025
                       const renderHeaderTitle = () => {
-                        if (col.key === 'beneficiaries2023') return <span className="flex flex-col items-center leading-tight"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>;
-                        if (col.key === 'beneficiaries2024') return <span className="flex flex-col items-center leading-tight"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>;
-                        if (col.key === 'beneficiaries2025') return <span className="flex flex-col items-center leading-tight"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>;
-                        if (col.key === 'avgPerCapita2023') return <span className="flex flex-col items-center leading-tight"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>;
-                        if (col.key === 'avgPerCapita2024') return <span className="flex flex-col items-center leading-tight"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>;
-                        if (col.key === 'avgPerCapita2025') return <span className="flex flex-col items-center leading-tight"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>;
-                        return <span className="line-clamp-2 leading-tight">{toArabicNumerals(col.customLabel)}</span>;
+                        if (col.key === 'beneficiaries2023' && col.customLabel === col.defaultLabel)
+                          return <span className="flex flex-col items-center leading-tight"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>;
+                        if (col.key === 'beneficiaries2024' && col.customLabel === col.defaultLabel)
+                          return <span className="flex flex-col items-center leading-tight"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>;
+                        if (col.key === 'beneficiaries2025' && col.customLabel === col.defaultLabel)
+                          return <span className="flex flex-col items-center leading-tight"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>;
+                        if (col.key === 'avgPerCapita2023' && col.customLabel === col.defaultLabel)
+                          return <span className="flex flex-col items-center leading-tight"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>;
+                        if (col.key === 'avgPerCapita2024' && col.customLabel === col.defaultLabel)
+                          return <span className="flex flex-col items-center leading-tight"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>;
+                        if (col.key === 'avgPerCapita2025' && col.customLabel === col.defaultLabel)
+                          return <span className="flex flex-col items-center leading-tight"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>;
+                        return <span className="leading-snug">{toArabicNumerals(col.customLabel)}</span>;
                       };
 
                       const isNumericCol =
@@ -1588,29 +2018,49 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                               setSortAsc(true);
                             }
                           }}
-                          title={`${col.defaultLabel} — انقر للفرز`}
-                          style={{ minWidth: `${Math.min(col.width, 130)}px`, maxWidth: `${Math.max(col.width + 24, 145)}px` }}
-                          className={`cursor-pointer select-none whitespace-normal border-l border-white/15 ${groupBg} hover:brightness-110 ${
+                          title={`${col.customLabel} — انقر للفرز`}
+                          style={{
+                            ...registryAutoFit.getColStyle(col.key),
+                            ...(isPinned ? { right: `${pinnedOffsetsMap[col.key]}px` } : {}),
+                          }}
+                          className={`group cursor-pointer select-none autofit-header-cell border-l border-white/15 ${groupBg} hover:brightness-110 ${
                             isNumericCol ? 'text-center' : 'text-right'
-                          }`}
+                          } ${isPinned ? 'sticky z-30' : ''} ${isLastPinned ? 'pinned-col-edge' : ''}`}
                         >
                           <div className={`flex items-center gap-1 ${isNumericCol ? 'justify-center' : 'justify-between'}`}>
-                            {renderHeaderTitle()}
-                            {isActiveSort ? (
-                              sortAsc ? (
-                                <ArrowUp className="w-3 h-3 text-[#C6A15B] shrink-0" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTogglePinColumn(col.key);
+                              }}
+                              title={col.pinned ? 'إلغاء تثبيت العمود' : 'تثبيت العمود'}
+                              className={`p-0.5 rounded transition-opacity cursor-pointer shrink-0 ${
+                                col.pinned
+                                  ? 'text-[#C6A15B] opacity-100'
+                                  : 'text-white/60 opacity-0 group-hover:opacity-100 hover:text-[#C6A15B]'
+                              }`}
+                            >
+                              {col.pinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
+                            </button>
+                            <div className="flex items-center gap-1 min-w-0">
+                              {renderHeaderTitle()}
+                              {isActiveSort ? (
+                                sortAsc ? (
+                                  <ArrowUp className="w-3 h-3 text-[#C6A15B] shrink-0" />
+                                ) : (
+                                  <ArrowDown className="w-3 h-3 text-[#C6A15B] shrink-0" />
+                                )
                               ) : (
-                                <ArrowDown className="w-3 h-3 text-[#C6A15B] shrink-0" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="w-3 h-3 text-[#C6A15B] opacity-55 shrink-0" />
-                            )}
+                                <ArrowUpDown className="w-3 h-3 text-[#C6A15B] opacity-55 shrink-0" />
+                              )}
+                            </div>
                           </div>
                         </th>
                       );
                     })}
                     {/* Mandatory Fixed Actions Column */}
-                    <th className="bg-[#102A43] text-[#C6A15B] text-center whitespace-nowrap sticky left-0 z-30 border-r border-white/20 shadow-md">
+                    <th className="bg-[#102A43] text-[#C6A15B] text-center whitespace-nowrap sticky left-0 z-40 border-r border-white/20 shadow-md w-[114px] min-w-[114px]">
                       الإجراءات
                     </th>
                   </tr>
@@ -1618,22 +2068,37 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <tbody className="divide-y divide-slate-200">
                   {paginatedBakeries.length === 0 ? (
                     <tr>
-                      <td colSpan={visibleColumns.length + 1} className="py-12 text-center text-slate-500">
+                      <td colSpan={visibleColumns.length + 2} className="py-10 text-center text-slate-500">
                         لا توجد مخابز مطابقة لمعايير البحث أو الفلترة الحالية.
                       </td>
                     </tr>
                   ) : (
                     paginatedBakeries.map((bakery, rowIdx) => {
                       const prevRow = rowIdx > 0 ? paginatedBakeries[rowIdx - 1] : null;
+                      const isRowSelected = selectedBakeryIds.includes(bakery.id);
+                      const rowSolidBg = isRowSelected
+                        ? 'bg-amber-50'
+                        : rowIdx % 2 === 0
+                        ? 'bg-white'
+                        : 'bg-[#F4F7FB]';
                       return (
                         <tr
                           key={bakery.id}
-                          className={`${
-                            rowIdx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/70'
-                          } hover:bg-blue-50/80 transition-colors`}
+                          className={`${rowSolidBg} hover:bg-blue-50/80 transition-colors`}
                         >
+                          <td className={`text-center sticky right-0 z-20 border-l border-slate-200 w-[34px] min-w-[34px] max-w-[34px] ${rowSolidBg}`}>
+                            <input
+                              type="checkbox"
+                              checked={isRowSelected}
+                              onChange={() => toggleSelectBakery(bakery.id)}
+                              aria-label={`تحديد ${bakery.name}`}
+                              className="w-3.5 h-3.5 accent-[#102A43] cursor-pointer"
+                            />
+                          </td>
                           {visibleColumns.map((col) => {
                             const rawVal = bakery[col.key as keyof BakeryRecord];
+                            const isPinned = col.pinned && pinnedOffsetsMap[col.key] !== undefined;
+                            const isLastPinned = lastPinnedKey === col.key;
                             const isNumericOrCode =
                               typeof rawVal === 'number' ||
                               col.key.includes('Date') ||
@@ -1651,10 +2116,15 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                             const isCurrencyCol =
                               col.key === 'insuranceAmountEgp' ||
                               col.key === 'totalInsuranceValueEgp' ||
+                              col.key === 'sackPriceEgp' ||
                               col.key === 'remainingDebtEgp';
                             const isIntegerCol =
                               col.key === 'serialNumber' ||
                               col.key === 'actualQuota' ||
+                              col.key === 'dailySacksCount' ||
+                              col.key === 'dailyCapacitySacks' ||
+                              col.key === 'productionFactor' ||
+                              col.key === 'breadTypesCount' ||
                               col.key === 'dailyLoavesCount' ||
                               col.key === 'villagePopulation' ||
                               col.key === 'beneficiaries2023' ||
@@ -1682,6 +2152,27 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                                   〃
                                 </span>
                               );
+                            } else if (col.key === 'posNumber') {
+                              displayNode = (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAction(bakery, 'details')}
+                                  title="اضغط لفتح ملف المخبز"
+                                  className="num-cell font-black px-2 py-0.5 rounded bg-slate-100 hover:bg-[#102A43] hover:text-white text-[#102A43] transition-colors cursor-pointer"
+                                >
+                                  {toArabicNumerals(String(rawVal ?? '—'))}
+                                </button>
+                              );
+                            } else if (col.key === 'name' || col.key === 'ownerName') {
+                              displayNode = (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAction(bakery, 'details')}
+                                  className="font-black text-[#102A43] hover:text-[#164E83] hover:underline text-right cursor-pointer"
+                                >
+                                  {toArabicNumerals(String(rawVal ?? '—'))}
+                                </button>
+                              );
                             } else if (isDecimalCol) {
                               displayNode = formatArabicDecimal(rawVal as number, 3);
                             } else if (isCurrencyCol) {
@@ -1691,7 +2182,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                             } else if (col.key === 'activityStatus') {
                               displayNode = (
                                 <span
-                                  className={`px-1.5 py-0.5 rounded text-[10.5px] font-bold border ${
+                                  className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
                                     rawVal === 'نشط'
                                       ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                       : 'bg-red-50 text-red-800 border-red-200'
@@ -1715,25 +2206,22 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                             const isCenterAligned =
                               isNumericOrCode || col.key === 'activityStatus' || col.key === 'leaseContractType' || isRepeatedGeo;
 
-                            const shouldTruncate =
-                              col.key === 'insuranceCheckDetails' ||
-                              col.key === 'ownerName' ||
-                              col.key === 'managerName' ||
-                              col.key === 'localUnit' ||
-                              col.key === 'breadType';
-
                             return (
                               <td
                                 key={col.key}
                                 title={fullTextTitle}
+                                style={{
+                                  ...registryAutoFit.getColStyle(col.key),
+                                  ...(isPinned ? { right: `${pinnedOffsetsMap[col.key]}px` } : {}),
+                                }}
                                 className={`border-l border-slate-100 ${
-                                  isNumericOrCode ? 'num-cell' : ''
+                                  isNumericOrCode ? 'num-cell' : registryAutoFit.getCellWrapClass(col.key)
                                 } ${isCenterAligned ? 'text-center' : 'text-right'} ${
-                                  shouldTruncate ? 'max-w-[145px] truncate' : 'whitespace-nowrap'
-                                } ${
+                                  isPinned ? `sticky z-20 ${rowSolidBg}` : ''
+                                } ${isLastPinned ? 'pinned-col-edge' : ''} ${
                                   col.key === 'remainingDebtEgp' && Number(rawVal || 0) > 0
-                                    ? 'text-red-700 font-bold'
-                                    : col.groupKey === 'quota' || col.groupKey === 'population' || col.key === 'ownerName'
+                                    ? 'text-red-700 font-extrabold'
+                                    : col.groupKey === 'quota' || col.groupKey === 'population' || col.key === 'ownerName' || col.key === 'name'
                                     ? 'text-[#102A43]'
                                     : 'text-[#243447]'
                                 }`}
@@ -1744,7 +2232,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                           })}
 
                           {/* Sticky Actions & Quick-Jump Column */}
-                          <td className="text-center whitespace-nowrap sticky left-0 bg-white/95 backdrop-blur-xs border-r border-slate-200 z-10">
+                          <td className={`text-center whitespace-nowrap sticky left-0 border-r border-slate-200 z-20 w-[114px] min-w-[114px] ${rowSolidBg}`}>
                             {renderActionsMenu(bakery)}
                           </td>
                         </tr>
@@ -1756,8 +2244,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             </div>
 
             {/* Pagination Footer */}
-            <div className="px-4 py-2.5 bg-[#F4F7FB] border-t border-slate-200 flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-semibold">
+            <div className="px-4 py-2.5 bg-[#F4F7FB] border-t border-slate-200 flex items-center justify-between text-[11px]">
+              <span className="text-slate-700 font-bold">
                 صفحة <strong>{formatArabicNumber(currentPage)}</strong> من <strong>{formatArabicNumber(totalPages)}</strong> · إجمالي النتائج: <strong>{formatArabicNumber(filteredBakeries.length)}</strong> مخبز
               </span>
               <div className="flex items-center gap-1.5">
@@ -1786,133 +2274,316 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
       {/* =====================================================================
           2B. بيانات أصحاب المخابز والمديرين المسؤولين (Group 1)
          ===================================================================== */}
-      {activeSubTab === 'owners' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 bg-[#102A43] text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-black flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#C6A15B]" />
-                <span>دليل أصحاب المخابز والمديرين المسؤولين</span>
-              </h2>
-              <p className="text-[11px] text-slate-300">بيانات التواصل والرقم القومي وأرقام ماكينات POS المرتبطة بكل مالك</p>
+      {activeSubTab === 'owners' && (() => {
+        const filteredOwners = activeBakeriesList.filter((b) => {
+          const q = normalizeSearchText(ownersSearch);
+          if (!q) return true;
+          return normalizeSearchText(`${b.ownerName} ${b.managerName || ''} ${b.phone} ${b.ownerNationalId} ${b.name} ${b.village} ${b.posNumber}`).includes(q);
+        });
+
+        const ownerColumns: SmartTableColumn<BakeryRecord>[] = [
+          {
+            key: 'serialNumber',
+            label: 'م',
+            headerText: 'م',
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 55,
+            measureValue: (b) => formatArabicNumber(b.serialNumber),
+            render: (b) => formatArabicNumber(b.serialNumber),
+          },
+          {
+            key: 'ownerName',
+            label: getColLabel('ownerName', 'اسم صاحب المخبز'),
+            headerText: getColLabel('ownerName', 'اسم صاحب المخبز'),
+            type: 'name',
+            defaultWidth: 185,
+            render: (b) => (
+              <button
+                type="button"
+                onClick={() => handleOpenAction(b, 'details')}
+                className="font-extrabold text-[#102A43] hover:text-[#164E83] hover:underline text-right cursor-pointer"
+              >
+                {b.ownerName}
+              </button>
+            ),
+          },
+          {
+            key: 'posNumber',
+            label: getColLabel('posNumber', 'رقم ماكينة POS'),
+            headerText: getColLabel('posNumber', 'رقم ماكينة POS'),
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 130,
+            measureValue: (b) => toArabicNumerals(b.posNumber),
+            render: (b) => (
+              <button
+                type="button"
+                onClick={() => handleOpenAction(b, 'details')}
+                title="اضغط لفتح ملف المخبز"
+                className="num-cell font-black px-2 py-0.5 rounded bg-slate-100 hover:bg-[#102A43] hover:text-white text-[#102A43] transition-colors cursor-pointer"
+              >
+                {toArabicNumerals(b.posNumber)}
+              </button>
+            ),
+          },
+          {
+            key: 'name',
+            label: getColLabel('name', 'اسم المخبز'),
+            headerText: getColLabel('name', 'اسم المخبز'),
+            type: 'name',
+            defaultWidth: 180,
+            render: (b) => (
+              <button
+                type="button"
+                onClick={() => handleOpenAction(b, 'details')}
+                className="font-extrabold text-[#164E83] hover:underline text-right cursor-pointer"
+              >
+                {b.name}
+              </button>
+            ),
+          },
+          {
+            key: 'managerName',
+            label: getColLabel('managerName', 'المدير المسؤول'),
+            headerText: getColLabel('managerName', 'المدير المسؤول'),
+            type: 'name',
+            defaultWidth: 165,
+            render: (b) => <span className="text-slate-700">{b.managerName || '—'}</span>,
+          },
+          {
+            key: 'ownerNationalId',
+            label: getColLabel('ownerNationalId', 'الرقم القومي'),
+            headerText: getColLabel('ownerNationalId', 'الرقم القومي'),
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 145,
+            measureValue: (b) => toArabicNumerals(b.ownerNationalId),
+            render: (b) => toArabicNumerals(b.ownerNationalId),
+          },
+          {
+            key: 'phone',
+            label: getColLabel('phone', 'رقم الهاتف'),
+            headerText: getColLabel('phone', 'رقم الهاتف'),
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 130,
+            measureValue: (b) => toArabicNumerals(b.phone),
+            render: (b) => <span className="font-extrabold text-[#164E83]">{toArabicNumerals(b.phone)}</span>,
+          },
+          {
+            key: 'village',
+            label: getColLabel('village', 'القرية'),
+            headerText: getColLabel('village', 'القرية'),
+            type: 'text',
+            defaultWidth: 130,
+            render: (b) => <span className="text-slate-700">{b.village}</span>,
+          },
+          {
+            key: 'actions',
+            label: 'الإجراءات',
+            headerText: 'الإجراءات',
+            type: 'actions',
+            align: 'center',
+            sortable: false,
+            defaultWidth: 185,
+            render: (b) => renderActionsMenu(b),
+          },
+        ];
+
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-4 space-y-3">
+            <div className="p-4 bg-[#102A43] text-white rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="text-[13px] font-black flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#C6A15B]" />
+                  <span>دليل أصحاب المخابز والمديرين المسؤولين</span>
+                </h2>
+                <p className="text-[10.5px] text-slate-300 font-bold">بيانات التواصل والرقم القومي وأرقام ماكينات الصرف المرتبطة بكل مالك</p>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                <input
+                  type="text"
+                  value={ownersSearch}
+                  onChange={(e) => setOwnersSearch(e.target.value)}
+                  placeholder="بحث باسم المالك، رقم ماكينة POS، الهاتف أو القرية..."
+                  className="w-full pr-9 pl-3 py-2 bg-white text-[#102A43] rounded-lg text-[11px] font-bold"
+                />
+              </div>
             </div>
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
-              <input
-                type="text"
-                value={ownersSearch}
-                onChange={(e) => setOwnersSearch(e.target.value)}
-                placeholder="بحث باسم المالك، الهاتف أو القرية..."
-                className="w-full pr-8 pl-3 py-1.5 bg-white text-[#102A43] rounded-lg text-xs"
-              />
-            </div>
+
+            <SmartAutoFitTable
+              tableId="bakery_owners"
+              userId={currentUser.id}
+              rows={filteredOwners}
+              totalCount={activeBakeriesList.length}
+              getRowId={(b) => b.id}
+              columns={ownerColumns}
+              sortKey={ownersSort.key}
+              sortAsc={ownersSort.asc}
+              onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+              selectable
+              selectedIds={selectedBakeryIds}
+              onToggleSelect={toggleSelectBakery}
+              onClearSelection={() => setSelectedBakeryIds([])}
+              pinnedKeys={Array.from(new Set([...subPinnedCols, 'ownerName', 'posNumber']))}
+              onTogglePinColumn={toggleSubPin}
+              onPinAll={() => setSubPinnedCols(['ownerName', 'posNumber', 'name'])}
+              onUnpinAll={() => setSubPinnedCols([])}
+              onResetPinDefaults={() => setSubPinnedCols(['ownerName', 'posNumber'])}
+              onOpenHeaderCustomizer={() => setShowColumnModal(true)}
+              onNotify={showToast}
+              theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+            />
           </div>
-          <div className="overflow-auto max-h-[62vh] compact-table-scroll">
-            <table className="w-full text-right">
-              <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-                <tr>
-                  <SortableTh label="م" sortKey="serialNumber" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="صاحب المخبز" sortKey="ownerName" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="المدير المسؤول" sortKey="managerName" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="الرقم القومي" sortKey="ownerNationalId" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="رقم الهاتف" sortKey="phone" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="اسم المخبز" sortKey="name" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="رقم الماكينة POS" sortKey="posNumber" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="القرية" sortKey="village" activeSortKey={ownersSort.key} sortAsc={ownersSort.asc} onSort={(k) => setOwnersSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <th className="text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {activeBakeriesList
-                  .filter((b) => {
-                    const q = ownersSearch.trim().toLowerCase();
-                    if (!q) return true;
-                    return `${b.ownerName} ${b.managerName || ''} ${b.phone} ${b.ownerNationalId} ${b.name} ${b.village}`.toLowerCase().includes(q);
-                  })
-                  .sort((a, b) => compareTableValues(a[ownersSort.key as keyof BakeryRecord], b[ownersSort.key as keyof BakeryRecord], ownersSort.asc))
-                  .map((b, idx) => (
-                    <tr key={b.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-blue-50/60`}>
-                      <td className="num-cell text-center">{formatArabicNumber(b.serialNumber)}</td>
-                      <td className="font-bold text-[#102A43]">{b.ownerName}</td>
-                      <td className="text-slate-700">{b.managerName || '—'}</td>
-                      <td className="num-cell text-center text-slate-700">{toArabicNumerals(b.ownerNationalId)}</td>
-                      <td className="num-cell text-center font-bold text-[#164E83]">{toArabicNumerals(b.phone)}</td>
-                      <td className="font-bold text-[#102A43]">{b.name}</td>
-                      <td className="num-cell text-center">{toArabicNumerals(b.posNumber)}</td>
-                      <td className="text-slate-700 whitespace-nowrap">{b.village}</td>
-                      <td className="text-center whitespace-nowrap">{renderActionsMenu(b)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* =====================================================================
           2C. القرى والوحدات المحلية (Group 1)
          ===================================================================== */}
-      {activeSubTab === 'villages' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 bg-[#102A43] text-white flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#C6A15B]" />
-                <span>توزيع المخابز والحصص حسب القرى والوحدات المحلية</span>
-              </h2>
-              <p className="text-[11px] text-slate-300">إحصائيات مجمعة لكل قرية مع إمكانية فتح مخابز القرية مباشرة في السجل</p>
+      {activeSubTab === 'villages' && (() => {
+        const villageColumns: SmartTableColumn<(typeof villagesSummary)[number]>[] = [
+          {
+            key: 'village',
+            label: 'القرية',
+            headerText: 'القرية',
+            type: 'text',
+            defaultWidth: 145,
+            render: (row) => <span className="font-extrabold text-[#102A43]">{row.village}</span>,
+          },
+          {
+            key: 'localUnit',
+            label: 'الوحدة المحلية',
+            headerText: 'الوحدة المحلية',
+            type: 'name',
+            defaultWidth: 185,
+            render: (row) => <span className="text-slate-700">{row.localUnit}</span>,
+          },
+          {
+            key: 'count',
+            label: 'إجمالي المخابز',
+            headerText: 'إجمالي المخابز',
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 115,
+            measureValue: (row) => formatArabicNumber(row.count),
+            render: (row) => <span className="font-extrabold">{formatArabicNumber(row.count)}</span>,
+          },
+          {
+            key: 'activeCount',
+            label: 'النشطة',
+            headerText: 'النشطة',
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 95,
+            measureValue: (row) => formatArabicNumber(row.activeCount),
+            render: (row) => <span className="text-emerald-700 font-extrabold">{formatArabicNumber(row.activeCount)}</span>,
+          },
+          {
+            key: 'totalActualQuota',
+            label: 'إجمالي الحصص الفعلية',
+            headerText: 'إجمالي الحصص الفعلية',
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 155,
+            measureValue: (row) => `${formatArabicNumber(row.totalActualQuota)} شيكارة`,
+            render: (row) => <span className="font-extrabold text-[#164E83]">{formatArabicNumber(row.totalActualQuota)} شيكارة</span>,
+          },
+          {
+            key: 'totalDailyLoaves',
+            label: 'الأرغفة اليومية',
+            headerText: 'الأرغفة اليومية',
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 135,
+            measureValue: (row) => formatArabicNumber(row.totalDailyLoaves),
+            render: (row) => <span className="font-extrabold text-emerald-800">{formatArabicNumber(row.totalDailyLoaves)}</span>,
+          },
+          {
+            key: 'totalBeneficiaries2025',
+            label: 'المستفيدين ٢٠٢٥',
+            headerText: 'المستفيدين ٢٠٢٥',
+            type: 'numeric',
+            align: 'center',
+            defaultWidth: 135,
+            measureValue: (row) => formatArabicNumber(row.totalBeneficiaries2025),
+            render: (row) => formatArabicNumber(row.totalBeneficiaries2025),
+          },
+          {
+            key: 'totalDebt',
+            label: 'إجمالي المديونيات',
+            headerText: 'إجمالي المديونيات',
+            type: 'currency',
+            align: 'center',
+            defaultWidth: 145,
+            measureValue: (row) => `${formatArabicNumber(row.totalDebt)} ج.م`,
+            render: (row) => (
+              <span className={`font-extrabold ${row.totalDebt > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                {formatArabicNumber(row.totalDebt)} ج.م
+              </span>
+            ),
+          },
+          {
+            key: 'actions',
+            label: 'استعراض',
+            headerText: 'استعراض',
+            type: 'actions',
+            align: 'center',
+            sortable: false,
+            defaultWidth: 145,
+            render: (row) => (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterVillage(row.village);
+                  setCurrentPage(1);
+                  setActiveSubTab('registry');
+                  setActiveFocus('registry');
+                }}
+                className="px-3 py-1 bg-[#102A43] hover:bg-[#164E83] text-white rounded-lg text-[10.5px] font-extrabold cursor-pointer"
+              >
+                عرض مخابز القرية
+              </button>
+            ),
+          },
+        ];
+
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-4 space-y-3">
+            <div className="p-4 bg-[#102A43] text-white rounded-xl flex items-center justify-between">
+              <div>
+                <h2 className="text-[13px] font-black flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-[#C6A15B]" />
+                  <span>توزيع المخابز والحصص حسب القرى والوحدات المحلية</span>
+                </h2>
+                <p className="text-[10.5px] text-slate-300 font-bold">إحصائيات مجمعة لكل قرية مع إمكانية فتح مخابز القرية مباشرة في السجل</p>
+              </div>
+              <span className="num-cell text-[11px] text-[#C6A15B] font-extrabold">{formatArabicNumber(villagesSummary.length)} قرية مسجلة</span>
             </div>
-            <span className="text-xs text-[#C6A15B] font-bold">{formatArabicNumber(villagesSummary.length)} قرية مسجلة</span>
+
+            <SmartAutoFitTable
+              tableId="bakery_villages"
+              userId={currentUser.id}
+              rows={villagesSummary}
+              totalCount={villagesSummary.length}
+              getRowId={(r) => r.village}
+              columns={villageColumns}
+              sortKey={villagesSort.key}
+              sortAsc={villagesSort.asc}
+              onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+              pinnedKeys={subPinnedCols}
+              onTogglePinColumn={toggleSubPin}
+              onPinAll={() => setSubPinnedCols(['village'])}
+              onUnpinAll={() => setSubPinnedCols([])}
+              onResetPinDefaults={() => setSubPinnedCols(['village'])}
+              onNotify={showToast}
+              theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+            />
           </div>
-          <div className="overflow-auto max-h-[62vh] compact-table-scroll">
-            <table className="w-full text-right">
-              <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-                <tr>
-                  <SortableTh label="القرية" sortKey="village" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="الوحدة المحلية" sortKey="localUnit" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="إجمالي المخابز" sortKey="count" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="النشطة" sortKey="activeCount" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="إجمالي الحصص الفعلية" sortKey="totalActualQuota" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="الأرغفة اليومية" sortKey="totalDailyLoaves" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="المستفيدين ٢٠٢٥" sortKey="totalBeneficiaries2025" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="إجمالي المديونيات" sortKey="totalDebt" activeSortKey={villagesSort.key} sortAsc={villagesSort.asc} onSort={(k) => setVillagesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <th className="text-center">استعراض</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {villagesSummary.map((row, idx) => (
-                  <tr key={row.village} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-blue-50/60`}>
-                    <td className="font-bold text-[#102A43]">{row.village}</td>
-                    <td className="text-slate-700">{row.localUnit}</td>
-                    <td className="num-cell text-center font-bold">{formatArabicNumber(row.count)}</td>
-                    <td className="num-cell text-center text-emerald-700 font-bold">{formatArabicNumber(row.activeCount)}</td>
-                    <td className="num-cell text-center font-bold text-[#164E83]">{formatArabicNumber(row.totalActualQuota)} شيكارة</td>
-                    <td className="num-cell text-center font-bold text-emerald-800">{formatArabicNumber(row.totalDailyLoaves)}</td>
-                    <td className="num-cell text-center">{formatArabicNumber(row.totalBeneficiaries2025)}</td>
-                    <td className={`num-cell text-center font-bold ${row.totalDebt > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-                      {formatArabicNumber(row.totalDebt)} ج.م
-                    </td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilterVillage(row.village);
-                          setCurrentPage(1);
-                          setActiveSubTab('registry');
-                          setActiveFocus('registry');
-                        }}
-                        className="px-2.5 py-1 bg-[#102A43] hover:bg-[#164E83] text-white rounded text-[10.5px] font-bold cursor-pointer"
-                      >
-                        عرض مخابز القرية
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* =====================================================================
           4B. منظومة الرقابة والتفتيش (Group 4)
@@ -1935,6 +2606,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
          ===================================================================== */}
       {activeSubTab === 'debts' && (
         <BakeryDebtsModule
+          userId={currentUser.id}
+          currentUser={currentUser}
           bakeries={activeBakeriesList}
           transactions={debtTransactions}
           activeFocus={activeFocus}
@@ -1956,11 +2629,11 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200 gap-2">
             <div>
-              <h2 className="text-lg font-black text-[#102A43]">
+              <h2 className="text-xl font-black text-[#102A43]">
                 {editingBakeryId ? `تعديل بيانات المخبز: ${formBakery.name}` : 'إضافة مخبز جديد — إدارة تموين مركز المحلة الكبرى'}
               </h2>
-              <p className="text-xs text-slate-500">
-                نموذج قياسي من 7 خطوات مع تحقق Zod للرقم القومي (14 رقماً) والهاتف (11 رقماً) والربط التلقائي للقرية بالوحدة المحلية
+              <p className="text-[11px] font-bold text-slate-600">
+                نموذج قياسي من ٧ خطوات مع التحقق الإلكتروني القياسي للرقم القومي (١٤ رقماً) والهاتف (١١ رقماً) والربط التلقائي للقرية بالوحدة المحلية
               </p>
             </div>
             <button
@@ -1969,7 +2642,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 setEditingBakeryId(null);
                 setActiveSubTab('registry');
               }}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold self-start cursor-pointer"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-[11px] font-extrabold self-start cursor-pointer"
             >
               إلغاء والعودة للسجل
             </button>
@@ -1978,13 +2651,13 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           {/* 7-Step Indicator */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {[
-              { s: 1, label: '1. البيانات والموقع' },
-              { s: 2, label: '2. صاحب المخبز' },
-              { s: 3, label: '3. التشغيل والتصنيف' },
-              { s: 4, label: '4. الحصص والتأمين' },
-              { s: 5, label: '5. السكان والمتوسطات' },
-              { s: 6, label: '6. التراخيص والعقود' },
-              { s: 7, label: '7. المراجعة والحفظ' },
+              { s: 1, label: '١. البيانات والموقع' },
+              { s: 2, label: '٢. صاحب المخبز' },
+              { s: 3, label: '٣. التشغيل والتصنيف' },
+              { s: 4, label: '٤. الحصص والتأمين' },
+              { s: 5, label: '٥. السكان والمتوسطات' },
+              { s: 6, label: '٦. التراخيص والعقود' },
+              { s: 7, label: '٧. المراجعة والحفظ' },
             ].map((item) => (
               <button
                 key={item.s}
@@ -1992,12 +2665,12 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 onClick={() => {
                   if (item.s < wizardStep) setWizardStep(item.s as 1 | 2 | 3 | 4 | 5 | 6 | 7);
                 }}
-                className={`p-2.5 rounded-xl text-xs font-bold border text-center transition-all ${
+                className={`p-2.5 rounded-xl text-[11px] font-extrabold border text-center transition-all ${
                   wizardStep === item.s
                     ? 'bg-[#102A43] text-white border-[#102A43] shadow-xs'
                     : wizardStep > item.s
                     ? 'bg-emerald-50 text-emerald-900 border-emerald-200 cursor-pointer'
-                    : 'bg-slate-50 text-slate-500 border-slate-200'
+                    : 'bg-slate-50 text-slate-600 border-slate-200'
                 }`}
               >
                 {item.label}
@@ -2006,7 +2679,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           </div>
 
           {wizardError && (
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-900 text-xs font-bold flex items-center gap-2">
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-900 text-[11px] font-extrabold flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
               <span>{wizardError}</span>
             </div>
@@ -2017,44 +2690,44 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {wizardStep === 1 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">رقم المخبز الرسمي (فريد) *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">رقم المخبز الرسمي (فريد) *</label>
                   <input
                     type="text"
                     required
                     value={formBakery.bakeryNumber || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, bakeryNumber: e.target.value })}
-                    placeholder="مثال: 1290"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    placeholder="مثال: ١٢٩٠"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">رقم ماكينة الصرف POS (فريد) *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">رقم ماكينة الصرف (فريد) *</label>
                   <input
                     type="text"
                     required
                     value={formBakery.posNumber || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, posNumber: e.target.value })}
-                    placeholder="مثال: POS-884900"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    placeholder="مثال: ٨٨٤٩٠٠"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">اسم المخبز *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">اسم المخبز *</label>
                   <input
                     type="text"
                     required
                     value={formBakery.name || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, name: e.target.value })}
                     placeholder="مثال: مخبز الأمل الآلي"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">القرية (تربط الوحدة المحلية تلقائياً) *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">القرية (تربط الوحدة المحلية تلقائياً) *</label>
                   <select
                     value={formBakery.village || 'صفط تراب'}
                     onChange={(e) => handleWizardVillageChange(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-extrabold"
                   >
                     {MAHALLA_VILLAGES.map(v => (
                       <option key={v} value={v}>{v}</option>
@@ -2062,20 +2735,20 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">الوحدة المحلية التابعة (تلقائي)</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الوحدة المحلية التابعة (تلقائي)</label>
                   <input
                     type="text"
                     readOnly
                     value={formBakery.localUnit || ''}
-                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-[#164E83]"
+                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-[11px] font-extrabold text-[#164E83]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">حالة النشاط</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">حالة النشاط</label>
                   <select
                     value={formBakery.activityStatus || 'نشط'}
                     onChange={(e) => setFormBakery({ ...formBakery, activityStatus: e.target.value as BakeryRecord['activityStatus'] })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-extrabold"
                   >
                     <option value="نشط">نشط</option>
                     <option value="متوقف">متوقف</option>
@@ -2084,14 +2757,14 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   </select>
                 </div>
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">العنوان التفصيلي *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">العنوان التفصيلي *</label>
                   <input
                     type="text"
                     required
                     value={formBakery.address || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, address: e.target.value })}
                     placeholder="الشارع والمعلم البارز والقرية - مركز المحلة الكبرى"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   />
                 </div>
               </div>
@@ -2101,18 +2774,18 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {wizardStep === 2 && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">اسم صاحب المخبز / المستغل الرباعي *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">اسم صاحب المخبز / المستغل الرباعي *</label>
                   <input
                     type="text"
                     required
                     value={formBakery.ownerName || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, ownerName: e.target.value })}
                     placeholder="الاسم الرباعي كاملاً"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">الرقم القومي لصاحب المخبز (14 رقماً) *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الرقم القومي لصاحب المخبز (١٤ رقماً) *</label>
                   <input
                     type="text"
                     required
@@ -2124,15 +2797,15 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                         ownerNationalId: e.target.value.replace(/\D/g, '').slice(0, 14),
                       })
                     }
-                    placeholder="275XXXXXXXXXXX"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono tracking-widest"
+                    placeholder="٢٧٥٠٠٠٠٠٠٠٠٠٠٠"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono tracking-widest"
                   />
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    عدد الأرقام المدخلة: {formBakery.ownerNationalId?.length || 0} / 14
+                  <span className="text-xs font-bold text-slate-600 mt-1 block">
+                    عدد الأرقام المدخلة: {toArabicNumerals(formBakery.ownerNationalId?.length || 0)} / ١٤
                   </span>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">رقم الهاتف المحمول (11 رقماً) *</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">رقم الهاتف المحمول (١١ رقماً) *</label>
                   <input
                     type="tel"
                     required
@@ -2144,11 +2817,11 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                         phone: e.target.value.replace(/\D/g, '').slice(0, 11),
                       })
                     }
-                    placeholder="010XXXXXXXX"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono tracking-widest"
+                    placeholder="٠١٠٠٠٠٠٠٠٠٠"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono tracking-widest"
                   />
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    عدد الأرقام المدخلة: {formBakery.phone?.length || 0} / 11
+                  <span className="text-xs font-bold text-slate-600 mt-1 block">
+                    عدد الأرقام المدخلة: {toArabicNumerals(formBakery.phone?.length || 0)} / ١١
                   </span>
                 </div>
               </div>
@@ -2158,7 +2831,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {wizardStep === 3 && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">نوع الخبز ومعامل الإنتاج</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">نوع الخبز ومعامل الإنتاج</label>
                   <select
                     value={formBakery.breadType || 'بلدي مدعم (ماو)'}
                     onChange={(e) => {
@@ -2166,34 +2839,34 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                       const factor: 660 | 725 = bType.includes('ملدن') ? 725 : 660;
                       setFormBakery({ ...formBakery, breadType: bType, productionFactor: factor });
                     }}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-extrabold"
                   >
-                    <option value="بلدي مدعم (ماو)">بلدي مدعم (ماو — معامل 660)</option>
-                    <option value="بلدي مدعم (ملدن)">بلدي مدعم (ملدن — معامل 725)</option>
+                    <option value="بلدي مدعم (ماو)">بلدي مدعم (ماو — معامل ٦٦٠)</option>
+                    <option value="بلدي مدعم (ملدن)">بلدي مدعم (ملدن — معامل ٧٢٥)</option>
                     <option value="طباقي">طباقي</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">معامل إنتاج الخبز المعتمد</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">معامل إنتاج الخبز المعتمد</label>
                   <select
                     value={formBakery.productionFactor || 660}
                     onChange={(e) =>
                       setFormBakery({ ...formBakery, productionFactor: Number(e.target.value) === 725 ? 725 : 660 })
                     }
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-mono font-extrabold"
                   >
-                    <option value={660}>660 رغيف لكل شيكارة</option>
-                    <option value={725}>725 رغيف لكل شيكارة</option>
+                    <option value={660}>٦٦٠ رغيف لكل شيكارة</option>
+                    <option value={725}>٧٢٥ رغيف لكل شيكارة</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">نوع خط الإنتاج</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">نوع خط الإنتاج</label>
                   <select
                     value={formBakery.productionLineType || 'آلي كامل'}
                     onChange={(e) =>
                       setFormBakery({ ...formBakery, productionLineType: e.target.value as BakeryRecord['productionLineType'] })
                     }
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   >
                     <option value="آلي كامل">آلي كامل</option>
                     <option value="نصف آلي">نصف آلي</option>
@@ -2201,24 +2874,24 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">نوع الوقود</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">نوع الوقود</label>
                   <select
                     value={formBakery.fuelType || 'غاز طبيعي'}
                     onChange={(e) => setFormBakery({ ...formBakery, fuelType: e.target.value as BakeryRecord['fuelType'] })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   >
                     <option value="غاز طبيعي">غاز طبيعي</option>
                     <option value="سولار">سولار</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">تصنيف المخبز</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">تصنيف المخبز</label>
                   <select
                     value={formBakery.bakeryCategory || 'نموذجي'}
                     onChange={(e) =>
                       setFormBakery({ ...formBakery, bakeryCategory: e.target.value as BakeryRecord['bakeryCategory'] })
                     }
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   >
                     <option value="ممتاز أ">ممتاز أ</option>
                     <option value="نموذجي">نموذجي</option>
@@ -2226,12 +2899,12 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">الطاقة الإنتاجية اليومية (شيكارة)</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الطاقة الإنتاجية اليومية (شيكارة)</label>
                   <input
                     type="number"
                     value={formBakery.dailyCapacitySacks || 30}
                     onChange={(e) => setFormBakery({ ...formBakery, dailyCapacitySacks: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                   />
                 </div>
               </div>
@@ -2242,16 +2915,16 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1">المبلغ التأميني المسدد (ج.م) [يدوي]</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">المبلغ التأميني المسدد (ج.م) [يدوي]</label>
                     <input
                       type="number"
                       value={formBakery.insuranceAmountEgp || 0}
                       onChange={(e) => setFormBakery({ ...formBakery, insuranceAmountEgp: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-mono font-extrabold"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1">الحصة الفعلية اليومية (شيكارة) [يدوي]</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الحصة الفعلية اليومية (شيكارة) [يدوي]</label>
                     <input
                       type="number"
                       value={formBakery.actualQuota || 0}
@@ -2262,16 +2935,16 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                           dailySacksCount: Number(e.target.value),
                         })
                       }
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-mono font-extrabold"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1">المتبقي أو المديونية على المخبز (ج.م)</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">المتبقي أو المديونية على المخبز (ج.م)</label>
                     <input
                       type="number"
                       value={formBakery.remainingDebtEgp || 0}
                       onChange={(e) => setFormBakery({ ...formBakery, remainingDebtEgp: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                     />
                   </div>
                 </div>
@@ -2279,18 +2952,18 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 {/* Live Equations 1 & 2 Box */}
                 <div className="bg-[#F4F7FB] p-4 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <span className="text-[11px] font-bold text-slate-500 block">
-                      المعادلة الأولى (تلقائي): الحصة التأمينية = المبلغ التأميني ÷ 235 ÷ 3
+                    <span className="text-xs font-extrabold text-slate-600 block">
+                      المعادلة الأولى (تلقائي): الحصة التأمينية = المبلغ التأميني ÷ ٢٣٥ ÷ ٣
                     </span>
-                    <span className="text-lg font-black font-mono text-[#102A43]">
-                      {liveWizardPreview.insuranceQuota.toFixed(3)} شيكارة
+                    <span className="num-cell text-lg font-black text-[#102A43]">
+                      {formatArabicDecimal(liveWizardPreview.insuranceQuota, 3)} شيكارة
                     </span>
                   </div>
                   <div>
-                    <span className="text-[11px] font-bold text-slate-500 block">
-                      المعادلة الثانية (تلقائي): الأرغفة اليومية = الحصة الفعلية × {formBakery.productionFactor}
+                    <span className="text-xs font-extrabold text-slate-600 block">
+                      المعادلة الثانية (تلقائي): الأرغفة اليومية = الحصة الفعلية × {formatArabicNumber(formBakery.productionFactor)}
                     </span>
-                    <span className="text-lg font-black font-mono text-emerald-800">
+                    <span className="num-cell text-lg font-black text-emerald-800">
                       {formatArabicNumber(liveWizardPreview.dailyLoavesCount)} رغيف / يوم
                     </span>
                   </div>
@@ -2303,72 +2976,72 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1">عدد سكان القرية</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">عدد سكان القرية</label>
                     <input
                       type="number"
                       value={formBakery.villagePopulation || 0}
                       onChange={(e) => setFormBakery({ ...formBakery, villagePopulation: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1">عدد المستفيدين لعام 2023</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">عدد المستفيدين لعام ٢٠٢٣</label>
                     <input
                       type="number"
                       value={formBakery.beneficiaries2023 || 0}
                       onChange={(e) => setFormBakery({ ...formBakery, beneficiaries2023: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1">عدد المستفيدين لعام 2024</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">عدد المستفيدين لعام ٢٠٢٤</label>
                     <input
                       type="number"
                       value={formBakery.beneficiaries2024 || 0}
                       onChange={(e) => setFormBakery({ ...formBakery, beneficiaries2024: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1">عدد المستفيدين لعام 2025</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">عدد المستفيدين لعام ٢٠٢٥</label>
                     <input
                       type="number"
                       value={formBakery.beneficiaries2025 || 0}
                       onChange={(e) => setFormBakery({ ...formBakery, beneficiaries2025: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="bg-[#F4F7FB] p-4 rounded-xl border border-slate-200 grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 block">متوسط 2023 (م3)</span>
-                    <span className="text-base font-black font-mono text-[#102A43]">
-                      {liveWizardPreview.avgPerCapita2023.toFixed(3)}
+                    <span className="text-xs font-extrabold text-slate-600 block">متوسط ٢٠٢٣ (م٣)</span>
+                    <span className="num-cell text-base font-black text-[#102A43]">
+                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2023, 3)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 block">متوسط 2024 (م4)</span>
-                    <span className="text-base font-black font-mono text-[#102A43]">
-                      {liveWizardPreview.avgPerCapita2024.toFixed(3)}
+                    <span className="text-xs font-extrabold text-slate-600 block">متوسط ٢٠٢٤ (م٤)</span>
+                    <span className="num-cell text-base font-black text-[#102A43]">
+                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2024, 3)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 block">متوسط 2025 (م5)</span>
-                    <span className="text-base font-black font-mono text-[#102A43]">
-                      {liveWizardPreview.avgPerCapita2025.toFixed(3)}
+                    <span className="text-xs font-extrabold text-slate-600 block">متوسط ٢٠٢٥ (م٥)</span>
+                    <span className="num-cell text-base font-black text-[#102A43]">
+                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2025, 3)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 block">الفرق التراكمي (م6)</span>
-                    <span className="text-base font-black font-mono text-amber-800">
-                      {liveWizardPreview.cumulativeAvgDifference.toFixed(3)}
+                    <span className="text-xs font-extrabold text-slate-600 block">الفرق التراكمي (م٦)</span>
+                    <span className="num-cell text-base font-black text-amber-800">
+                      {formatArabicDecimal(liveWizardPreview.cumulativeAvgDifference, 3)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 block">نصيب الفرد الفعلي (م7)</span>
-                    <span className="text-base font-black font-mono text-emerald-800">
-                      {liveWizardPreview.dailyShareActual2025.toFixed(3)}
+                    <span className="text-xs font-extrabold text-slate-600 block">نصيب الفرد الفعلي (م٧)</span>
+                    <span className="num-cell text-base font-black text-emerald-800">
+                      {formatArabicDecimal(liveWizardPreview.dailyShareActual2025, 3)}
                     </span>
                   </div>
                 </div>
@@ -2379,59 +3052,59 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {wizardStep === 6 && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">رقم رخصة المخبز</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">رقم رخصة المخبز</label>
                   <input
                     type="text"
                     value={formBakery.licenseNumber || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, licenseNumber: e.target.value })}
-                    placeholder="ر.م/xxxx/محلة"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    placeholder="ر.م/٠٠٠٠/محلة"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">تاريخ انتهاء الرخصة</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">تاريخ انتهاء الرخصة</label>
                   <input
                     type="date"
                     value={formBakery.licenseExpiryDate || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, licenseExpiryDate: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">رقم البطاقة الضريبية</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">رقم البطاقة الضريبية</label>
                   <input
                     type="text"
                     value={formBakery.taxCardNumber || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, taxCardNumber: e.target.value })}
-                    placeholder="xxx-xxx-xxx"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    placeholder="٠٠٠-٠٠٠-٠٠٠"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">تاريخ انتهاء البطاقة الضريبية</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">تاريخ انتهاء البطاقة الضريبية</label>
                   <input
                     type="date"
                     value={formBakery.taxCardExpiryDate || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, taxCardExpiryDate: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">رقم عقد الإيجار / الملكية</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">رقم عقد الإيجار / الملكية</label>
                   <input
                     type="text"
                     value={formBakery.leaseContractNumber || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, leaseContractNumber: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">تاريخ انتهاء العقد</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">تاريخ انتهاء العقد</label>
                   <input
                     type="date"
                     value={formBakery.leaseExpiryDate || ''}
                     onChange={(e) => setFormBakery({ ...formBakery, leaseExpiryDate: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold font-mono"
                   />
                 </div>
               </div>
@@ -2439,17 +3112,17 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
             {/* الخطوة السابعة: المراجعة والحفظ */}
             {wizardStep === 7 && (
-              <div className="bg-[#F4F7FB] p-5 rounded-2xl border border-slate-200 space-y-3 text-xs">
-                <h4 className="font-black text-sm text-[#102A43] border-b border-slate-200 pb-2">
+              <div className="bg-[#F4F7FB] p-5 rounded-2xl border border-slate-200 space-y-3 text-[11px] font-bold">
+                <h4 className="font-black text-[13px] text-[#102A43] border-b border-slate-200 pb-2">
                   ملخص مراجعة بيانات المخبز قبل الحفظ النهائي في قاعدة البيانات
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div><span className="text-slate-500">اسم المخبز:</span> <strong className="text-[#102A43]">{formBakery.name}</strong></div>
-                  <div><span className="text-slate-500">رقم المخبز / POS:</span> <strong className="font-mono">{formBakery.bakeryNumber} / {formBakery.posNumber}</strong></div>
-                  <div><span className="text-slate-500">القرية والوحدة:</span> <strong>{formBakery.village} ({formBakery.localUnit})</strong></div>
-                  <div><span className="text-slate-500">صاحب المخبز:</span> <strong>{formBakery.ownerName}</strong></div>
-                  <div><span className="text-slate-500">الرقم القومي:</span> <strong className="font-mono">{formBakery.ownerNationalId}</strong></div>
-                  <div><span className="text-slate-500">الحصة الفعلية والأرغفة:</span> <strong className="font-mono text-emerald-800">{liveWizardPreview.actualQuota} شيكارة ({liveWizardPreview.dailyLoavesCount} رغيف)</strong></div>
+                  <div><span className="text-slate-600">اسم المخبز:</span> <strong className="text-[#102A43]">{formBakery.name}</strong></div>
+                  <div><span className="text-slate-600">رقم المخبز / ماكينة الصرف:</span> <strong className="num-cell">{toArabicNumerals(formBakery.bakeryNumber)} / {toArabicNumerals(formBakery.posNumber)}</strong></div>
+                  <div><span className="text-slate-600">القرية والوحدة:</span> <strong>{formBakery.village} ({formBakery.localUnit})</strong></div>
+                  <div><span className="text-slate-600">صاحب المخبز:</span> <strong>{formBakery.ownerName}</strong></div>
+                  <div><span className="text-slate-600">الرقم القومي:</span> <strong className="num-cell">{toArabicNumerals(formBakery.ownerNationalId)}</strong></div>
+                  <div><span className="text-slate-600">الحصة الفعلية والأرغفة:</span> <strong className="num-cell text-emerald-800">{formatArabicNumber(liveWizardPreview.actualQuota)} شيكارة ({formatArabicNumber(liveWizardPreview.dailyLoavesCount)} رغيف)</strong></div>
                 </div>
               </div>
             )}
@@ -2459,7 +3132,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <button
                   type="button"
                   onClick={() => setWizardStep((s) => (s - 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7)}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold rounded-xl text-[11px] cursor-pointer"
                 >
                   الخطوة السابقة
                 </button>
@@ -2471,14 +3144,14 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <button
                   type="button"
                   onClick={handleWizardNext}
-                  className="px-6 py-2.5 bg-[#102A43] hover:bg-[#164E83] text-white font-bold rounded-xl text-xs cursor-pointer"
+                  className="px-6 py-2.5 bg-[#102A43] hover:bg-[#164E83] text-white font-extrabold rounded-xl text-[11px] cursor-pointer"
                 >
                   الخطوة التالية
                 </button>
               ) : (
                 <button
                   type="submit"
-                  className="px-7 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl text-xs flex items-center gap-2 shadow-md cursor-pointer"
+                  className="px-7 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl text-[11px] flex items-center gap-2 shadow-md cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
                   <span>حفظ بيانات المخبز واعتماد المعادلات</span>
@@ -2574,71 +3247,177 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             ].map((eq, i) => (
               <div key={i} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
                 <div>
-                  <span className="text-[10.5px] font-black text-[#C6A15B] bg-[#102A43] px-2 py-0.5 rounded inline-block mb-1.5">
+                  <span className="text-[10px] font-black text-[#C6A15B] bg-[#102A43] px-2 py-0.5 rounded inline-block mb-1.5">
                     {eq.num}
                   </span>
                   <h3 className="text-xs font-black text-[#102A43] mb-1.5">{eq.title}</h3>
-                  <div className="p-2 bg-[#F4F7FB] rounded-xl border border-slate-200 text-[11px] font-bold text-[#164E83] mb-1.5">
+                  <div className="p-2 bg-[#F4F7FB] rounded-xl border border-slate-200 text-[10px] font-bold text-[#164E83] mb-1.5">
                     {eq.formula}
                   </div>
-                  <p className="text-[10.5px] text-slate-500 leading-relaxed">{eq.source}</p>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">{eq.source}</p>
                 </div>
                 <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10.5px] font-bold text-slate-500">النتيجة المعتمدة:</span>
+                  <span className="text-[10px] font-bold text-slate-500">النتيجة المعتمدة:</span>
                   <span className="text-xs font-black tabular-nums text-emerald-800">{eq.result}</span>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Detailed Sortable Quotas & Equations Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="p-3.5 bg-[#102A43] text-white flex items-center justify-between">
-              <h3 className="text-xs font-black">جدول تدقيق الحصص والمعادلات السبع لكل مخبز (مدخل يدوي مقابل ناتج تلقائي)</h3>
-              <span className="text-[11px] text-[#C6A15B]">تقريب قياسي: ٣ منازل عشرية · انقر على أي عمود للفرز</span>
+          {/* Detailed Sortable & Auto-Fit Quotas & Equations Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-4 space-y-3">
+            <div className="p-3.5 bg-[#102A43] text-white rounded-xl flex items-center justify-between">
+              <h3 className="text-[12px] font-black">جدول تدقيق الحصص والمعادلات السبع لكل مخبز (مدخل يدوي مقابل ناتج تلقائي)</h3>
+              <span className="text-[10.5px] text-[#C6A15B] font-bold">تقريب قياسي: ٣ منازل عشرية · انقر على أي عمود للفرز</span>
             </div>
-            <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-                  <tr>
-                    <SortableTh label="المخبز والقرية" sortKey="name" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="المبلغ التأميني" sortKey="insuranceAmountEgp" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الحصة التأمينية" sortKey="insuranceQuota" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الحصة الفعلية" sortKey="actualQuota" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="المعامل" sortKey="productionFactor" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الأرغفة اليومية" sortKey="dailyLoavesCount" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label={<span className="flex flex-col items-center"><span>متوسط</span><span>٢٠٢٣</span></span>} sortKey="avgPerCapita2023" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label={<span className="flex flex-col items-center"><span>متوسط</span><span>٢٠٢٤</span></span>} sortKey="avgPerCapita2024" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label={<span className="flex flex-col items-center"><span>متوسط</span><span>٢٠٢٥</span></span>} sortKey="avgPerCapita2025" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الفرق التراكمي" sortKey="cumulativeAvgDifference" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="نصيب الفرد" sortKey="dailyShareActual2025" activeSortKey={quotasSort.key} sortAsc={quotasSort.asc} onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <th className="text-center">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {[...activeBakeriesList]
-                    .sort((a, b) => compareTableValues(a[quotasSort.key as keyof BakeryRecord], b[quotasSort.key as keyof BakeryRecord], quotasSort.asc))
-                    .map((b, idx) => (
-                      <tr key={b.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-blue-50/50`}>
-                        <td className="font-bold text-[#102A43] max-w-[160px] truncate" title={`${b.name} (${b.village})`}>
-                          {b.name} <span className="text-slate-500 font-normal">({b.village})</span>
-                        </td>
-                        <td className="num-cell text-center">{formatArabicNumber(b.insuranceAmountEgp)} ج.م</td>
-                        <td className="num-cell text-center font-bold text-[#164E83]">{formatArabicDecimal(b.insuranceQuota, 3)}</td>
-                        <td className="num-cell text-center font-bold text-[#102A43]">{formatArabicNumber(b.actualQuota)}</td>
-                        <td className="num-cell text-center">{formatArabicNumber(b.productionFactor)}</td>
-                        <td className="num-cell text-center font-bold text-emerald-800">{formatArabicNumber(b.dailyLoavesCount)}</td>
-                        <td className="num-cell text-center">{formatArabicDecimal(b.avgPerCapita2023, 3)}</td>
-                        <td className="num-cell text-center">{formatArabicDecimal(b.avgPerCapita2024, 3)}</td>
-                        <td className="num-cell text-center font-bold">{formatArabicDecimal(b.avgPerCapita2025, 3)}</td>
-                        <td className="num-cell text-center text-amber-800 font-bold">{formatArabicDecimal(b.cumulativeAvgDifference, 3)}</td>
-                        <td className="num-cell text-center text-emerald-800 font-bold">{formatArabicDecimal(b.dailyShareActual2025, 3)}</td>
-                        <td className="text-center whitespace-nowrap">{renderActionsMenu(b)}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+
+            <SmartAutoFitTable
+              tableId="bakery_quotas"
+              userId={currentUser.id}
+              rows={activeBakeriesList}
+              totalCount={activeBakeriesList.length}
+              getRowId={(b) => b.id}
+              columns={[
+                {
+                  key: 'name',
+                  label: 'المخبز والقرية',
+                  headerText: 'المخبز والقرية',
+                  type: 'name',
+                  defaultWidth: 195,
+                  measureValue: (b) => `${b.name} (${b.village})`,
+                  render: (b) => (
+                    <span className="font-extrabold text-[#102A43]">
+                      {b.name} <span className="text-slate-600 font-bold">({b.village})</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'insuranceAmountEgp',
+                  label: 'المبلغ التأميني',
+                  headerText: 'المبلغ التأميني',
+                  type: 'currency',
+                  align: 'center',
+                  defaultWidth: 130,
+                  measureValue: (b) => `${formatArabicNumber(b.insuranceAmountEgp)} ج.م`,
+                  render: (b) => `${formatArabicNumber(b.insuranceAmountEgp)} ج.م`,
+                },
+                {
+                  key: 'insuranceQuota',
+                  label: 'الحصة التأمينية',
+                  headerText: 'الحصة التأمينية',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 115,
+                  measureValue: (b) => formatArabicDecimal(b.insuranceQuota, 3),
+                  render: (b) => <span className="font-extrabold text-[#164E83]">{formatArabicDecimal(b.insuranceQuota, 3)}</span>,
+                },
+                {
+                  key: 'actualQuota',
+                  label: 'الحصة الفعلية',
+                  headerText: 'الحصة الفعلية',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 105,
+                  measureValue: (b) => formatArabicNumber(b.actualQuota),
+                  render: (b) => <span className="font-extrabold text-[#102A43]">{formatArabicNumber(b.actualQuota)}</span>,
+                },
+                {
+                  key: 'productionFactor',
+                  label: 'المعامل',
+                  headerText: 'المعامل',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 85,
+                  measureValue: (b) => formatArabicNumber(b.productionFactor),
+                  render: (b) => formatArabicNumber(b.productionFactor),
+                },
+                {
+                  key: 'dailyLoavesCount',
+                  label: 'الأرغفة اليومية',
+                  headerText: 'الأرغفة اليومية',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 120,
+                  measureValue: (b) => formatArabicNumber(b.dailyLoavesCount),
+                  render: (b) => <span className="font-extrabold text-emerald-800">{formatArabicNumber(b.dailyLoavesCount)}</span>,
+                },
+                {
+                  key: 'avgPerCapita2023',
+                  label: <span className="flex flex-col items-center"><span>متوسط</span><span>٢٠٢٣</span></span>,
+                  headerText: 'متوسط ٢٠٢٣',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 95,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
+                },
+                {
+                  key: 'avgPerCapita2024',
+                  label: <span className="flex flex-col items-center"><span>متوسط</span><span>٢٠٢٤</span></span>,
+                  headerText: 'متوسط ٢٠٢٤',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 95,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
+                },
+                {
+                  key: 'avgPerCapita2025',
+                  label: <span className="flex flex-col items-center"><span>متوسط</span><span>٢٠٢٥</span></span>,
+                  headerText: 'متوسط ٢٠٢٥',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 95,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
+                  render: (b) => <span className="font-extrabold">{formatArabicDecimal(b.avgPerCapita2025, 3)}</span>,
+                },
+                {
+                  key: 'cumulativeAvgDifference',
+                  label: 'الفرق التراكمي',
+                  headerText: 'الفرق التراكمي',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 115,
+                  measureValue: (b) => formatArabicDecimal(b.cumulativeAvgDifference, 3),
+                  render: (b) => <span className="text-amber-800 font-extrabold">{formatArabicDecimal(b.cumulativeAvgDifference, 3)}</span>,
+                },
+                {
+                  key: 'dailyShareActual2025',
+                  label: 'نصيب الفرد',
+                  headerText: 'نصيب الفرد',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 105,
+                  measureValue: (b) => formatArabicDecimal(b.dailyShareActual2025, 3),
+                  render: (b) => <span className="text-emerald-800 font-extrabold">{formatArabicDecimal(b.dailyShareActual2025, 3)}</span>,
+                },
+                {
+                  key: 'actions',
+                  label: 'الإجراءات',
+                  headerText: 'الإجراءات',
+                  type: 'actions',
+                  align: 'center',
+                  sortable: false,
+                  defaultWidth: 185,
+                  render: (b) => renderActionsMenu(b),
+                },
+              ]}
+              sortKey={quotasSort.key}
+              sortAsc={quotasSort.asc}
+              onSort={(k) => setQuotasSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+              selectable
+              selectedIds={selectedBakeryIds}
+              onToggleSelect={toggleSelectBakery}
+              onClearSelection={() => setSelectedBakeryIds([])}
+              pinnedKeys={subPinnedCols}
+              onTogglePinColumn={toggleSubPin}
+              onPinAll={() => setSubPinnedCols(['name'])}
+              onUnpinAll={() => setSubPinnedCols([])}
+              onResetPinDefaults={() => setSubPinnedCols(['name'])}
+              onOpenHeaderCustomizer={() => setShowColumnModal(true)}
+              onNotify={showToast}
+              theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+            />
           </div>
         </div>
       )}
@@ -2647,78 +3426,179 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           5. تحليل متوسطات المخابز 2023–2024–2025 والمستفيدين (Section 5)
          ===================================================================== */}
       {activeSubTab === 'averages' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-4 space-y-3">
+          <div className="pb-3 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <h2 className="text-sm font-black text-[#102A43]">
+              <h2 className="text-[13px] font-black text-[#102A43]">
                 {activeFocus === 'avg-beneficiaries'
                   ? 'إحصائيات المستفيدين ومقارنة النمو السنوي (٢٠٢٣ – ٢٠٢٤ – ٢٠٢٥)'
                   : 'شاشة التحليل المقارن لمتوسطات نصيب الفرد (٢٠٢٣ – ٢٠٢٤ – ٢٠٢٥)'}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] font-bold text-slate-600">
                 تحليل التغير في أعداد المستفيدين ونصيب الفرد اليومي والفرق الحسابي التراكمي لكل مخبز مع فرز رقمي حقيقي
               </p>
             </div>
-            <span className="text-[11px] font-bold text-[#164E83] bg-[#F4F7FB] px-3 py-1.5 rounded-xl border border-slate-200">
+            <span className="text-[10.5px] font-extrabold text-[#164E83] bg-[#F4F7FB] px-3 py-1.5 rounded-xl border border-slate-200">
               المعادلة السابعة معروضة بصورة مستقلة دون ازدواج في إجمالي الإنتاج
             </span>
           </div>
 
-          <div className="overflow-auto max-h-[62vh] compact-table-scroll">
-            <table className="w-full text-right">
-              <thead className="bg-[#102A43] text-white sticky top-0 z-10">
-                <tr>
-                  <SortableTh label="المخبز والقرية" sortKey="name" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="الأرغفة اليومية" sortKey="dailyLoavesCount" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label={<span className="flex flex-col items-center"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>} sortKey="beneficiaries2023" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label={<span className="flex flex-col items-center"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>} sortKey="avgPerCapita2023" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label={<span className="flex flex-col items-center"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>} sortKey="beneficiaries2024" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label={<span className="flex flex-col items-center"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>} sortKey="avgPerCapita2024" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label={<span className="flex flex-col items-center"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>} sortKey="beneficiaries2025" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label={<span className="flex flex-col items-center"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>} sortKey="avgPerCapita2025" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="فرق ٢٤−٢٣" sortKey="diff24_23" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="فرق ٢٥−٢٤" sortKey="diff25_24" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="الفرق التراكمي" sortKey="cumulativeAvgDifference" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="نصيب الفرد ٢٠٢٥" sortKey="dailyShareActual2025" activeSortKey={averagesSort.key} sortAsc={averagesSort.asc} onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <th className="text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {activeBakeriesList
-                  .map((b) => ({
-                    ...b,
-                    diff24_23: round3(b.avgPerCapita2024 - b.avgPerCapita2023),
-                    diff25_24: round3(b.avgPerCapita2025 - b.avgPerCapita2024),
-                  }))
-                  .sort((a, b) =>
-                    compareTableValues(
-                      a[averagesSort.key as keyof typeof a],
-                      b[averagesSort.key as keyof typeof b],
-                      averagesSort.asc
-                    )
-                  )
-                  .map((b, idx) => (
-                    <tr key={b.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-blue-50/50`}>
-                      <td className="font-bold text-[#102A43] max-w-[160px] truncate" title={`${b.name} — ${b.village}`}>
-                        {b.name} — <span className="text-slate-500 font-normal">{b.village}</span>
-                      </td>
-                      <td className="num-cell text-center font-bold">{formatArabicNumber(b.dailyLoavesCount)}</td>
-                      <td className="num-cell text-center">{formatArabicNumber(b.beneficiaries2023)}</td>
-                      <td className="num-cell text-center font-bold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2023, 3)}</td>
-                      <td className="num-cell text-center">{formatArabicNumber(b.beneficiaries2024)}</td>
-                      <td className="num-cell text-center font-bold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2024, 3)}</td>
-                      <td className="num-cell text-center">{formatArabicNumber(b.beneficiaries2025)}</td>
-                      <td className="num-cell text-center font-bold text-[#102A43]">{formatArabicDecimal(b.avgPerCapita2025, 3)}</td>
-                      <td className="num-cell text-center">{formatArabicDecimal(b.diff24_23, 3)}</td>
-                      <td className="num-cell text-center">{formatArabicDecimal(b.diff25_24, 3)}</td>
-                      <td className="num-cell text-center font-bold text-amber-800">{formatArabicDecimal(b.cumulativeAvgDifference, 3)}</td>
-                      <td className="num-cell text-center font-bold text-emerald-800 bg-emerald-50/50">{formatArabicDecimal(b.dailyShareActual2025, 3)}</td>
-                      <td className="text-center whitespace-nowrap">{renderActionsMenu(b)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+          <SmartAutoFitTable
+            tableId="bakery_averages"
+            userId={currentUser.id}
+            rows={averagesRows}
+            totalCount={activeBakeriesList.length}
+            getRowId={(b) => b.id}
+            columns={[
+              {
+                key: 'name',
+                label: 'المخبز والقرية',
+                headerText: 'المخبز والقرية',
+                type: 'name',
+                defaultWidth: 195,
+                measureValue: (b) => `${b.name} — ${b.village}`,
+                render: (b) => (
+                  <span className="font-extrabold text-[#102A43]">
+                    {b.name} — <span className="text-slate-600 font-bold">{b.village}</span>
+                  </span>
+                ),
+              },
+              {
+                key: 'dailyLoavesCount',
+                label: 'الأرغفة اليومية',
+                headerText: 'الأرغفة اليومية',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 120,
+                measureValue: (b) => formatArabicNumber(b.dailyLoavesCount),
+                render: (b) => <span className="font-extrabold">{formatArabicNumber(b.dailyLoavesCount)}</span>,
+              },
+              {
+                key: 'beneficiaries2023',
+                label: <span className="flex flex-col items-center"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>,
+                headerText: 'المستفيدين ٢٠٢٣',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 105,
+                measureValue: (b) => formatArabicNumber(b.beneficiaries2023),
+                render: (b) => formatArabicNumber(b.beneficiaries2023),
+              },
+              {
+                key: 'avgPerCapita2023',
+                label: <span className="flex flex-col items-center"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٣</span></span>,
+                headerText: 'متوسط ٢٠٢٣',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 95,
+                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
+                render: (b) => <span className="font-extrabold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2023, 3)}</span>,
+              },
+              {
+                key: 'beneficiaries2024',
+                label: <span className="flex flex-col items-center"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>,
+                headerText: 'المستفيدين ٢٠٢٤',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 105,
+                measureValue: (b) => formatArabicNumber(b.beneficiaries2024),
+                render: (b) => formatArabicNumber(b.beneficiaries2024),
+              },
+              {
+                key: 'avgPerCapita2024',
+                label: <span className="flex flex-col items-center"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٤</span></span>,
+                headerText: 'متوسط ٢٠٢٤',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 95,
+                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
+                render: (b) => <span className="font-extrabold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2024, 3)}</span>,
+              },
+              {
+                key: 'beneficiaries2025',
+                label: <span className="flex flex-col items-center"><span>المستفيدين</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>,
+                headerText: 'المستفيدين ٢٠٢٥',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 105,
+                measureValue: (b) => formatArabicNumber(b.beneficiaries2025),
+                render: (b) => formatArabicNumber(b.beneficiaries2025),
+              },
+              {
+                key: 'avgPerCapita2025',
+                label: <span className="flex flex-col items-center"><span>متوسط</span><span className="text-[#C6A15B]">٢٠٢٥</span></span>,
+                headerText: 'متوسط ٢٠٢٥',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 95,
+                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
+                render: (b) => <span className="font-extrabold text-[#102A43]">{formatArabicDecimal(b.avgPerCapita2025, 3)}</span>,
+              },
+              {
+                key: 'diff24_23',
+                label: 'فرق ٢٤−٢٣',
+                headerText: 'فرق ٢٤−٢٣',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 95,
+                measureValue: (b) => formatArabicDecimal(b.diff24_23, 3),
+                render: (b) => formatArabicDecimal(b.diff24_23, 3),
+              },
+              {
+                key: 'diff25_24',
+                label: 'فرق ٢٥−٢٤',
+                headerText: 'فرق ٢٥−٢٤',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 95,
+                measureValue: (b) => formatArabicDecimal(b.diff25_24, 3),
+                render: (b) => formatArabicDecimal(b.diff25_24, 3),
+              },
+              {
+                key: 'cumulativeAvgDifference',
+                label: 'الفرق التراكمي',
+                headerText: 'الفرق التراكمي',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 115,
+                measureValue: (b) => formatArabicDecimal(b.cumulativeAvgDifference, 3),
+                render: (b) => <span className="font-extrabold text-amber-800">{formatArabicDecimal(b.cumulativeAvgDifference, 3)}</span>,
+              },
+              {
+                key: 'dailyShareActual2025',
+                label: 'نصيب الفرد ٢٠٢٥',
+                headerText: 'نصيب الفرد ٢٠٢٥',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 115,
+                measureValue: (b) => formatArabicDecimal(b.dailyShareActual2025, 3),
+                render: (b) => <span className="font-extrabold text-emerald-800">{formatArabicDecimal(b.dailyShareActual2025, 3)}</span>,
+              },
+              {
+                key: 'actions',
+                label: 'الإجراءات',
+                headerText: 'الإجراءات',
+                type: 'actions',
+                align: 'center',
+                sortable: false,
+                defaultWidth: 185,
+                render: (b) => renderActionsMenu(b),
+              },
+            ]}
+            sortKey={averagesSort.key}
+            sortAsc={averagesSort.asc}
+            onSort={(k) => setAveragesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+            selectable
+            selectedIds={selectedBakeryIds}
+            onToggleSelect={toggleSelectBakery}
+            onClearSelection={() => setSelectedBakeryIds([])}
+            pinnedKeys={subPinnedCols}
+            onTogglePinColumn={toggleSubPin}
+            onPinAll={() => setSubPinnedCols(['name'])}
+            onUnpinAll={() => setSubPinnedCols([])}
+            onResetPinDefaults={() => setSubPinnedCols(['name'])}
+            onOpenHeaderCustomizer={() => setShowColumnModal(true)}
+            onNotify={showToast}
+          />
         </div>
       )}
 
@@ -2726,111 +3606,220 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           6. التراخيص والسجلات التجارية والبطاقات الضريبية (Section 6)
          ===================================================================== */}
       {activeSubTab === 'licenses' && (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* جدول تراخيص المخابز */}
-          <div className={`bg-white rounded-2xl border overflow-hidden ${activeFocus === 'doc-licenses' ? 'border-[#102A43] ring-1 ring-[#102A43]/20' : 'border-slate-200'}`}>
-            <div className="p-3.5 bg-[#102A43] text-white flex items-center justify-between">
-              <h3 className="text-xs font-black">أولاً: جدول تراخيص تشغيل المخابز ومواعيد الانتهاء</h3>
-              <span className="text-[11px] text-[#C6A15B]">حساب تلقائي للأيام المتبقية وفرز زمني ورقمي</span>
+          <div className={`bg-white rounded-2xl border overflow-hidden p-4 space-y-3 ${activeFocus === 'doc-licenses' ? 'border-[#102A43] ring-1 ring-[#102A43]/20' : 'border-slate-200'}`}>
+            <div className="p-3.5 bg-[#102A43] text-white rounded-xl flex items-center justify-between">
+              <h3 className="text-[12px] font-black">أولاً: جدول تراخيص تشغيل المخابز ومواعيد الانتهاء</h3>
+              <span className="text-[10.5px] text-[#C6A15B] font-bold">حساب تلقائي للأيام المتبقية وفرز زمني ورقمي</span>
             </div>
-            <div className="overflow-auto max-h-[52vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-                  <tr>
-                    <SortableTh label="اسم المخبز" sortKey="name" activeSortKey={licensesSort.key} sortAsc={licensesSort.asc} onSort={(k) => setLicensesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="اسم المالك" sortKey="ownerName" activeSortKey={licensesSort.key} sortAsc={licensesSort.asc} onSort={(k) => setLicensesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="رقم الترخيص" sortKey="licenseNumber" activeSortKey={licensesSort.key} sortAsc={licensesSort.asc} onSort={(k) => setLicensesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="تاريخ الانتهاء" sortKey="licenseExpiryDate" activeSortKey={licensesSort.key} sortAsc={licensesSort.asc} onSort={(k) => setLicensesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الأيام المتبقية" sortKey="daysRemaining" activeSortKey={licensesSort.key} sortAsc={licensesSort.asc} onSort={(k) => setLicensesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="حالة الترخيص" sortKey="status" activeSortKey={licensesSort.key} sortAsc={licensesSort.asc} onSort={(k) => setLicensesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <th className="text-center">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {activeBakeriesList
-                    .map((b) => {
-                      const ev = evaluateDocumentExpiry(b.licenseExpiryDate, b.licenseNumber, todayRef);
-                      return { bakery: b, ...b, daysRemaining: ev.daysRemaining, status: ev.status, severity: ev.severity };
-                    })
-                    .sort((a, b) =>
-                      compareTableValues(
-                        a[licensesSort.key as keyof typeof a],
-                        b[licensesSort.key as keyof typeof b],
-                        licensesSort.asc
-                      )
-                    )
-                    .map((row, idx) => (
-                      <tr key={row.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-slate-50`}>
-                        <td className="font-bold text-[#102A43]">{row.name} ({row.village})</td>
-                        <td>{row.ownerName}</td>
-                        <td className="num-cell text-center font-bold">{toArabicNumerals(row.licenseNumber || '—')}</td>
-                        <td className="num-cell text-center font-bold">{formatDateArabic(row.licenseExpiryDate)}</td>
-                        <td className="num-cell text-center font-bold">
-                          {row.daysRemaining !== null ? `${formatArabicNumber(row.daysRemaining)} يوم` : '—'}
-                        </td>
-                        <td className="text-center">{renderExpiryStatusBadge(row.status, row.severity)}</td>
-                        <td className="text-center whitespace-nowrap">{renderActionsMenu(row.bakery)}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+
+            <SmartAutoFitTable
+              tableId="bakery_licenses"
+              userId={currentUser.id}
+              rows={licenseRows}
+              totalCount={activeBakeriesList.length}
+              getRowId={(r) => r.id}
+              columns={[
+                {
+                  key: 'name',
+                  label: 'اسم المخبز',
+                  headerText: 'اسم المخبز',
+                  type: 'name',
+                  defaultWidth: 195,
+                  measureValue: (r) => `${r.name} (${r.village})`,
+                  render: (r) => <span className="font-extrabold text-[#102A43]">{r.name} ({r.village})</span>,
+                },
+                {
+                  key: 'ownerName',
+                  label: 'اسم المالك',
+                  headerText: 'اسم المالك',
+                  type: 'name',
+                  defaultWidth: 170,
+                  render: (r) => r.ownerName,
+                },
+                {
+                  key: 'licenseNumber',
+                  label: 'رقم الترخيص',
+                  headerText: 'رقم الترخيص',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 135,
+                  measureValue: (r) => toArabicNumerals(r.licenseNumber || '—'),
+                  render: (r) => <span className="font-extrabold">{toArabicNumerals(r.licenseNumber || '—')}</span>,
+                },
+                {
+                  key: 'licenseExpiryDate',
+                  label: 'تاريخ الانتهاء',
+                  headerText: 'تاريخ الانتهاء',
+                  type: 'date',
+                  align: 'center',
+                  defaultWidth: 130,
+                  measureValue: (r) => formatDateArabic(r.licenseExpiryDate),
+                  render: (r) => <span className="font-extrabold">{formatDateArabic(r.licenseExpiryDate)}</span>,
+                },
+                {
+                  key: 'daysRemaining',
+                  label: 'الأيام المتبقية',
+                  headerText: 'الأيام المتبقية',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 115,
+                  measureValue: (r) => (r.daysRemaining !== null ? `${formatArabicNumber(r.daysRemaining)} يوم` : '—'),
+                  render: (r) => (
+                    <span className="font-extrabold">
+                      {r.daysRemaining !== null ? `${formatArabicNumber(r.daysRemaining)} يوم` : '—'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  label: 'حالة الترخيص',
+                  headerText: 'حالة الترخيص',
+                  type: 'badge',
+                  align: 'center',
+                  defaultWidth: 150,
+                  render: (r) => renderExpiryStatusBadge(r.status, r.severity),
+                },
+                {
+                  key: 'actions',
+                  label: 'الإجراءات',
+                  headerText: 'الإجراءات',
+                  type: 'actions',
+                  align: 'center',
+                  sortable: false,
+                  defaultWidth: 185,
+                  render: (r) => renderActionsMenu(r.bakery),
+                },
+              ]}
+              sortKey={licensesSort.key}
+              sortAsc={licensesSort.asc}
+              onSort={(k) => setLicensesSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+              selectable
+              selectedIds={selectedBakeryIds}
+              onToggleSelect={toggleSelectBakery}
+              onClearSelection={() => setSelectedBakeryIds([])}
+              pinnedKeys={subPinnedCols}
+              onTogglePinColumn={toggleSubPin}
+              onPinAll={() => setSubPinnedCols(['name'])}
+              onUnpinAll={() => setSubPinnedCols([])}
+              onResetPinDefaults={() => setSubPinnedCols(['name'])}
+              onNotify={showToast}
+              theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+            />
           </div>
 
           {/* جدول البطاقات الضريبية والسجلات التجارية */}
-          <div className={`bg-white rounded-2xl border overflow-hidden ${activeFocus === 'doc-tax' || activeFocus === 'doc-commercial' ? 'border-[#164E83] ring-1 ring-[#164E83]/25' : 'border-slate-200'}`}>
-            <div className="p-3.5 bg-[#164E83] text-white flex items-center justify-between">
-              <h3 className="text-xs font-black">
+          <div className={`bg-white rounded-2xl border overflow-hidden p-4 space-y-3 ${activeFocus === 'doc-tax' || activeFocus === 'doc-commercial' ? 'border-[#164E83] ring-1 ring-[#164E83]/25' : 'border-slate-200'}`}>
+            <div className="p-3.5 bg-[#164E83] text-white rounded-xl flex items-center justify-between">
+              <h3 className="text-[12px] font-black">
                 {activeFocus === 'doc-commercial'
                   ? 'ثانياً: جدول السجلات التجارية والبطاقات الضريبية'
                   : 'ثانياً: جدول البطاقات الضريبية والسجلات التجارية'}
               </h3>
-              <span className="text-[11px] text-slate-200">متابعة الصلاحية الضريبية والتجارية</span>
+              <span className="text-[10.5px] text-slate-200 font-bold">متابعة الصلاحية الضريبية والتجارية</span>
             </div>
-            <div className="overflow-auto max-h-[52vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-                  <tr>
-                    <SortableTh label="اسم المخبز" sortKey="name" activeSortKey={taxSort.key} sortAsc={taxSort.asc} onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="السجل التجاري" sortKey="commercialRegisterNumber" activeSortKey={taxSort.key} sortAsc={taxSort.asc} onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="انتهاء السجل" sortKey="commercialRegisterExpiryDate" activeSortKey={taxSort.key} sortAsc={taxSort.asc} onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="البطاقة الضريبية" sortKey="taxCardNumber" activeSortKey={taxSort.key} sortAsc={taxSort.asc} onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="انتهاء الضريبية" sortKey="taxCardExpiryDate" activeSortKey={taxSort.key} sortAsc={taxSort.asc} onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الأيام المتبقية" sortKey="daysRemaining" activeSortKey={taxSort.key} sortAsc={taxSort.asc} onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الحالة" sortKey="status" activeSortKey={taxSort.key} sortAsc={taxSort.asc} onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <th className="text-center">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {activeBakeriesList
-                    .map((b) => {
-                      const ev = evaluateDocumentExpiry(b.taxCardExpiryDate, b.taxCardNumber, todayRef);
-                      return { bakery: b, ...b, daysRemaining: ev.daysRemaining, status: ev.status, severity: ev.severity };
-                    })
-                    .sort((a, b) =>
-                      compareTableValues(
-                        a[taxSort.key as keyof typeof a],
-                        b[taxSort.key as keyof typeof b],
-                        taxSort.asc
-                      )
-                    )
-                    .map((row, idx) => (
-                      <tr key={row.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-slate-50`}>
-                        <td className="font-bold text-[#102A43]">{row.name}</td>
-                        <td className="num-cell text-center">{toArabicNumerals(row.commercialRegisterNumber || '—')}</td>
-                        <td className="num-cell text-center">{formatDateArabic(row.commercialRegisterExpiryDate)}</td>
-                        <td className="num-cell text-center font-bold">{toArabicNumerals(row.taxCardNumber || '—')}</td>
-                        <td className="num-cell text-center font-bold">{formatDateArabic(row.taxCardExpiryDate)}</td>
-                        <td className="num-cell text-center font-bold">
-                          {row.daysRemaining !== null ? `${formatArabicNumber(row.daysRemaining)} يوم` : '—'}
-                        </td>
-                        <td className="text-center">{renderExpiryStatusBadge(row.status, row.severity)}</td>
-                        <td className="text-center whitespace-nowrap">{renderActionsMenu(row.bakery)}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+
+            <SmartAutoFitTable
+              tableId="bakery_tax_commercial"
+              userId={currentUser.id}
+              rows={taxRows}
+              totalCount={activeBakeriesList.length}
+              getRowId={(r) => r.id}
+              columns={[
+                {
+                  key: 'name',
+                  label: 'اسم المخبز',
+                  headerText: 'اسم المخبز',
+                  type: 'name',
+                  defaultWidth: 180,
+                  render: (r) => <span className="font-extrabold text-[#102A43]">{r.name}</span>,
+                },
+                {
+                  key: 'commercialRegisterNumber',
+                  label: 'السجل التجاري',
+                  headerText: 'السجل التجاري',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 135,
+                  measureValue: (r) => toArabicNumerals(r.commercialRegisterNumber || '—'),
+                  render: (r) => toArabicNumerals(r.commercialRegisterNumber || '—'),
+                },
+                {
+                  key: 'commercialRegisterExpiryDate',
+                  label: 'انتهاء السجل',
+                  headerText: 'انتهاء السجل',
+                  type: 'date',
+                  align: 'center',
+                  defaultWidth: 125,
+                  measureValue: (r) => formatDateArabic(r.commercialRegisterExpiryDate),
+                  render: (r) => formatDateArabic(r.commercialRegisterExpiryDate),
+                },
+                {
+                  key: 'taxCardNumber',
+                  label: 'البطاقة الضريبية',
+                  headerText: 'البطاقة الضريبية',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 140,
+                  measureValue: (r) => toArabicNumerals(r.taxCardNumber || '—'),
+                  render: (r) => <span className="font-extrabold">{toArabicNumerals(r.taxCardNumber || '—')}</span>,
+                },
+                {
+                  key: 'taxCardExpiryDate',
+                  label: 'انتهاء الضريبية',
+                  headerText: 'انتهاء الضريبية',
+                  type: 'date',
+                  align: 'center',
+                  defaultWidth: 125,
+                  measureValue: (r) => formatDateArabic(r.taxCardExpiryDate),
+                  render: (r) => <span className="font-extrabold">{formatDateArabic(r.taxCardExpiryDate)}</span>,
+                },
+                {
+                  key: 'daysRemaining',
+                  label: 'الأيام المتبقية',
+                  headerText: 'الأيام المتبقية',
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 115,
+                  measureValue: (r) => (r.daysRemaining !== null ? `${formatArabicNumber(r.daysRemaining)} يوم` : '—'),
+                  render: (r) => (
+                    <span className="font-extrabold">
+                      {r.daysRemaining !== null ? `${formatArabicNumber(r.daysRemaining)} يوم` : '—'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  label: 'الحالة',
+                  headerText: 'الحالة',
+                  type: 'badge',
+                  align: 'center',
+                  defaultWidth: 150,
+                  render: (r) => renderExpiryStatusBadge(r.status, r.severity),
+                },
+                {
+                  key: 'actions',
+                  label: 'الإجراءات',
+                  headerText: 'الإجراءات',
+                  type: 'actions',
+                  align: 'center',
+                  sortable: false,
+                  defaultWidth: 185,
+                  render: (r) => renderActionsMenu(r.bakery),
+                },
+              ]}
+              sortKey={taxSort.key}
+              sortAsc={taxSort.asc}
+              onSort={(k) => setTaxSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+              pinnedKeys={subPinnedCols}
+              onTogglePinColumn={toggleSubPin}
+              onPinAll={() => setSubPinnedCols(['name'])}
+              onUnpinAll={() => setSubPinnedCols([])}
+              onResetPinDefaults={() => setSubPinnedCols(['name'])}
+              onNotify={showToast}
+              theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+            />
           </div>
         </div>
       )}
@@ -2839,53 +3828,106 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           7. العقود والإيجارات (Section 6)
          ===================================================================== */}
       {activeSubTab === 'contracts' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-3.5 bg-[#102A43] text-white flex items-center justify-between">
-            <h3 className="text-xs font-black">جدول العقود والإيجارات وسندات الملكية للمخابز</h3>
-            <span className="text-[11px] text-[#C6A15B]">متابعة مدد الإيجار والانتفاع</span>
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-4 space-y-3">
+          <div className="p-3.5 bg-[#102A43] text-white rounded-xl flex items-center justify-between">
+            <h3 className="text-[12px] font-black">جدول العقود والإيجارات وسندات الملكية للمخابز</h3>
+            <span className="text-[10.5px] text-[#C6A15B] font-bold">متابعة مدد الإيجار والانتفاع</span>
           </div>
-          <div className="overflow-auto max-h-[62vh] compact-table-scroll">
-            <table className="w-full text-right">
-              <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-                <tr>
-                  <SortableTh label="اسم المخبز" sortKey="name" activeSortKey={contractsSort.key} sortAsc={contractsSort.asc} onSort={(k) => setContractsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="نوع العقد" sortKey="leaseContractType" activeSortKey={contractsSort.key} sortAsc={contractsSort.asc} onSort={(k) => setContractsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="رقم العقد" sortKey="leaseContractNumber" activeSortKey={contractsSort.key} sortAsc={contractsSort.asc} onSort={(k) => setContractsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="نهاية العقد" sortKey="leaseExpiryDate" activeSortKey={contractsSort.key} sortAsc={contractsSort.asc} onSort={(k) => setContractsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="الأيام المتبقية" sortKey="daysRemaining" activeSortKey={contractsSort.key} sortAsc={contractsSort.asc} onSort={(k) => setContractsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="حالة العقد" sortKey="status" activeSortKey={contractsSort.key} sortAsc={contractsSort.asc} onSort={(k) => setContractsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <th className="text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {activeBakeriesList
-                  .map((b) => {
-                    const ev = evaluateDocumentExpiry(b.leaseExpiryDate, b.leaseContractNumber, todayRef);
-                    return { bakery: b, ...b, daysRemaining: ev.daysRemaining, status: ev.status, severity: ev.severity };
-                  })
-                  .sort((a, b) =>
-                    compareTableValues(
-                      a[contractsSort.key as keyof typeof a],
-                      b[contractsSort.key as keyof typeof b],
-                      contractsSort.asc
-                    )
-                  )
-                  .map((row, idx) => (
-                    <tr key={row.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-slate-50`}>
-                      <td className="font-bold text-[#102A43]">{row.name} ({row.village})</td>
-                      <td className="text-center font-bold">{row.leaseContractType}</td>
-                      <td className="num-cell text-center">{toArabicNumerals(row.leaseContractNumber || '—')}</td>
-                      <td className="num-cell text-center font-bold">{formatDateArabic(row.leaseExpiryDate)}</td>
-                      <td className="num-cell text-center font-bold">
-                        {row.daysRemaining !== null ? `${formatArabicNumber(row.daysRemaining)} يوم` : '—'}
-                      </td>
-                      <td className="text-center">{renderExpiryStatusBadge(row.status, row.severity)}</td>
-                      <td className="text-center whitespace-nowrap">{renderActionsMenu(row.bakery)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+
+          <SmartAutoFitTable
+            tableId="bakery_contracts"
+            userId={currentUser.id}
+            rows={contractRows}
+            totalCount={activeBakeriesList.length}
+            getRowId={(r) => r.id}
+            columns={[
+              {
+                key: 'name',
+                label: 'اسم المخبز',
+                headerText: 'اسم المخبز',
+                type: 'name',
+                defaultWidth: 195,
+                measureValue: (r) => `${r.name} (${r.village})`,
+                render: (r) => <span className="font-extrabold text-[#102A43]">{r.name} ({r.village})</span>,
+              },
+              {
+                key: 'leaseContractType',
+                label: 'نوع العقد',
+                headerText: 'نوع العقد',
+                type: 'badge',
+                align: 'center',
+                defaultWidth: 115,
+                render: (r) => <span className="font-extrabold">{r.leaseContractType}</span>,
+              },
+              {
+                key: 'leaseContractNumber',
+                label: 'رقم العقد',
+                headerText: 'رقم العقد',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 145,
+                measureValue: (r) => toArabicNumerals(r.leaseContractNumber || '—'),
+                render: (r) => toArabicNumerals(r.leaseContractNumber || '—'),
+              },
+              {
+                key: 'leaseExpiryDate',
+                label: 'نهاية العقد',
+                headerText: 'نهاية العقد',
+                type: 'date',
+                align: 'center',
+                defaultWidth: 130,
+                measureValue: (r) => formatDateArabic(r.leaseExpiryDate),
+                render: (r) => <span className="font-extrabold">{formatDateArabic(r.leaseExpiryDate)}</span>,
+              },
+              {
+                key: 'daysRemaining',
+                label: 'الأيام المتبقية',
+                headerText: 'الأيام المتبقية',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 115,
+                measureValue: (r) => (r.daysRemaining !== null ? `${formatArabicNumber(r.daysRemaining)} يوم` : '—'),
+                render: (r) => (
+                  <span className="font-extrabold">
+                    {r.daysRemaining !== null ? `${formatArabicNumber(r.daysRemaining)} يوم` : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                label: 'حالة العقد',
+                headerText: 'حالة العقد',
+                type: 'badge',
+                align: 'center',
+                defaultWidth: 150,
+                render: (r) => renderExpiryStatusBadge(r.status, r.severity),
+              },
+              {
+                key: 'actions',
+                label: 'الإجراءات',
+                headerText: 'الإجراءات',
+                type: 'actions',
+                align: 'center',
+                sortable: false,
+                defaultWidth: 185,
+                render: (r) => renderActionsMenu(r.bakery),
+              },
+            ]}
+            sortKey={contractsSort.key}
+            sortAsc={contractsSort.asc}
+            onSort={(k) => setContractsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+            selectable
+            selectedIds={selectedBakeryIds}
+            onToggleSelect={toggleSelectBakery}
+            onClearSelection={() => setSelectedBakeryIds([])}
+            pinnedKeys={subPinnedCols}
+            onTogglePinColumn={toggleSubPin}
+            onPinAll={() => setSubPinnedCols(['name'])}
+            onUnpinAll={() => setSubPinnedCols([])}
+            onResetPinDefaults={() => setSubPinnedCols(['name'])}
+            onNotify={showToast}
+            theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+          />
         </div>
       )}
 
@@ -2897,10 +3939,10 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           {/* Audio Alert Controls Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <h2 className="text-sm font-black text-[#102A43]">
+              <h2 className="text-[13px] font-black text-[#102A43]">
                 مركز التنبيهات الذكي والصوتي لمواعيد انتهاء التراخيص والعقود (٣٠ / ١٥ / ٧ / ٣ أيام / يوم الانتهاء / منتهي)
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] font-bold text-slate-600 mt-0.5">
                 إشعارات صوتية مميزة للتراخيص المنتهية والعقود التي قاربت على الانتهاء مع حفظ إجراءات المتابعة والتجديد
               </p>
             </div>
@@ -2909,7 +3951,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               <button
                 type="button"
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 border cursor-pointer ${
                   soundEnabled
                     ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
                     : 'bg-slate-100 text-slate-600 border-slate-300'
@@ -2919,8 +3961,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <span>{soundEnabled ? 'التنبيه الصوتي مفعل' : 'الصوت مكتوم'}</span>
               </button>
 
-              <div className="flex items-center gap-2 bg-[#F4F7FB] px-2.5 py-1.5 rounded-xl border border-slate-200">
-                <span className="text-[11px] font-bold text-slate-600">الصوت:</span>
+              <div className="flex items-center gap-2 bg-[#F4F7FB] px-3 py-2 rounded-xl border border-slate-200">
+                <span className="text-[10.5px] font-extrabold text-slate-700">الصوت:</span>
                 <input
                   type="range"
                   min={0.1}
@@ -2935,201 +3977,308 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               <button
                 type="button"
                 onClick={() => playAlertSound('expired_license', soundVolume)}
-                className="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                className="px-3.5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-[11px] font-extrabold cursor-pointer"
               >
                 اختبار صوت منتهي
               </button>
               <button
                 type="button"
                 onClick={() => playAlertSound('expiring_contract', soundVolume)}
-                className="px-3 py-1.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-xs font-bold cursor-pointer"
+                className="px-3.5 py-2 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-[11px] font-extrabold cursor-pointer"
               >
                 اختبار صوت قارب الانتهاء
               </button>
             </div>
           </div>
 
-          {/* Sortable Alerts Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-[#102A43] text-white sticky top-0 z-10">
-                  <tr>
-                    <SortableTh label="اسم المخبز" sortKey="bakeryName" activeSortKey={alertsSort.key} sortAsc={alertsSort.asc} onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="صاحب المخبز" sortKey="ownerName" activeSortKey={alertsSort.key} sortAsc={alertsSort.asc} onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="القرية والوحدة" sortKey="village" activeSortKey={alertsSort.key} sortAsc={alertsSort.asc} onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="نوع المستند" sortKey="docLabel" activeSortKey={alertsSort.key} sortAsc={alertsSort.asc} onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="تاريخ الانتهاء" sortKey="expiryDate" activeSortKey={alertsSort.key} sortAsc={alertsSort.asc} onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="الأيام المتبقية" sortKey="daysRemaining" activeSortKey={alertsSort.key} sortAsc={alertsSort.asc} onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="حالة المستند" sortKey="status" activeSortKey={alertsSort.key} sortAsc={alertsSort.asc} onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <th className="text-center">موقف المتابعة</th>
-                    <th className="text-center">إجراءات فورية</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {allAlerts.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="py-10 text-center text-emerald-700 font-bold">
-                        جميع تراخيص وعقود المخابز سارية ولا توجد تنبيهات مستحقة حالياً.
-                      </td>
-                    </tr>
+          <SmartAutoFitTable
+            tableId="bakery_alerts"
+            userId={currentUser.id}
+            rows={alertRows}
+            totalCount={allAlerts.length}
+            getRowId={(al) => al.alertId}
+            columns={[
+              {
+                key: 'bakeryName',
+                label: 'اسم المخبز',
+                headerText: 'اسم المخبز',
+                type: 'name',
+                defaultWidth: 180,
+                render: (al) => <span className="font-extrabold text-[#102A43]">{al.bakery.name}</span>,
+              },
+              {
+                key: 'ownerName',
+                label: 'صاحب المخبز',
+                headerText: 'صاحب المخبز',
+                type: 'name',
+                defaultWidth: 165,
+                render: (al) => al.bakery.ownerName,
+              },
+              {
+                key: 'village',
+                label: 'القرية والوحدة',
+                headerText: 'القرية والوحدة',
+                type: 'name',
+                defaultWidth: 195,
+                measureValue: (al) => `${al.bakery.village} — ${al.bakery.localUnit}`,
+                render: (al) => (
+                  <span>
+                    {al.bakery.village} — <span className="text-slate-600">{al.bakery.localUnit}</span>
+                  </span>
+                ),
+              },
+              {
+                key: 'docLabel',
+                label: 'نوع المستند',
+                headerText: 'نوع المستند',
+                type: 'text',
+                defaultWidth: 155,
+                render: (al) => <span className="font-extrabold text-[#164E83]">{al.docLabel}</span>,
+              },
+              {
+                key: 'expiryDate',
+                label: 'تاريخ الانتهاء',
+                headerText: 'تاريخ الانتهاء',
+                type: 'date',
+                align: 'center',
+                defaultWidth: 125,
+                measureValue: (al) => formatDateArabic(al.expiryDate),
+                render: (al) => <span className="font-extrabold">{formatDateArabic(al.expiryDate)}</span>,
+              },
+              {
+                key: 'daysRemaining',
+                label: 'الأيام المتبقية',
+                headerText: 'الأيام المتبقية',
+                type: 'numeric',
+                align: 'center',
+                defaultWidth: 115,
+                measureValue: (al) => (al.daysRemaining !== null ? `${formatArabicNumber(al.daysRemaining)} يوم` : '—'),
+                render: (al) => (
+                  <span className="font-extrabold">
+                    {al.daysRemaining !== null ? `${formatArabicNumber(al.daysRemaining)} يوم` : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                label: 'حالة المستند',
+                headerText: 'حالة المستند',
+                type: 'badge',
+                align: 'center',
+                defaultWidth: 150,
+                render: (al) => renderExpiryStatusBadge(al.status, al.severity),
+              },
+              {
+                key: 'followUp',
+                label: 'موقف المتابعة',
+                headerText: 'موقف المتابعة',
+                type: 'badge',
+                align: 'center',
+                sortable: false,
+                defaultWidth: 140,
+                render: (al) =>
+                  al.actionState ? (
+                    <span className="text-[10px] font-extrabold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                      {al.actionState.action === 'postponed'
+                        ? `مؤجل (${toArabicNumerals(al.actionState.postponedUntil)})`
+                        : 'تم التجديد'}
+                    </span>
                   ) : (
-                    allAlerts
-                      .map((al) => ({
-                        ...al,
-                        bakeryName: al.bakery.name,
-                        ownerName: al.bakery.ownerName,
-                        village: al.bakery.village,
-                      }))
-                      .sort((a, b) =>
-                        compareTableValues(
-                          a[alertsSort.key as keyof typeof a],
-                          b[alertsSort.key as keyof typeof b],
-                          alertsSort.asc
-                        )
-                      )
-                      .map((al, idx) => (
-                        <tr key={al.alertId} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-slate-50`}>
-                          <td className="font-bold text-[#102A43]">{al.bakery.name}</td>
-                          <td>{al.bakery.ownerName}</td>
-                          <td>
-                            {al.bakery.village} — <span className="text-slate-500">{al.bakery.localUnit}</span>
-                          </td>
-                          <td className="font-bold text-[#164E83]">{al.docLabel}</td>
-                          <td className="num-cell text-center font-bold">{formatDateArabic(al.expiryDate)}</td>
-                          <td className="num-cell text-center font-bold">
-                            {al.daysRemaining !== null ? `${formatArabicNumber(al.daysRemaining)} يوم` : '—'}
-                          </td>
-                          <td className="text-center">{renderExpiryStatusBadge(al.status, al.severity)}</td>
-                          <td className="text-center">
-                            {al.actionState ? (
-                              <span className="text-[10.5px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                {al.actionState.action === 'postponed'
-                                  ? `مؤجل (${toArabicNumerals(al.actionState.postponedUntil)})`
-                                  : 'تم التجديد'}
-                              </span>
-                            ) : (
-                              <span className="text-[10.5px] text-slate-500">قيد المتابعة</span>
-                            )}
-                          </td>
-                          <td className="text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAction(al.bakery, 'details')}
-                                className="px-2 py-1 bg-[#102A43] text-white rounded text-[10.5px] font-bold cursor-pointer"
-                              >
-                                الملف
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleAlertQuickRenew(al.bakery, al.docType)}
-                                className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10.5px] font-bold cursor-pointer"
-                              >
-                                تجديد
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleAlertPostpone(al.bakery, al.docType)}
-                                className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded text-[10.5px] font-bold cursor-pointer"
-                              >
-                                تأجيل
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    <span className="text-[10px] font-bold text-slate-600">قيد المتابعة</span>
+                  ),
+              },
+              {
+                key: 'actions',
+                label: 'إجراءات فورية',
+                headerText: 'إجراءات فورية',
+                type: 'actions',
+                align: 'center',
+                sortable: false,
+                defaultWidth: 195,
+                render: (al) => (
+                  <div className="flex items-center justify-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAction(al.bakery, 'details')}
+                      className="px-2.5 py-1 bg-[#102A43] text-white rounded text-[10px] font-extrabold cursor-pointer"
+                    >
+                      الملف
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAlertQuickRenew(al.bakery, al.docType)}
+                      className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-extrabold cursor-pointer"
+                    >
+                      تجديد
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAlertPostpone(al.bakery, al.docType)}
+                      className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded text-[10px] font-extrabold cursor-pointer"
+                    >
+                      تأجيل
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+            sortKey={alertsSort.key}
+            sortAsc={alertsSort.asc}
+            onSort={(k) => setAlertsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+            pinnedKeys={subPinnedCols}
+            onTogglePinColumn={toggleSubPin}
+            onPinAll={() => setSubPinnedCols(['bakeryName'])}
+            onUnpinAll={() => setSubPinnedCols([])}
+            onResetPinDefaults={() => setSubPinnedCols(['bakeryName'])}
+            onNotify={showToast}
+            emptyMessage="جميع تراخيص وعقود المخابز سارية ولا توجد تنبيهات مستحقة حالياً."
+          />
         </div>
       )}
 
       {/* =====================================================================
-          9. سجل التعديلات والمراجعة Audit Log (Section 14)
+          9. سجل التعديلات والمراجعة (Section 14)
          ===================================================================== */}
       {activeSubTab === 'audit' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-3.5 bg-[#102A43] text-white flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-4 space-y-3">
+          <div className="p-3.5 bg-[#102A43] text-white rounded-xl flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-black">سجل التدقيق والمراجعة لتعديلات المخابز والحصص والتراخيص والعقود (Immutable Audit Log)</h3>
-              <p className="text-[10.5px] text-slate-300">غير قابل للحذف أو التعديل من المستخدمين العاديين</p>
+              <h3 className="text-[12px] font-black">سجل التدقيق والمراجعة لتعديلات المخابز والحصص والتراخيص والعقود (سجل تدقيق رسمي محمي)</h3>
+              <p className="text-[10.5px] text-slate-300 font-bold">غير قابل للحذف أو التعديل من المستخدمين العاديين</p>
             </div>
-            <span className="text-xs text-[#C6A15B] font-bold">{formatArabicNumber(auditChanges.length)} عملية موثقة</span>
+            <span className="num-cell text-[11px] text-[#C6A15B] font-extrabold">{formatArabicNumber(auditChanges.length)} عملية موثقة</span>
           </div>
-          <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-            <table className="w-full text-right">
-              <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-                <tr>
-                  <SortableTh label="التاريخ والوقت" sortKey="timestamp" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  <SortableTh label="المخبز" sortKey="bakeryName" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="نوع العملية" sortKey="actionType" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <SortableTh label="الحقل المعدل" sortKey="fieldName" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                  <th>القيمة القديمة</th>
-                  <th>القيمة الجديدة</th>
-                  <th>سبب التعديل</th>
-                  <SortableTh label="المسؤول المنفذ" sortKey="performedBy" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {[...auditChanges]
-                  .sort((a, b) => compareTableValues(a[auditSort.key as keyof BakeryAuditChange], b[auditSort.key as keyof BakeryAuditChange], auditSort.asc))
-                  .map((ch, idx) => (
-                    <tr key={ch.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-slate-50`}>
-                      <td className="num-cell text-center text-slate-600">{formatDateArabic(ch.timestamp, true)}</td>
-                      <td className="font-bold text-[#102A43]">{ch.bakeryName}</td>
-                      <td className="font-bold text-[#164E83]">{ch.actionType}</td>
-                      <td>{ch.fieldName}</td>
-                      <td className="text-red-700">{toArabicNumerals(ch.oldValue)}</td>
-                      <td className="text-emerald-800 font-bold">{toArabicNumerals(ch.newValue)}</td>
-                      <td className="text-slate-700 max-w-[200px] truncate" title={ch.reason}>{toArabicNumerals(ch.reason)}</td>
-                      <td className="font-bold text-[#102A43]">{ch.performedBy}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+
+          <SmartAutoFitTable
+            tableId="bakery_audit"
+            userId={currentUser.id}
+            rows={auditChanges}
+            totalCount={auditChanges.length}
+            getRowId={(ch) => ch.id}
+            columns={[
+              {
+                key: 'timestamp',
+                label: 'التاريخ والوقت',
+                headerText: 'التاريخ والوقت',
+                type: 'date',
+                align: 'center',
+                defaultWidth: 155,
+                measureValue: (ch) => formatDateArabic(ch.timestamp, true),
+                render: (ch) => <span className="text-slate-700">{formatDateArabic(ch.timestamp, true)}</span>,
+              },
+              {
+                key: 'bakeryName',
+                label: 'المخبز',
+                headerText: 'المخبز',
+                type: 'name',
+                defaultWidth: 185,
+                render: (ch) => <span className="font-extrabold text-[#102A43]">{ch.bakeryName}</span>,
+              },
+              {
+                key: 'actionType',
+                label: 'نوع العملية',
+                headerText: 'نوع العملية',
+                type: 'text',
+                defaultWidth: 135,
+                render: (ch) => <span className="font-extrabold text-[#164E83]">{ch.actionType}</span>,
+              },
+              {
+                key: 'fieldName',
+                label: 'الحقل المعدل',
+                headerText: 'الحقل المعدل',
+                type: 'text',
+                defaultWidth: 155,
+                render: (ch) => ch.fieldName,
+              },
+              {
+                key: 'oldValue',
+                label: 'القيمة القديمة',
+                headerText: 'القيمة القديمة',
+                type: 'longText',
+                sortable: false,
+                defaultWidth: 165,
+                measureValue: (ch) => toArabicNumerals(ch.oldValue),
+                render: (ch) => <span className="text-red-700">{toArabicNumerals(ch.oldValue)}</span>,
+              },
+              {
+                key: 'newValue',
+                label: 'القيمة الجديدة',
+                headerText: 'القيمة الجديدة',
+                type: 'longText',
+                sortable: false,
+                defaultWidth: 185,
+                measureValue: (ch) => toArabicNumerals(ch.newValue),
+                render: (ch) => <span className="text-emerald-800 font-extrabold">{toArabicNumerals(ch.newValue)}</span>,
+              },
+              {
+                key: 'reason',
+                label: 'سبب التعديل',
+                headerText: 'سبب التعديل',
+                type: 'longText',
+                sortable: false,
+                defaultWidth: 220,
+                measureValue: (ch) => toArabicNumerals(ch.reason),
+                render: (ch) => <span className="text-slate-700">{toArabicNumerals(ch.reason)}</span>,
+              },
+              {
+                key: 'performedBy',
+                label: 'المسؤول المنفذ',
+                headerText: 'المسؤول المنفذ',
+                type: 'name',
+                defaultWidth: 155,
+                render: (ch) => <span className="font-extrabold text-[#102A43]">{ch.performedBy}</span>,
+              },
+            ]}
+            sortKey={auditSort.key}
+            sortAsc={auditSort.asc}
+            onSort={(k) => setAuditSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+            pinnedKeys={subPinnedCols}
+            onTogglePinColumn={toggleSubPin}
+            onPinAll={() => setSubPinnedCols(['bakeryName'])}
+            onUnpinAll={() => setSubPinnedCols([])}
+            onResetPinDefaults={() => setSubPinnedCols(['bakeryName'])}
+            onNotify={showToast}
+            theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+          />
         </div>
       )}
 
       {/* =====================================================================
-          10. مركز التقارير والإحصائيات — 18 تقريراً رسمياً (Section 11)
+          10. مركز التقارير والإحصائيات — ١٨ تقريراً رسمياً (Section 11)
          ===================================================================== */}
       {activeSubTab === 'reports' && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* 18 Reports Selector Grid */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200">
-            <h2 className="text-sm font-black text-[#102A43] mb-3">
-              اختر التقرير الرسمي المطلوب استخراجه من بين (18) تقريراً معتمداً:
+            <h2 className="text-[13px] font-black text-[#102A43] mb-3">
+              اختر التقرير الرسمي المطلوب استخراجه من بين (١٨) تقريراً معتمداً:
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {[
-                { id: 1, title: '1. تقرير شامل لجميع المخابز' },
-                { id: 2, title: '2. تقرير المخابز حسب القرية' },
-                { id: 3, title: '3. تقرير المخابز حسب الوحدة المحلية' },
-                { id: 4, title: '4. تقرير الحصص الفعلية والتأمينية' },
-                { id: 5, title: '5. تقرير عدد الأرغفة اليومية' },
-                { id: 6, title: '6. تقرير متوسطات نصيب الفرد 2023' },
-                { id: 7, title: '7. تقرير متوسطات نصيب الفرد 2024' },
-                { id: 8, title: '8. تقرير متوسطات نصيب الفرد 2025' },
-                { id: 9, title: '9. تقرير مقارنة المتوسطات بين السنوات' },
-                { id: 10, title: '10. تقرير المخابز ذات البيانات الناقصة' },
-                { id: 11, title: '11. تقرير التراخيص السارية' },
-                { id: 12, title: '12. تقرير التراخيص المنتهية' },
-                { id: 13, title: '13. تقرير التراخيص التي قاربت على الانتهاء' },
-                { id: 14, title: '14. تقرير البطاقات الضريبية' },
-                { id: 15, title: '15. تقرير العقود المنتهية' },
-                { id: 16, title: '16. تقرير العقود التي قاربت على الانتهاء' },
-                { id: 17, title: '17. تقرير شامل بالمستندات المطلوب تجديدها' },
-                { id: 18, title: '18. تقرير موقف تفصيلي لكل مخبز' },
+                { id: 1, title: '١. تقرير شامل لجميع المخابز' },
+                { id: 2, title: '٢. تقرير المخابز حسب القرية' },
+                { id: 3, title: '٣. تقرير المخابز حسب الوحدة المحلية' },
+                { id: 4, title: '٤. تقرير الحصص الفعلية والتأمينية' },
+                { id: 5, title: '٥. تقرير عدد الأرغفة اليومية' },
+                { id: 6, title: '٦. تقرير متوسطات نصيب الفرد ٢٠٢٣' },
+                { id: 7, title: '٧. تقرير متوسطات نصيب الفرد ٢٠٢٤' },
+                { id: 8, title: '٨. تقرير متوسطات نصيب الفرد ٢٠٢٥' },
+                { id: 9, title: '٩. تقرير مقارنة المتوسطات بين السنوات' },
+                { id: 10, title: '١٠. تقرير المخابز ذات البيانات الناقصة' },
+                { id: 11, title: '١١. تقرير التراخيص السارية' },
+                { id: 12, title: '١٢. تقرير التراخيص المنتهية' },
+                { id: 13, title: '١٣. تقرير التراخيص التي قاربت على الانتهاء' },
+                { id: 14, title: '١٤. تقرير البطاقات الضريبية' },
+                { id: 15, title: '١٥. تقرير العقود المنتهية' },
+                { id: 16, title: '١٦. تقرير العقود التي قاربت على الانتهاء' },
+                { id: 17, title: '١٧. تقرير شامل بالمستندات المطلوب تجديدها' },
+                { id: 18, title: '١٨. تقرير موقف تفصيلي لكل مخبز' },
               ].map((rep) => (
                 <button
                   key={rep.id}
                   type="button"
                   onClick={() => setSelectedReportId(rep.id)}
-                  className={`p-3 rounded-xl text-right text-xs font-bold border transition-all cursor-pointer ${
+                  className={`p-3 rounded-xl text-right text-[11px] font-extrabold border transition-all cursor-pointer ${
                     selectedReportId === rep.id
                       ? 'bg-[#102A43] text-white border-[#102A43] shadow-sm'
                       : 'bg-[#F4F7FB] text-[#102A43] border-slate-200 hover:bg-slate-200/70'
@@ -3146,15 +4295,15 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {/* Official Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b-2 border-[#102A43] gap-4">
               <div>
-                <p className="text-xs font-black text-[#102A43]">جمهورية مصر العربية — محافظة الغربية</p>
-                <p className="text-xs font-bold text-[#164E83]">مديرية التموين والتجارة الداخلية بالغربية</p>
-                <p className="text-xs font-bold text-[#102A43]">إدارة تموين مركز المحلة الكبرى — قسم المخابز</p>
+                <p className="text-[11px] font-black text-[#102A43]">جمهورية مصر العربية — محافظة الغربية</p>
+                <p className="text-[11px] font-extrabold text-[#164E83]">مديرية التموين والتجارة الداخلية بالغربية</p>
+                <p className="text-[11px] font-extrabold text-[#102A43]">إدارة تموين مركز المحلة الكبرى — قسم المخابز</p>
               </div>
               <div className="text-center">
                 <h3 className="text-base sm:text-lg font-black text-[#102A43]">
-                  التقرير الرسمي رقم ({selectedReportId}) — بيان رقابي معتمد
+                  التقرير الرسمي رقم ({formatArabicNumber(selectedReportId)}) — بيان رقابي معتمد
                 </h3>
-                <span className="text-[11px] font-mono text-slate-600">
+                <span className="text-[10.5px] font-bold text-slate-600">
                   تاريخ ووقت الإنشاء: {formatDateArabic(clientNowIso, true)}
                 </span>
               </div>
@@ -3162,104 +4311,196 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="px-4 py-2 bg-[#102A43] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-[#102A43] text-white rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-4 h-4 text-[#C6A15B]" />
-                  <span>طباعة التقرير A4</span>
+                  <span>طباعة التقرير</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleExportCSV(activeBakeriesList, `تقرير_${selectedReportId}_مخابز_المحلة`)}
-                  className="px-4 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-emerald-700 text-white rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>تصدير Excel</span>
+                  <span>تصدير إكسل</span>
                 </button>
               </div>
             </div>
 
             {/* Statistical Summary Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#F4F7FB] p-4 rounded-xl border border-slate-200 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#F4F7FB] p-4 rounded-xl border border-slate-200 text-[11px]">
               <div>
-                <span className="text-slate-500 block">إجمالي عدد المخابز بالتقرير:</span>
-                <strong className="text-sm text-[#102A43]">{formatArabicNumber(activeBakeriesList.length)} مخبز</strong>
+                <span className="text-slate-600 font-bold block">إجمالي عدد المخابز بالتقرير:</span>
+                <strong className="num-cell text-[13px] font-black text-[#102A43]">{formatArabicNumber(activeBakeriesList.length)} مخبز</strong>
               </div>
               <div>
-                <span className="text-slate-500 block">إجمالي الحصص الفعلية:</span>
-                <strong className="text-sm text-[#164E83]">{formatArabicNumber(kpiStats.totalActualQuota)} شيكارة/يوم</strong>
+                <span className="text-slate-600 font-bold block">إجمالي الحصص الفعلية:</span>
+                <strong className="num-cell text-[13px] font-black text-[#164E83]">{formatArabicNumber(kpiStats.totalActualQuota)} شيكارة/يوم</strong>
               </div>
               <div>
-                <span className="text-slate-500 block">إجمالي الأرغفة اليومية:</span>
-                <strong className="text-sm text-emerald-800">{formatArabicNumber(kpiStats.totalDailyLoaves)} رغيف</strong>
+                <span className="text-slate-600 font-bold block">إجمالي الأرغفة اليومية:</span>
+                <strong className="num-cell text-[13px] font-black text-emerald-800">{formatArabicNumber(kpiStats.totalDailyLoaves)} رغيف</strong>
               </div>
               <div>
-                <span className="text-slate-500 block">متوسط نصيب الفرد ٢٠٢٥:</span>
-                <strong className="text-sm text-[#102A43]">{formatArabicDecimal(kpiStats.avg2025, 3)} رغيف/فرد</strong>
+                <span className="text-slate-600 font-bold block">متوسط نصيب الفرد ٢٠٢٥:</span>
+                <strong className="num-cell text-[13px] font-black text-[#102A43]">{formatArabicDecimal(kpiStats.avg2025, 3)} رغيف/فرد</strong>
               </div>
             </div>
 
-            {/* Sortable Report Data Table */}
-            <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-              <table className="w-full text-right border border-slate-300">
-                <thead className="bg-[#102A43] text-white sticky top-0 z-10">
-                  <tr>
-                    <SortableTh label="م" sortKey="serialNumber" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <SortableTh label="رقم المخبز" sortKey="bakeryNumber" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <SortableTh label="اسم المخبز" sortKey="name" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} className="border border-slate-300" />
-                    <SortableTh label="صاحب المخبز" sortKey="ownerName" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} className="border border-slate-300" />
-                    <SortableTh label="القرية" sortKey="village" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} className="border border-slate-300" />
-                    <SortableTh label="الحصة التأمينية" sortKey="insuranceQuota" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <SortableTh label="الحصة الفعلية" sortKey="actualQuota" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <SortableTh label="الأرغفة اليومية" sortKey="dailyLoavesCount" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <SortableTh label="متوسط ٢٠٢٣" sortKey="avgPerCapita2023" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <SortableTh label="متوسط ٢٠٢٤" sortKey="avgPerCapita2024" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <SortableTh label="متوسط ٢٠٢٥" sortKey="avgPerCapita2025" activeSortKey={reportsSort.key} sortAsc={reportsSort.asc} onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" className="border border-slate-300" />
-                    <th className="border border-slate-300 text-center">حالة الرخصة والعقد</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {[...activeBakeriesList]
-                    .sort((a, b) => compareTableValues(a[reportsSort.key as keyof BakeryRecord], b[reportsSort.key as keyof BakeryRecord], reportsSort.asc))
-                    .map((b, i) => {
-                      const lic = evaluateDocumentExpiry(b.licenseExpiryDate, b.licenseNumber, todayRef);
-                      const lease = evaluateDocumentExpiry(b.leaseExpiryDate, b.leaseContractNumber, todayRef);
-                      return (
-                        <tr key={b.id} className={i % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'}>
-                          <td className="num-cell text-center border border-slate-200">{formatArabicNumber(i + 1)}</td>
-                          <td className="num-cell text-center border border-slate-200 font-bold">{toArabicNumerals(b.bakeryNumber)}</td>
-                          <td className="border border-slate-200 font-bold text-[#102A43]">{b.name}</td>
-                          <td className="border border-slate-200">{b.ownerName}</td>
-                          <td className="border border-slate-200">{b.village}</td>
-                          <td className="num-cell text-center border border-slate-200">{formatArabicDecimal(b.insuranceQuota, 3)}</td>
-                          <td className="num-cell text-center border border-slate-200 font-bold">{formatArabicNumber(b.actualQuota)}</td>
-                          <td className="num-cell text-center border border-slate-200 font-bold">{formatArabicNumber(b.dailyLoavesCount)}</td>
-                          <td className="num-cell text-center border border-slate-200">{formatArabicDecimal(b.avgPerCapita2023, 3)}</td>
-                          <td className="num-cell text-center border border-slate-200">{formatArabicDecimal(b.avgPerCapita2024, 3)}</td>
-                          <td className="num-cell text-center border border-slate-200 font-bold">{formatArabicDecimal(b.avgPerCapita2025, 3)}</td>
-                          <td className="border border-slate-200 text-center whitespace-nowrap">
-                            رخصة: {toArabicNumerals(lic.status)} | عقد: {toArabicNumerals(lease.status)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
+            {/* Sortable & Auto-Fit Report Data Table (reflects Custom Column Headers) */}
+            <SmartAutoFitTable
+              tableId="bakery_reports"
+              userId={currentUser.id}
+              rows={reportRows}
+              totalCount={activeBakeriesList.length}
+              getRowId={(b) => b.id}
+              columns={[
+                {
+                  key: 'serialNumber',
+                  label: getColLabel('serialNumber', 'م'),
+                  headerText: getColLabel('serialNumber', 'م'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 55,
+                  measureValue: (_b) => '٩٩',
+                  render: (_b, i) => formatArabicNumber(i + 1),
+                },
+                {
+                  key: 'bakeryNumber',
+                  label: getColLabel('bakeryNumber', 'رقم المخبز'),
+                  headerText: getColLabel('bakeryNumber', 'رقم المخبز'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 100,
+                  measureValue: (b) => toArabicNumerals(b.bakeryNumber),
+                  render: (b) => <span className="font-extrabold">{toArabicNumerals(b.bakeryNumber)}</span>,
+                },
+                {
+                  key: 'name',
+                  label: getColLabel('name', 'اسم المخبز'),
+                  headerText: getColLabel('name', 'اسم المخبز'),
+                  type: 'name',
+                  defaultWidth: 185,
+                  render: (b) => <span className="font-extrabold text-[#102A43]">{b.name}</span>,
+                },
+                {
+                  key: 'ownerName',
+                  label: getColLabel('ownerName', 'صاحب المخبز'),
+                  headerText: getColLabel('ownerName', 'صاحب المخبز'),
+                  type: 'name',
+                  defaultWidth: 165,
+                  render: (b) => b.ownerName,
+                },
+                {
+                  key: 'village',
+                  label: getColLabel('village', 'القرية'),
+                  headerText: getColLabel('village', 'القرية'),
+                  type: 'text',
+                  defaultWidth: 125,
+                  render: (b) => b.village,
+                },
+                {
+                  key: 'insuranceQuota',
+                  label: getColLabel('insuranceQuota', 'الحصة التأمينية'),
+                  headerText: getColLabel('insuranceQuota', 'الحصة التأمينية'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 115,
+                  measureValue: (b) => formatArabicDecimal(b.insuranceQuota, 3),
+                  render: (b) => formatArabicDecimal(b.insuranceQuota, 3),
+                },
+                {
+                  key: 'actualQuota',
+                  label: getColLabel('actualQuota', 'الحصة الفعلية'),
+                  headerText: getColLabel('actualQuota', 'الحصة الفعلية'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 105,
+                  measureValue: (b) => formatArabicNumber(b.actualQuota),
+                  render: (b) => <span className="font-extrabold">{formatArabicNumber(b.actualQuota)}</span>,
+                },
+                {
+                  key: 'dailyLoavesCount',
+                  label: getColLabel('dailyLoavesCount', 'الأرغفة اليومية'),
+                  headerText: getColLabel('dailyLoavesCount', 'الأرغفة اليومية'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 120,
+                  measureValue: (b) => formatArabicNumber(b.dailyLoavesCount),
+                  render: (b) => <span className="font-extrabold">{formatArabicNumber(b.dailyLoavesCount)}</span>,
+                },
+                {
+                  key: 'avgPerCapita2023',
+                  label: getColLabel('avgPerCapita2023', 'متوسط ٢٠٢٣'),
+                  headerText: getColLabel('avgPerCapita2023', 'متوسط ٢٠٢٣'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 95,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
+                },
+                {
+                  key: 'avgPerCapita2024',
+                  label: getColLabel('avgPerCapita2024', 'متوسط ٢٠٢٤'),
+                  headerText: getColLabel('avgPerCapita2024', 'متوسط ٢٠٢٤'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 95,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
+                },
+                {
+                  key: 'avgPerCapita2025',
+                  label: getColLabel('avgPerCapita2025', 'متوسط ٢٠٢٥'),
+                  headerText: getColLabel('avgPerCapita2025', 'متوسط ٢٠٢٥'),
+                  type: 'numeric',
+                  align: 'center',
+                  defaultWidth: 95,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
+                  render: (b) => <span className="font-extrabold">{formatArabicDecimal(b.avgPerCapita2025, 3)}</span>,
+                },
+                {
+                  key: 'combinedDocStatus',
+                  label: 'حالة الرخصة والعقد',
+                  headerText: 'حالة الرخصة والعقد',
+                  type: 'longText',
+                  sortable: false,
+                  align: 'center',
+                  defaultWidth: 215,
+                  measureValue: (b) => toArabicNumerals(b.combinedDocStatus),
+                  render: (b) => toArabicNumerals(b.combinedDocStatus),
+                },
+              ]}
+              sortKey={reportsSort.key}
+              sortAsc={reportsSort.asc}
+              onSort={(k) => setReportsSort(s => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+              selectable
+              selectedIds={selectedBakeryIds}
+              onToggleSelect={toggleSelectBakery}
+              onClearSelection={() => setSelectedBakeryIds([])}
+              pinnedKeys={subPinnedCols}
+              onTogglePinColumn={toggleSubPin}
+              onPinAll={() => setSubPinnedCols(['name'])}
+              onUnpinAll={() => setSubPinnedCols([])}
+              onResetPinDefaults={() => setSubPinnedCols(['name'])}
+              onOpenHeaderCustomizer={() => setShowColumnModal(true)}
+              onNotify={showToast}
+            />
 
             {/* Official 3 Signatures Footer */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-8 border-t-2 border-slate-200 text-center text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-8 border-t-2 border-slate-200 text-center text-[11px]">
               <div>
-                <p className="font-bold text-slate-600 mb-1">توقيع معد التقرير</p>
+                <p className="font-extrabold text-slate-700 mb-1">توقيع معد التقرير</p>
                 <p className="font-black text-[#102A43]">{preparerName}</p>
                 <p className="text-[10px] text-slate-400 mt-4">التوقيع: ...............................</p>
               </div>
               <div>
-                <p className="font-bold text-slate-600 mb-1">توقيع المراجع المختص</p>
+                <p className="font-extrabold text-slate-700 mb-1">توقيع المراجع المختص</p>
                 <p className="font-black text-[#102A43]">{reviewerName}</p>
                 <p className="text-[10px] text-slate-400 mt-4">التوقيع: ...............................</p>
               </div>
               <div>
-                <p className="font-bold text-slate-600 mb-1">يعتمد، مدير الإدارة</p>
+                <p className="font-extrabold text-slate-700 mb-1">يعتمد، مدير الإدارة</p>
                 <p className="font-black text-[#102A43]">{managerApprovalName}</p>
                 <p className="text-[10px] text-slate-400 mt-4">خاتم شعار الجمهورية: ...............................</p>
               </div>
@@ -3272,16 +4513,16 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           11. مركز الطباعة والتصدير (Section 12)
          ===================================================================== */}
       {activeSubTab === 'print' && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 print:hidden">
-            <h2 className="text-base font-black text-[#102A43]">مركز الطباعة الرسمية والتصدير (A4 RTL)</h2>
+            <h2 className="text-base font-black text-[#102A43]">مركز الطباعة الرسمية والتصدير العربي المعتمد</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-bold text-[#102A43] mb-1">نطاق الطباعة</label>
+                <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">نطاق الطباعة</label>
                 <select
                   value={printScope}
                   onChange={(e) => setPrintScope(e.target.value as typeof printScope)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                 >
                   <option value="all">طباعة جميع المخابز</option>
                   <option value="single">طباعة ملف مخبز واحد</option>
@@ -3295,11 +4536,11 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
               {printScope === 'single' && (
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">اختر المخبز</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">اختر المخبز</label>
                   <select
                     value={printSingleBakeryId}
                     onChange={(e) => setPrintSingleBakeryId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   >
                     {activeBakeriesList.map(b => (
                       <option key={b.id} value={b.id}>{b.name} (#{toArabicNumerals(b.bakeryNumber)})</option>
@@ -3310,11 +4551,11 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
               {printScope === 'village' && (
                 <div>
-                  <label className="block text-xs font-bold text-[#102A43] mb-1">اختر القرية</label>
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">اختر القرية</label>
                   <select
                     value={printVillageName}
                     onChange={(e) => setPrintVillageName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   >
                     {MAHALLA_VILLAGES.map(v => (
                       <option key={v} value={v}>{v}</option>
@@ -3324,24 +4565,24 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               )}
 
               <div>
-                <label className="block text-xs font-bold text-[#102A43] mb-1">اتجاه ورق الطباعة A4</label>
+                <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">اتجاه ورق الطباعة</label>
                 <select
                   value={printOrientation}
                   onChange={(e) => setPrintOrientation(e.target.value as 'landscape' | 'portrait')}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                 >
-                  <option value="landscape">أفقي (Landscape A4)</option>
-                  <option value="portrait">رأسي (Portrait A4)</option>
+                  <option value="landscape">أفقي (ورق عرضي)</option>
+                  <option value="portrait">رأسي (ورق طولي)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#102A43] mb-1">اسم معد البيان</label>
+                <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">اسم معد البيان</label>
                 <input
                   type="text"
                   value={preparerName}
                   onChange={(e) => setPreparerName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                 />
               </div>
             </div>
@@ -3350,18 +4591,18 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="px-5 py-2.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-[11px] font-extrabold flex items-center gap-2 cursor-pointer"
               >
                 <Printer className="w-4 h-4 text-[#C6A15B]" />
-                <span>طباعة مباشرة / حفظ PDF رسمي</span>
+                <span>طباعة مباشرة / حفظ ملف رسمي</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleExportCSV(filteredBakeries, 'تصدير_رسمي_مخابز_المحلة')}
-                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-extrabold flex items-center gap-2 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
-                <span>تصدير Excel (XLSX / UTF-8 BOM CSV)</span>
+                <span>تصدير إكسل (دعم كامل للعربية)</span>
               </button>
             </div>
           </div>
@@ -3370,12 +4611,12 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           <div className="bg-white p-8 rounded-2xl border border-slate-300 shadow-xs space-y-6">
             <div className="flex justify-between items-center border-b-2 border-[#102A43] pb-4">
               <div>
-                <h3 className="text-sm font-black text-[#102A43]">محافظة الغربية — مديرية التموين والتجارة الداخلية</h3>
-                <p className="text-xs font-bold text-[#164E83]">إدارة تموين مركز المحلة الكبرى — مركز الطباعة الرسمي</p>
+                <h3 className="text-[13px] font-black text-[#102A43]">محافظة الغربية — مديرية التموين والتجارة الداخلية</h3>
+                <p className="text-[11px] font-extrabold text-[#164E83]">إدارة تموين مركز المحلة الكبرى — مركز الطباعة الرسمي</p>
               </div>
-              <div className="text-left text-xs">
-                <p>التاريخ: {formatDateArabic(clientNowIso, false)}</p>
-                <p>حجم الورق: A4 ({printOrientation === 'landscape' ? 'أفقي' : 'رأسي'})</p>
+              <div className="text-left text-[11px] font-bold">
+                <p>التاريخ: <span className="num-cell">{formatDateArabic(clientNowIso, false)}</span></p>
+                <p>اتجاه الطباعة: {printOrientation === 'landscape' ? 'أفقي' : 'رأسي'}</p>
               </div>
             </div>
 
@@ -3384,63 +4625,133 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 const b = activeBakeriesList.find(x => x.id === printSingleBakeryId) || activeBakeriesList[0];
                 if (!b) return null;
                 return (
-                  <div className="space-y-4 text-xs">
+                  <div className="space-y-4 text-[11px]">
                     <h4 className="text-base font-black text-[#102A43] bg-[#F4F7FB] p-3 rounded-xl border border-slate-200">
                       بطاقة بيان مخبز معتمدة: {b.name} — رقم ({toArabicNumerals(b.bakeryNumber)})
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 border border-slate-200 rounded-xl">
-                      <div><span className="text-slate-500">صاحب المخبز:</span> <strong>{b.ownerName}</strong></div>
-                      <div><span className="text-slate-500">الرقم القومي:</span> <strong>{toArabicNumerals(b.ownerNationalId)}</strong></div>
-                      <div><span className="text-slate-500">رقم الهاتف:</span> <strong>{toArabicNumerals(b.phone)}</strong></div>
-                      <div><span className="text-slate-500">القرية والوحدة:</span> <strong>{b.village} - {b.localUnit}</strong></div>
-                      <div><span className="text-slate-500">ماكينة POS:</span> <strong>{toArabicNumerals(b.posNumber)}</strong></div>
-                      <div><span className="text-slate-500">نوع الخبز والمعامل:</span> <strong>{b.breadType} ({formatArabicNumber(b.productionFactor)})</strong></div>
-                      <div><span className="text-slate-500">الحصة التأمينية (م١):</span> <strong>{formatArabicDecimal(b.insuranceQuota, 3)} شيكارة</strong></div>
-                      <div><span className="text-slate-500">الحصة الفعلية:</span> <strong>{formatArabicNumber(b.actualQuota)} شيكارة</strong></div>
-                      <div><span className="text-slate-500">الأرغفة اليومية (م٢):</span> <strong>{formatArabicNumber(b.dailyLoavesCount)} رغيف</strong></div>
-                      <div><span className="text-slate-500">متوسط ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong>{formatArabicDecimal(b.avgPerCapita2023, 3)} / {formatArabicDecimal(b.avgPerCapita2024, 3)} / {formatArabicDecimal(b.avgPerCapita2025, 3)}</strong></div>
-                      <div><span className="text-slate-500">رقم الرخصة وانتهاؤها:</span> <strong>{toArabicNumerals(b.licenseNumber)} ({formatDateArabic(b.licenseExpiryDate)})</strong></div>
-                      <div><span className="text-slate-500">عقد الإيجار وانتهاؤه:</span> <strong>{toArabicNumerals(b.leaseContractNumber)} ({formatDateArabic(b.leaseExpiryDate)})</strong></div>
+                      <div><span className="text-slate-600">{getColLabel('ownerName', 'صاحب المخبز')}:</span> <strong>{b.ownerName}</strong></div>
+                      <div><span className="text-slate-600">{getColLabel('ownerNationalId', 'الرقم القومي')}:</span> <strong className="num-cell">{toArabicNumerals(b.ownerNationalId)}</strong></div>
+                      <div><span className="text-slate-600">{getColLabel('phone', 'رقم الهاتف')}:</span> <strong className="num-cell">{toArabicNumerals(b.phone)}</strong></div>
+                      <div><span className="text-slate-600">القرية والوحدة:</span> <strong>{b.village} - {b.localUnit}</strong></div>
+                      <div><span className="text-slate-600">{getColLabel('posNumber', 'رقم الماكينة')}:</span> <strong className="num-cell">{toArabicNumerals(b.posNumber)}</strong></div>
+                      <div><span className="text-slate-600">نوع الخبز والمعامل:</span> <strong>{b.breadType} ({formatArabicNumber(b.productionFactor)})</strong></div>
+                      <div><span className="text-slate-600">الحصة التأمينية (م١):</span> <strong className="num-cell">{formatArabicDecimal(b.insuranceQuota, 3)} شيكارة</strong></div>
+                      <div><span className="text-slate-600">{getColLabel('actualQuota', 'الحصة الفعلية')}:</span> <strong className="num-cell">{formatArabicNumber(b.actualQuota)} شيكارة</strong></div>
+                      <div><span className="text-slate-600">الأرغفة اليومية (م٢):</span> <strong className="num-cell">{formatArabicNumber(b.dailyLoavesCount)} رغيف</strong></div>
+                      <div><span className="text-slate-600">متوسط ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong className="num-cell">{formatArabicDecimal(b.avgPerCapita2023, 3)} / {formatArabicDecimal(b.avgPerCapita2024, 3)} / {formatArabicDecimal(b.avgPerCapita2025, 3)}</strong></div>
+                      <div><span className="text-slate-600">رقم الرخصة وانتهاؤها:</span> <strong className="num-cell">{toArabicNumerals(b.licenseNumber)} ({formatDateArabic(b.licenseExpiryDate)})</strong></div>
+                      <div><span className="text-slate-600">عقد الإيجار وانتهاؤه:</span> <strong className="num-cell">{toArabicNumerals(b.leaseContractNumber)} ({formatDateArabic(b.leaseExpiryDate)})</strong></div>
                     </div>
                   </div>
                 );
               })()
             ) : (
-              <div className="overflow-auto compact-table-scroll">
-                <table className="w-full text-right border border-slate-300">
-                  <thead className="bg-[#102A43] text-white">
-                    <tr>
-                      <th className="border text-center">م</th>
-                      <th className="border text-center">رقم المخبز</th>
-                      <th className="border">اسم المخبز</th>
-                      <th className="border">المالك</th>
-                      <th className="border">القرية</th>
-                      <th className="border text-center">الحصة الفعلية</th>
-                      <th className="border text-center">الأرغفة اليومية</th>
-                      <th className="border text-center">متوسط ٢٠٢٥</th>
-                      <th className="border text-center">انتهاء الرخصة</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {(printScope === 'village'
-                      ? activeBakeriesList.filter(b => b.village === printVillageName)
-                      : filteredBakeries
-                    ).map((b, idx) => (
-                      <tr key={b.id}>
-                        <td className="num-cell text-center border">{formatArabicNumber(idx + 1)}</td>
-                        <td className="num-cell text-center border font-bold">{toArabicNumerals(b.bakeryNumber)}</td>
-                        <td className="border font-bold">{b.name}</td>
-                        <td className="border">{b.ownerName}</td>
-                        <td className="border">{b.village}</td>
-                        <td className="num-cell text-center border font-bold">{formatArabicNumber(b.actualQuota)}</td>
-                        <td className="num-cell text-center border">{formatArabicNumber(b.dailyLoavesCount)}</td>
-                        <td className="num-cell text-center border">{formatArabicDecimal(b.avgPerCapita2025, 3)}</td>
-                        <td className="num-cell text-center border">{formatDateArabic(b.licenseExpiryDate)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SmartAutoFitTable
+                tableId="bakery_print_preview"
+                userId={currentUser.id}
+                rows={
+                  printScope === 'village'
+                    ? activeBakeriesList.filter(b => b.village === printVillageName)
+                    : filteredBakeries
+                }
+                totalCount={activeBakeriesList.length}
+                getRowId={(b) => b.id}
+                columns={[
+                  {
+                    key: 'serialNumber',
+                    label: getColLabel('serialNumber', 'م'),
+                    headerText: getColLabel('serialNumber', 'م'),
+                    type: 'numeric',
+                    align: 'center',
+                    defaultWidth: 55,
+                    measureValue: () => '٩٩',
+                    render: (_b, idx) => formatArabicNumber(idx + 1),
+                  },
+                  {
+                    key: 'bakeryNumber',
+                    label: getColLabel('bakeryNumber', 'رقم المخبز'),
+                    headerText: getColLabel('bakeryNumber', 'رقم المخبز'),
+                    type: 'numeric',
+                    align: 'center',
+                    defaultWidth: 100,
+                    measureValue: (b) => toArabicNumerals(b.bakeryNumber),
+                    render: (b) => <span className="font-extrabold">{toArabicNumerals(b.bakeryNumber)}</span>,
+                  },
+                  {
+                    key: 'name',
+                    label: getColLabel('name', 'اسم المخبز'),
+                    headerText: getColLabel('name', 'اسم المخبز'),
+                    type: 'name',
+                    defaultWidth: 185,
+                    render: (b) => <span className="font-extrabold text-[#102A43]">{b.name}</span>,
+                  },
+                  {
+                    key: 'ownerName',
+                    label: getColLabel('ownerName', 'المالك'),
+                    headerText: getColLabel('ownerName', 'المالك'),
+                    type: 'name',
+                    defaultWidth: 165,
+                    render: (b) => b.ownerName,
+                  },
+                  {
+                    key: 'village',
+                    label: getColLabel('village', 'القرية'),
+                    headerText: getColLabel('village', 'القرية'),
+                    type: 'text',
+                    defaultWidth: 125,
+                    render: (b) => b.village,
+                  },
+                  {
+                    key: 'actualQuota',
+                    label: getColLabel('actualQuota', 'الحصة الفعلية'),
+                    headerText: getColLabel('actualQuota', 'الحصة الفعلية'),
+                    type: 'numeric',
+                    align: 'center',
+                    defaultWidth: 105,
+                    measureValue: (b) => formatArabicNumber(b.actualQuota),
+                    render: (b) => <span className="font-extrabold">{formatArabicNumber(b.actualQuota)}</span>,
+                  },
+                  {
+                    key: 'dailyLoavesCount',
+                    label: getColLabel('dailyLoavesCount', 'الأرغفة اليومية'),
+                    headerText: getColLabel('dailyLoavesCount', 'الأرغفة اليومية'),
+                    type: 'numeric',
+                    align: 'center',
+                    defaultWidth: 120,
+                    measureValue: (b) => formatArabicNumber(b.dailyLoavesCount),
+                    render: (b) => formatArabicNumber(b.dailyLoavesCount),
+                  },
+                  {
+                    key: 'avgPerCapita2025',
+                    label: getColLabel('avgPerCapita2025', 'متوسط ٢٠٢٥'),
+                    headerText: getColLabel('avgPerCapita2025', 'متوسط ٢٠٢٥'),
+                    type: 'numeric',
+                    align: 'center',
+                    defaultWidth: 95,
+                    measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
+                    render: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
+                  },
+                  {
+                    key: 'licenseExpiryDate',
+                    label: getColLabel('licenseExpiryDate', 'انتهاء الرخصة'),
+                    headerText: getColLabel('licenseExpiryDate', 'انتهاء الرخصة'),
+                    type: 'date',
+                    align: 'center',
+                    defaultWidth: 125,
+                    measureValue: (b) => formatDateArabic(b.licenseExpiryDate),
+                    render: (b) => formatDateArabic(b.licenseExpiryDate),
+                  },
+                ]}
+                pinnedKeys={subPinnedCols}
+                onTogglePinColumn={toggleSubPin}
+                onPinAll={() => setSubPinnedCols(['name'])}
+                onUnpinAll={() => setSubPinnedCols([])}
+                onResetPinDefaults={() => setSubPinnedCols(['name'])}
+                onOpenHeaderCustomizer={() => setShowColumnModal(true)}
+                onNotify={showToast}
+                maxHeightClass="max-h-none"
+              />
             )}
           </div>
         </div>
@@ -3451,14 +4762,14 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
          ===================================================================== */}
       {(activeSubTab === 'columns' || showColumnModal) && (
         <div className={showColumnModal ? 'fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto' : ''}>
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-5xl w-full shadow-2xl space-y-6 my-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-5xl w-full shadow-2xl space-y-5 my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h2 className="text-base font-black text-[#102A43]">
-                  إعدادات القسم وتخصيص رؤوس الأعمدة وعناوين المجموعات ({formatArabicNumber(columns.length)} عموداً)
+                <h2 className="text-lg font-black text-[#102A43]">
+                  تخصيص رؤوس الأعمدة وعناوين المجموعات الخمس ({formatArabicNumber(columns.length)} عموداً)
                 </h2>
-                <p className="text-xs text-slate-500">
-                  تعديل اسم أي عمود، إظهار/إخفاء، ترتيب، وتثبيت الأعمدة مع انعكاس فوري على السجل والتقارير والطباعة وExcel دون تغيير حقول قاعدة البيانات
+                <p className="text-[11px] font-bold text-slate-600">
+                  تعديل اسم أي عمود، إعادة الترتيب، إظهار/إخفاء، وتثبيت الأعمدة مع حفظ فوري لكل مستخدم وانعكاس على السجل والتقارير والطباعة والتصدير دون تغيير حقول قاعدة البيانات
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -3468,7 +4779,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                     setShowColumnModal(false);
                     handleNavSelect('audit', 'audit');
                   }}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-[#102A43] rounded-lg text-xs font-bold cursor-pointer"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-[#102A43] rounded-lg text-[11px] font-extrabold cursor-pointer"
                 >
                   فتح سجل المراجعة ({formatArabicNumber(auditChanges.length)})
                 </button>
@@ -3476,7 +4787,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   <button
                     type="button"
                     onClick={() => setShowColumnModal(false)}
-                    className="text-slate-400 hover:text-slate-700 font-bold text-sm cursor-pointer"
+                    className="text-slate-400 hover:text-slate-700 font-bold text-base cursor-pointer"
                   >
                     ✕
                   </button>
@@ -3486,128 +4797,170 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
             {/* تعديل عناوين المجموعات الخمس الرئيسية */}
             <div className="bg-[#F4F7FB] p-4 rounded-xl border border-slate-200 space-y-3">
-              <h3 className="text-xs font-black text-[#102A43]">أولاً: تعديل عناوين المجموعات الرئيسية الخمس</h3>
+              <h3 className="text-[11px] font-black text-[#102A43]">أولاً: تعديل عناوين المجموعات الرئيسية الخمس</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                {(Object.keys(columnGroups) as Array<keyof BakeryColumnGroupConfig>).map((gKey) => (
-                  <div key={gKey}>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">مجموعة ({gKey})</label>
-                    <input
-                      type="text"
-                      value={columnGroups[gKey]}
-                      onChange={(e) => {
-                        const updated = { ...columnGroups, [gKey]: e.target.value };
-                        setColumnGroups(updated);
-                        saveStoredBakeryColumnGroups(updated);
-                      }}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-[#102A43]"
-                    />
-                  </div>
-                ))}
+                {(Object.keys(columnGroups) as Array<keyof BakeryColumnGroupConfig>).map((gKey) => {
+                  const groupArabicNames: Record<keyof BakeryColumnGroupConfig, string> = {
+                    basic: 'المجموعة الأولى (الأساسية)',
+                    operation: 'المجموعة الثانية (التشغيل)',
+                    quota: 'المجموعة الثالثة (الحصص)',
+                    population: 'المجموعة الرابعة (المستفيدون)',
+                    documents: 'المجموعة الخامسة (المستندات)',
+                  };
+                  return (
+                    <div key={gKey}>
+                      <label className="block text-xs font-extrabold text-slate-600 mb-1">{groupArabicNames[gKey]}</label>
+                      <input
+                        type="text"
+                        value={columnGroups[gKey]}
+                        onChange={(e) => {
+                          const updated = { ...columnGroups, [gKey]: e.target.value };
+                          setColumnGroups(updated);
+                          saveStoredBakeryColumnGroups(updated);
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-[11px] font-extrabold text-[#102A43]"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* جدول التحكم في الأعمدة */}
+            {/* جدول التحكم في الأعمدة الـ ٤٩ مع إعادة الترتيب */}
             <div className="max-h-96 overflow-auto border border-slate-200 rounded-xl compact-table-scroll">
               <table className="w-full text-right">
                 <thead className="bg-[#102A43] text-white sticky top-0 z-10">
                   <tr>
                     <th className="text-center">الترتيب</th>
-                    <th>الحقل الأصلي (DB)</th>
+                    <th className="text-center">نقل</th>
                     <th>الاسم الافتراضي</th>
                     <th>عنوان العمود المخصص للعرض</th>
-                    <th className="text-center">العرض (px)</th>
+                    <th className="text-center">العرض (بكسل)</th>
                     <th className="text-center">إظهار</th>
                     <th className="text-center">تثبيت</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {columns.map((col, idx) => (
-                    <tr key={col.key} className="hover:bg-slate-50">
-                      <td className="num-cell text-center">{formatArabicNumber(col.order)}</td>
-                      <td className="font-mono text-slate-500">{col.key}</td>
-                      <td className="text-slate-600">{toArabicNumerals(col.defaultLabel)}</td>
-                      <td>
-                        <input
-                          type="text"
-                          value={col.customLabel}
-                          onChange={(e) => {
-                            const updated = columns.map((c, i) =>
-                              i === idx ? { ...c, customLabel: e.target.value } : c
-                            );
-                            setColumns(updated);
-                          }}
-                          className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs font-bold text-[#102A43]"
-                        />
-                      </td>
-                      <td className="text-center">
-                        <input
-                          type="number"
-                          value={col.width}
-                          onChange={(e) => {
-                            const updated = columns.map((c, i) =>
-                              i === idx ? { ...c, width: Number(e.target.value) || 90 } : c
-                            );
-                            setColumns(updated);
-                          }}
-                          className="w-20 px-2 py-1 border border-slate-300 rounded text-xs font-mono"
-                        />
-                      </td>
-                      <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={col.visible}
-                          onChange={(e) => {
-                            const updated = columns.map((c, i) =>
-                              i === idx ? { ...c, visible: e.target.checked } : c
-                            );
-                            setColumns(updated);
-                          }}
-                          className="w-4 h-4 accent-[#102A43]"
-                        />
-                      </td>
-                      <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={col.pinned}
-                          onChange={(e) => {
-                            const updated = columns.map((c, i) =>
-                              i === idx ? { ...c, pinned: e.target.checked } : c
-                            );
-                            setColumns(updated);
-                          }}
-                          className="w-4 h-4 accent-[#164E83]"
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {[...columns]
+                    .sort((a, b) => a.order - b.order)
+                    .map((col, idx, sortedArr) => (
+                      <tr key={col.key} className="hover:bg-slate-50">
+                        <td className="num-cell text-center font-bold">{formatArabicNumber(col.order)}</td>
+                        <td className="text-center">
+                          <div className="inline-flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveColumn(col.key, 'up')}
+                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-30 cursor-pointer"
+                              title="تقديم العمود لأعلى"
+                            >
+                              <ArrowUp className="w-3 h-3 text-[#102A43]" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === sortedArr.length - 1}
+                              onClick={() => handleMoveColumn(col.key, 'down')}
+                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-30 cursor-pointer"
+                              title="تأخير العمود لأسفل"
+                            >
+                              <ArrowDown className="w-3 h-3 text-[#102A43]" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="text-slate-600">{toArabicNumerals(col.defaultLabel)}</td>
+                        <td>
+                          <input
+                            type="text"
+                            value={col.customLabel}
+                            onChange={(e) => {
+                              const updated = columns.map((c) =>
+                                c.key === col.key ? { ...c, customLabel: e.target.value } : c
+                              );
+                              setColumns(updated);
+                            }}
+                            className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs font-bold text-[#102A43]"
+                          />
+                        </td>
+                        <td className="text-center">
+                          <input
+                            type="number"
+                            value={col.width}
+                            onChange={(e) => {
+                              const updated = columns.map((c) =>
+                                c.key === col.key ? { ...c, width: Number(e.target.value) || 90 } : c
+                              );
+                              setColumns(updated);
+                            }}
+                            className="w-20 px-2 py-1 border border-slate-300 rounded text-xs font-mono"
+                          />
+                        </td>
+                        <td className="text-center">
+                          <input
+                            type="checkbox"
+                            checked={col.visible}
+                            onChange={(e) => {
+                              const updated = columns.map((c) =>
+                                c.key === col.key ? { ...c, visible: e.target.checked } : c
+                              );
+                              setColumns(updated);
+                            }}
+                            className="w-4 h-4 accent-[#102A43] cursor-pointer"
+                          />
+                        </td>
+                        <td className="text-center">
+                          <input
+                            type="checkbox"
+                            checked={col.pinned}
+                            onChange={(e) => {
+                              const updated = columns.map((c) =>
+                                c.key === col.key ? { ...c, pinned: e.target.checked } : c
+                              );
+                              setColumns(updated);
+                            }}
+                            className="w-4 h-4 accent-[#164E83] cursor-pointer"
+                          />
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={() => {
-                  setColumns(DEFAULT_BAKERY_COLUMNS);
-                  saveStoredBakeryColumns(DEFAULT_BAKERY_COLUMNS);
-                  setColumnGroups(DEFAULT_BAKERY_COLUMN_GROUPS);
-                  saveStoredBakeryColumnGroups(DEFAULT_BAKERY_COLUMN_GROUPS);
-                  showToast('تم استعادة الإعدادات الافتراضية لرؤوس الأعمدة والمجموعات');
-                }}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
-              >
-                استعادة الإعدادات الافتراضية
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetColumns}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-[11px] font-extrabold cursor-pointer"
+                >
+                  استعادة الإعدادات الافتراضية
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePinAllColumns}
+                  className="px-3.5 py-2 bg-[#164E83]/10 hover:bg-[#164E83]/20 text-[#102A43] rounded-xl text-[11px] font-extrabold cursor-pointer"
+                >
+                  تثبيت الكل الذكي
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnpinAllColumns}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-[11px] font-extrabold cursor-pointer"
+                >
+                  إلغاء تثبيت الكل
+                </button>
+              </div>
 
               <button
                 type="button"
                 onClick={() => {
-                  saveStoredBakeryColumns(columns);
+                  saveStoredBakeryColumns(columns, currentUser.id);
                   saveStoredBakeryColumnGroups(columnGroups);
                   setShowColumnModal(false);
-                  showToast('تم حفظ تفضيلات رؤوس الأعمدة وتطبيقها على السجل والتقارير والطباعة');
+                  showToast('تم حفظ تفضيلات رؤوس الأعمدة لحسابك وتطبيقها على السجل والتقارير والطباعة والتصدير');
                 }}
-                className="px-6 py-2.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-xs font-bold cursor-pointer"
+                className="px-6 py-2.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-[11px] font-extrabold cursor-pointer"
               >
                 حفظ الإعدادات وتطبيقها
               </button>
@@ -3624,10 +4977,10 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 className="text-base font-black text-[#102A43]">
+                <h3 className="text-lg font-black text-[#102A43]">
                   {selectedBakery.name} — رقم ({toArabicNumerals(selectedBakery.bakeryNumber)})
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-[11px] font-bold text-slate-600">
                   {selectedBakery.village} · {selectedBakery.localUnit} · المالك: {selectedBakery.ownerName}
                 </p>
               </div>
@@ -3637,39 +4990,39 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   setActionModalType(null);
                   setSelectedBakery(null);
                 }}
-                className="text-slate-400 hover:text-slate-700 font-bold text-sm cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 font-bold text-base cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {actionModalType === 'details' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-[#F4F7FB] p-4 rounded-xl border border-slate-200">
-                <div><span className="text-slate-500">رقم ماكينة POS:</span> <strong>{toArabicNumerals(selectedBakery.posNumber)}</strong></div>
-                <div><span className="text-slate-500">الرقم القومي للمالك:</span> <strong>{toArabicNumerals(selectedBakery.ownerNationalId)}</strong></div>
-                <div><span className="text-slate-500">رقم الهاتف:</span> <strong>{toArabicNumerals(selectedBakery.phone)}</strong></div>
-                <div><span className="text-slate-500">نوع الخبز والمعامل:</span> <strong>{selectedBakery.breadType} ({formatArabicNumber(selectedBakery.productionFactor)})</strong></div>
-                <div><span className="text-slate-500">المبلغ التأميني:</span> <strong>{formatArabicNumber(selectedBakery.insuranceAmountEgp)} ج.م</strong></div>
-                <div><span className="text-slate-500">الحصة التأمينية (م١):</span> <strong className="text-[#164E83]">{formatArabicDecimal(selectedBakery.insuranceQuota, 3)} شيكارة</strong></div>
-                <div><span className="text-slate-500">الحصة الفعلية:</span> <strong>{formatArabicNumber(selectedBakery.actualQuota)} شيكارة</strong></div>
-                <div><span className="text-slate-500">الأرغفة اليومية (م٢):</span> <strong className="text-emerald-800">{formatArabicNumber(selectedBakery.dailyLoavesCount)} رغيف</strong></div>
-                <div><span className="text-slate-500">متوسطات ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong>{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)} / {formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)} / {formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</strong></div>
-                <div><span className="text-slate-500">الفرق التراكمي (م٦):</span> <strong>{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 3)}</strong></div>
-                <div><span className="text-slate-500">رخصة المخبز:</span> <strong>{toArabicNumerals(selectedBakery.licenseNumber)} (تنتهي: {formatDateArabic(selectedBakery.licenseExpiryDate)})</strong></div>
-                <div><span className="text-slate-500">عقد الإيجار:</span> <strong>{toArabicNumerals(selectedBakery.leaseContractNumber)} (ينتهي: {formatDateArabic(selectedBakery.leaseExpiryDate)})</strong></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] font-bold bg-[#F4F7FB] p-4 rounded-xl border border-slate-200">
+                <div><span className="text-slate-600">رقم ماكينة الصرف:</span> <strong className="num-cell">{toArabicNumerals(selectedBakery.posNumber)}</strong></div>
+                <div><span className="text-slate-600">الرقم القومي للمالك:</span> <strong className="num-cell">{toArabicNumerals(selectedBakery.ownerNationalId)}</strong></div>
+                <div><span className="text-slate-600">رقم الهاتف:</span> <strong className="num-cell">{toArabicNumerals(selectedBakery.phone)}</strong></div>
+                <div><span className="text-slate-600">نوع الخبز والمعامل:</span> <strong>{selectedBakery.breadType} ({formatArabicNumber(selectedBakery.productionFactor)})</strong></div>
+                <div><span className="text-slate-600">المبلغ التأميني:</span> <strong className="num-cell">{formatArabicNumber(selectedBakery.insuranceAmountEgp)} ج.م</strong></div>
+                <div><span className="text-slate-600">الحصة التأمينية (م١):</span> <strong className="num-cell text-[#164E83]">{formatArabicDecimal(selectedBakery.insuranceQuota, 3)} شيكارة</strong></div>
+                <div><span className="text-slate-600">الحصة الفعلية:</span> <strong className="num-cell">{formatArabicNumber(selectedBakery.actualQuota)} شيكارة</strong></div>
+                <div><span className="text-slate-600">الأرغفة اليومية (م٢):</span> <strong className="num-cell text-emerald-800">{formatArabicNumber(selectedBakery.dailyLoavesCount)} رغيف</strong></div>
+                <div><span className="text-slate-600">متوسطات ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)} / {formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)} / {formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</strong></div>
+                <div><span className="text-slate-600">الفرق التراكمي (م٦):</span> <strong className="num-cell">{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 3)}</strong></div>
+                <div><span className="text-slate-600">رخصة المخبز:</span> <strong>{toArabicNumerals(selectedBakery.licenseNumber)} (تنتهي: <span className="num-cell">{formatDateArabic(selectedBakery.licenseExpiryDate)}</span>)</strong></div>
+                <div><span className="text-slate-600">عقد الإيجار:</span> <strong>{toArabicNumerals(selectedBakery.leaseContractNumber)} (ينتهي: <span className="num-cell">{formatDateArabic(selectedBakery.leaseExpiryDate)}</span>)</strong></div>
               </div>
             )}
 
             {actionModalType === 'equations' && (
-              <div className="space-y-3 text-xs">
+              <div className="space-y-3 text-[11px] font-bold">
                 <div className="p-3.5 bg-[#F4F7FB] rounded-xl border border-slate-200 space-y-2">
-                  <div>١. الحصة التأمينية = {formatArabicNumber(selectedBakery.insuranceAmountEgp)} ÷ ٢٣٥ ÷ ٣ = <strong>{formatArabicDecimal(selectedBakery.insuranceQuota, 3)} شيكارة</strong></div>
-                  <div>٢. الأرغفة اليومية = {formatArabicNumber(selectedBakery.actualQuota)} × {formatArabicNumber(selectedBakery.productionFactor)} = <strong>{formatArabicNumber(selectedBakery.dailyLoavesCount)} رغيف</strong></div>
-                  <div>٣. متوسط ٢٠٢٣ = {formatArabicNumber(selectedBakery.dailyLoavesCount)} ÷ {formatArabicNumber(selectedBakery.beneficiaries2023)} = <strong>{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)}</strong></div>
-                  <div>٤. متوسط ٢٠٢٤ = {formatArabicNumber(selectedBakery.dailyLoavesCount)} ÷ {formatArabicNumber(selectedBakery.beneficiaries2024)} = <strong>{formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)}</strong></div>
-                  <div>٥. متوسط ٢٠٢٥ = {formatArabicNumber(selectedBakery.dailyLoavesCount)} ÷ {formatArabicNumber(selectedBakery.beneficiaries2025)} = <strong>{formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</strong></div>
-                  <div>٦. الفرق التراكمي = {formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)} − {formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)} − {formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)} = <strong>{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 3)}</strong></div>
-                  <div>٧. نصيب الفرد اليومي الفعلي ٢٠٢٥ = <strong>{formatArabicDecimal(selectedBakery.dailyShareActual2025, 3)} رغيف/مستفيد</strong></div>
+                  <div>١. الحصة التأمينية = <span className="num-cell">{formatArabicNumber(selectedBakery.insuranceAmountEgp)}</span> ÷ ٢٣٥ ÷ ٣ = <strong className="num-cell">{formatArabicDecimal(selectedBakery.insuranceQuota, 3)} شيكارة</strong></div>
+                  <div>٢. الأرغفة اليومية = <span className="num-cell">{formatArabicNumber(selectedBakery.actualQuota)}</span> × <span className="num-cell">{formatArabicNumber(selectedBakery.productionFactor)}</span> = <strong className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)} رغيف</strong></div>
+                  <div>٣. متوسط ٢٠٢٣ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2023)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)}</strong></div>
+                  <div>٤. متوسط ٢٠٢٤ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2024)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)}</strong></div>
+                  <div>٥. متوسط ٢٠٢٥ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2025)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</strong></div>
+                  <div>٦. الفرق التراكمي = <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)}</span> − <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)}</span> − <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 3)}</strong></div>
+                  <div>٧. نصيب الفرد اليومي الفعلي ٢٠٢٥ = <strong className="num-cell">{formatArabicDecimal(selectedBakery.dailyShareActual2025, 3)} رغيف/مستفيد</strong></div>
                 </div>
               </div>
             )}
@@ -3677,23 +5030,23 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             {actionModalType === 'history' && (
               <div className="max-h-64 overflow-auto border border-slate-200 rounded-xl compact-table-scroll">
                 <table className="w-full text-right">
-                  <thead className="bg-slate-100 sticky top-0 z-10">
+                  <thead className="bg-slate-100 sticky top-0 z-10 text-[11px] font-black text-[#102A43]">
                     <tr>
-                      <th className="text-center">التاريخ</th>
-                      <th>العملية</th>
-                      <th>القيمة الجديدة</th>
-                      <th>المسؤول</th>
+                      <th className="text-center px-3 py-2">التاريخ</th>
+                      <th className="px-3 py-2">العملية</th>
+                      <th className="px-3 py-2">القيمة الجديدة</th>
+                      <th className="px-3 py-2">المسؤول</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 text-[11px] font-bold">
                     {auditChanges
                       .filter(a => a.bakeryId === selectedBakery.id || a.bakeryId === 'ALL')
                       .map(a => (
                         <tr key={a.id}>
-                          <td className="num-cell text-center">{formatDateArabic(a.timestamp, false)}</td>
-                          <td className="font-bold">{a.actionType}</td>
-                          <td className="text-emerald-800">{toArabicNumerals(a.newValue)}</td>
-                          <td>{a.performedBy}</td>
+                          <td className="num-cell text-center px-3 py-2">{formatDateArabic(a.timestamp, false)}</td>
+                          <td className="font-extrabold px-3 py-2">{a.actionType}</td>
+                          <td className="text-emerald-800 px-3 py-2">{toArabicNumerals(a.newValue)}</td>
+                          <td className="px-3 py-2">{a.performedBy}</td>
                         </tr>
                       ))}
                   </tbody>
@@ -3705,38 +5058,38 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               actionModalType === 'licenses' ||
               actionModalType === 'contracts' ||
               actionModalType === 'add_doc') && (
-              <form onSubmit={handleSaveActionModal} className="space-y-4 text-xs">
+              <form onSubmit={handleSaveActionModal} className="space-y-4 text-[11px] font-bold">
                 {actionModalType === 'quota' && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block font-bold mb-1">الحصة الفعلية (شيكارة)</label>
+                      <label className="block font-extrabold mb-1">الحصة الفعلية (شيكارة)</label>
                       <input
                         type="number"
                         required
                         value={editQuotaVal}
                         onChange={(e) => setEditQuotaVal(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold mb-1">المبلغ التأميني (ج.م)</label>
+                      <label className="block font-extrabold mb-1">المبلغ التأميني (ج.م)</label>
                       <input
                         type="number"
                         required
                         value={editInsuranceVal}
                         onChange={(e) => setEditInsuranceVal(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold mb-1">معامل الإنتاج</label>
+                      <label className="block font-extrabold mb-1">معامل الإنتاج</label>
                       <select
                         value={editFactorVal}
                         onChange={(e) => setEditFactorVal(Number(e.target.value) === 725 ? 725 : 660)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       >
-                        <option value={660}>660</option>
-                        <option value={725}>725</option>
+                        <option value={660}>٦٦٠</option>
+                        <option value={725}>٧٢٥</option>
                       </select>
                     </div>
                   </div>
@@ -3745,39 +5098,39 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 {(actionModalType === 'licenses' || actionModalType === 'add_doc') && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-bold mb-1">رقم الرخصة</label>
+                      <label className="block font-extrabold mb-1">رقم الرخصة</label>
                       <input
                         type="text"
                         value={editLicenseNum}
                         onChange={(e) => setEditLicenseNum(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold mb-1">تاريخ انتهاء الرخصة</label>
+                      <label className="block font-extrabold mb-1">تاريخ انتهاء الرخصة</label>
                       <input
                         type="date"
                         value={editLicenseExp}
                         onChange={(e) => setEditLicenseExp(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold mb-1">رقم البطاقة الضريبية</label>
+                      <label className="block font-extrabold mb-1">رقم البطاقة الضريبية</label>
                       <input
                         type="text"
                         value={editTaxNum}
                         onChange={(e) => setEditTaxNum(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold mb-1">تاريخ انتهاء البطاقة الضريبية</label>
+                      <label className="block font-extrabold mb-1">تاريخ انتهاء البطاقة الضريبية</label>
                       <input
                         type="date"
                         value={editTaxExp}
                         onChange={(e) => setEditTaxExp(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       />
                     </div>
                   </div>
@@ -3786,35 +5139,35 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 {actionModalType === 'contracts' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-bold mb-1">رقم عقد الإيجار / الملكية</label>
+                      <label className="block font-extrabold mb-1">رقم عقد الإيجار / الملكية</label>
                       <input
                         type="text"
                         value={editLeaseNum}
                         onChange={(e) => setEditLeaseNum(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold mb-1">تاريخ انتهاء العقد</label>
+                      <label className="block font-extrabold mb-1">تاريخ انتهاء العقد</label>
                       <input
                         type="date"
                         value={editLeaseExp}
                         onChange={(e) => setEditLeaseExp(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold"
                       />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block font-bold mb-1">سبب التعديل (يوثق في سجل المراجعة Audit Log)</label>
+                  <label className="block font-extrabold mb-1">سبب التعديل (يوثق في سجل التدقيق والمراجعة)</label>
                   <input
                     type="text"
                     required
                     value={editReason}
                     onChange={(e) => setEditReason(e.target.value)}
                     placeholder="اذكر رقم القرار أو سبب التحديث..."
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold"
                   />
                 </div>
 
@@ -3825,13 +5178,13 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                       setActionModalType(null);
                       setSelectedBakery(null);
                     }}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold"
+                    className="px-4 py-2 bg-slate-100 text-slate-800 rounded-xl font-extrabold cursor-pointer"
                   >
                     إلغاء
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl font-bold"
+                    className="px-5 py-2 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl font-extrabold cursor-pointer"
                   >
                     حفظ التعديلات واعتمادها
                   </button>

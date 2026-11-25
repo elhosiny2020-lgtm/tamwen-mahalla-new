@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} ${ibmPlexArabic.variable}`}>
-      <body className="bg-[#FAFBFD] text-[#102A43] font-sans antialiased min-h-screen selection:bg-[#102A43] selection:text-white">
+      <body className="bg-[#FAFBFD] text-[#102A43] font-sans text-[13px] font-bold antialiased min-h-screen selection:bg-[#102A43] selection:text-white">
         {children}
       </body>
     </html>

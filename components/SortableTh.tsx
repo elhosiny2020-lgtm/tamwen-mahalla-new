@@ -37,10 +37,10 @@ export default function SortableTh({
       style={style}
       title={title}
       aria-sort={isActive ? (sortAsc ? 'ascending' : 'descending') : 'none'}
-      className={`cursor-pointer select-none transition-colors hover:brightness-110 ${className}`}
+      className={`cursor-pointer select-none transition-colors hover:brightness-110 autofit-header-cell font-extrabold ${className}`}
     >
       <div className={`flex items-center gap-1 ${justifyClass}`}>
-        <span className="leading-tight">{label}</span>
+        <span className="leading-snug">{label}</span>
         {isActive ? (
           sortAsc ? (
             <ArrowUp className="w-3 h-3 text-[#C6A15B] shrink-0" />
@@ -48,7 +48,7 @@ export default function SortableTh({
             <ArrowDown className="w-3 h-3 text-[#C6A15B] shrink-0" />
           )
         ) : (
-          <ArrowUpDown className="w-3 h-3 opacity-45 shrink-0" />
+          <ArrowUpDown className="w-3 h-3 opacity-55 shrink-0" />
         )}
       </div>
     </th>

@@ -62,7 +62,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
       });
 
       if (!result.success) {
-        const firstError = result.error.issues[0]?.message || 'يرجى التحقق من صحة المدخلات (الرقم القومي 14 رقماً والهاتف 11 رقماً)';
+        const firstError = result.error.issues[0]?.message || 'يرجى التحقق من صحة المدخلات (الرقم القومي ١٤ رقماً والهاتف ١١ رقماً)';
         setErrorMsg(firstError);
         return;
       }
@@ -153,22 +153,22 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
       <div className="bg-white/95 backdrop-blur-md rounded-2xl max-w-3xl w-full p-8 shadow-2xl border border-slate-200 my-8">
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
           <div>
-            <h2 className="text-xl font-black text-[#102A43]">طلب إنشاء حساب مستخدم جديد</h2>
-            <p className="text-xs text-slate-500">مديرية التموين والتجارة الداخلية بالغربية · نظام التحقق القياسي المعتمد</p>
+            <h2 className="text-2xl font-black text-[#102A43]">طلب إنشاء حساب مستخدم جديد</h2>
+            <p className="text-[11px] font-bold text-slate-600">مديرية التموين والتجارة الداخلية بالغربية · نظام التحقق القياسي المعتمد</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1">✕</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer">✕</button>
         </div>
 
         {submitted ? (
           <div className="py-10 text-center space-y-4">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto text-2xl font-bold shadow-sm">✓</div>
-            <h3 className="text-xl font-bold text-[#102A43]">تم إرسال طلب التسجيل بنجاح</h3>
-            <p className="text-xs text-slate-600 max-w-md mx-auto">
-              حسابك الآن بحالة <span className="font-bold text-amber-700">«قيد المراجعة»</span> من قبل مدير النظام. سيتم تفعيل الحساب ومراجعة الصلاحيات في أقرب وقت.
+            <h3 className="text-2xl font-black text-[#102A43]">تم إرسال طلب التسجيل بنجاح</h3>
+            <p className="text-[11px] font-bold text-slate-600 max-w-md mx-auto">
+              حسابك الآن بحالة <span className="font-black text-amber-700">«قيد المراجعة»</span> من قبل مدير النظام. سيتم تفعيل الحساب ومراجعة الصلاحيات في أقرب وقت.
             </p>
             <button
               onClick={onSuccess}
-              className="px-6 py-3 bg-[#102A43] hover:bg-[#164E83] text-white font-bold rounded-xl text-xs transition-all shadow-sm cursor-pointer"
+              className="px-6 py-3 bg-[#102A43] hover:bg-[#164E83] text-white font-extrabold rounded-xl text-[11px] transition-all shadow-sm cursor-pointer"
             >
               العودة لتسجيل الدخول
             </button>
@@ -190,20 +190,20 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                 const completed = step > item.s;
                 return (
                   <div key={item.s} className="relative z-10 flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-black transition-all shadow-sm ${
                       active ? 'bg-[#102A43] text-[#C6A15B] ring-4 ring-blue-100' :
                       completed ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-600'
                     }`}>
                       <Icon className="w-4 h-4" />
                     </div>
-                    <span className="text-[11px] font-bold text-[#102A43] mt-2 hidden sm:block">{item.title}</span>
+                    <span className="text-xs font-extrabold text-[#102A43] mt-2 hidden sm:block">{item.title}</span>
                   </div>
                 );
               })}
             </div>
 
             {errorMsg && (
-              <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-900 text-xs font-bold flex items-center gap-2 animate-shake">
+              <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-900 text-[11px] font-extrabold flex items-center gap-2 animate-shake">
                 <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
@@ -213,24 +213,24 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
               {/* Step 1: Personal & Job Data */}
               {step === 1 && (
                 <div className="space-y-4">
-                  <h3 className="text-xs font-black text-[#102A43] pb-2 border-b border-slate-100">
+                  <h3 className="text-[11px] font-black text-[#102A43] pb-2 border-b border-slate-100">
                     أولاً: البيانات الشخصية والوظيفية (الرقم القومي ١٤ رقماً والهاتف ١١ رقماً)
                   </h3>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">الاسم الرباعي الرسمي *</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الاسم الرباعي الرسمي *</label>
                       <input
                         type="text"
                         required
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="مثل: أحمد محمد إبراهيم حسن"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">الرقم القومي (١٤ رقماً بالضبط) *</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الرقم القومي (١٤ رقماً بالضبط) *</label>
                       <input
                         type="text"
                         required
@@ -238,12 +238,12 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                         value={nationalId}
                         onChange={(e) => setNationalId(e.target.value.replace(/\D/g, '').slice(0, 14))}
                         placeholder="أدخل ١٤ رقماً"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 font-mono tracking-widest"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800 font-mono tracking-widest"
                       />
-                      <span className="text-[10px] text-slate-500 mt-0.5 block">العدد الحالي: {toArabicNumerals(nationalId.length)}/{toArabicNumerals(14)}</span>
+                      <span className="text-xs font-bold text-slate-600 mt-0.5 block">العدد الحالي: {toArabicNumerals(nationalId.length)}/{toArabicNumerals(14)}</span>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">رقم الهاتف المحمول (١١ رقماً) *</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">رقم الهاتف المحمول (١١ رقماً) *</label>
                       <input
                         type="tel"
                         required
@@ -251,62 +251,62 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                         value={phone}
                         onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
                         placeholder="أدخل ١١ رقماً"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 font-mono tracking-widest"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800 font-mono tracking-widest"
                       />
-                      <span className="text-[10px] text-slate-500 mt-0.5 block">العدد الحالي: {toArabicNumerals(phone.length)}/{toArabicNumerals(11)}</span>
+                      <span className="text-xs font-bold text-slate-600 mt-0.5 block">العدد الحالي: {toArabicNumerals(phone.length)}/{toArabicNumerals(11)}</span>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">البريد الإلكتروني الرسمي</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">البريد الإلكتروني الرسمي</label>
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="البريد الرسمي للجهة"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">اسم المستخدم للدخول *</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">اسم المستخدم للدخول *</label>
                       <input
                         type="text"
                         required
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         placeholder="أدخل اسم مستخدم فريد"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">المسمى الوظيفي الفعلي *</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">المسمى الوظيفي الفعلي *</label>
                       <input
                         type="text"
                         required
                         value={jobTitle}
                         onChange={(e) => setJobTitle(e.target.value)}
                         placeholder="مثل: مفتش تموين مخابز أول"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">كلمة المرور *</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">كلمة المرور *</label>
                       <input
                         type="password"
                         required
                         value={tempPassword}
                         onChange={(e) => setTempPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 font-mono"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800 font-mono"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#102A43] mb-1">تأكيد كلمة المرور *</label>
+                      <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">تأكيد كلمة المرور *</label>
                       <input
                         type="password"
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 font-mono"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800 font-mono"
                       />
                     </div>
                   </div>
@@ -316,7 +316,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
               {/* Step 2: Role Selection */}
               {step === 2 && (
                 <div className="space-y-4">
-                  <h3 className="text-xs font-black text-[#102A43] pb-2 border-b border-slate-100">
+                  <h3 className="text-[11px] font-black text-[#102A43] pb-2 border-b border-slate-100">
                     ثانياً: تحديد الدور الوظيفي المعتمد
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
@@ -347,8 +347,8 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                             className="text-[#102A43] mt-1 w-4 h-4 shrink-0"
                           />
                           <div>
-                            <span className="text-xs font-black text-[#102A43] block mb-1">{item.title}</span>
-                            <p className="text-[11px] text-slate-600 leading-relaxed">{item.desc}</p>
+                            <span className="text-[11px] font-black text-[#102A43] block mb-1">{item.title}</span>
+                            <p className="text-xs font-bold text-slate-600 leading-relaxed">{item.desc}</p>
                           </div>
                         </div>
                       );
@@ -362,21 +362,21 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 border-b border-slate-100 gap-2">
                     <div>
-                      <h3 className="text-xs font-black text-[#102A43]">ثالثاً: نطاق الفروع والإدارات التموينية ({toArabicNumerals(branches.length)} فرعاً)</h3>
-                      <p className="text-xs text-slate-500">اختر الفرع الأساسي والفروع المسموح للمستخدم الاطلاع على بياناتها</p>
+                      <h3 className="text-[11px] font-black text-[#102A43]">ثالثاً: نطاق الفروع والإدارات التموينية ({toArabicNumerals(branches.length)} فرعاً)</h3>
+                      <p className="text-[11px] font-bold text-slate-600">اختر الفرع الأساسي والفروع المسموح للمستخدم الاطلاع على بياناتها</p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleSelectAllBranches}
-                        className="px-3 py-1.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-[11px] font-bold cursor-pointer"
+                        className="px-3 py-1.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-xs font-extrabold cursor-pointer"
                       >
                         تحديد كافة الفروع ({toArabicNumerals(branches.length)} فرعاً)
                       </button>
                       <button
                         type="button"
                         onClick={handleClearAllBranches}
-                        className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-[11px] font-bold cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-extrabold cursor-pointer"
                       >
                         إلغاء الكل
                       </button>
@@ -384,11 +384,11 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-1.5">الفرع الأساسي الافتراضي *</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-1.5">الفرع الأساسي الافتراضي *</label>
                     <select
                       value={primaryBranchId}
                       onChange={(e) => setPrimaryBranchId(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-[#102A43] font-bold"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] text-[#102A43] font-extrabold"
                     >
                       {branches.map(b => (
                         <option key={b.id} value={b.id}>{b.arabicName}</option>
@@ -397,7 +397,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#102A43] mb-2">الفروع التابعة المسموح بالوصول لبياناتها:</label>
+                    <label className="block text-[11px] font-extrabold text-[#102A43] mb-2">الفروع التابعة المسموح بالوصول لبياناتها:</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
                       {branches.map(b => {
                         const isChecked = selectedBranches.includes(b.id);
@@ -406,7 +406,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                             key={b.id}
                             onClick={() => handleBranchToggle(b.id)}
                             className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
-                              isChecked ? 'bg-blue-50 border-[#102A43] text-[#102A43] font-bold' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                              isChecked ? 'bg-blue-50 border-[#102A43] text-[#102A43] font-extrabold' : 'bg-white border-slate-200 text-slate-700 font-bold hover:bg-slate-100'
                             }`}
                           >
                             <input
@@ -415,7 +415,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                               onChange={() => handleBranchToggle(b.id)}
                               className="w-4 h-4 accent-[#102A43]"
                             />
-                            <span className="text-xs">{b.arabicName}</span>
+                            <span className="text-[11px]">{b.arabicName}</span>
                           </div>
                         );
                       })}
@@ -429,21 +429,21 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 border-b border-slate-100 gap-2">
                     <div>
-                      <h3 className="text-xs font-black text-[#102A43]">رابعاً: اختيار الأقسام المصرح ظهورها</h3>
-                      <p className="text-xs text-slate-500">تحديد الأقسام والوحدات التي تظهر للمستخدم داخل المنظومة</p>
+                      <h3 className="text-[11px] font-black text-[#102A43]">رابعاً: اختيار الأقسام المصرح ظهورها</h3>
+                      <p className="text-[11px] font-bold text-slate-600">تحديد الأقسام والوحدات التي تظهر للمستخدم داخل المنظومة</p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleSelectAllDepartments}
-                        className="px-3 py-1.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-[11px] font-bold cursor-pointer"
+                        className="px-3 py-1.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-xs font-extrabold cursor-pointer"
                       >
                         تحديد كافة الأقسام
                       </button>
                       <button
                         type="button"
                         onClick={handleClearAllDepartments}
-                        className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-[11px] font-bold cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-extrabold cursor-pointer"
                       >
                         إلغاء تحديد الكل
                       </button>
@@ -468,8 +468,8 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                             className="w-4 h-4 mt-0.5 shrink-0 accent-[#102A43]"
                           />
                           <div>
-                            <span className="text-xs font-bold text-[#102A43] block mb-0.5">{d.arabicName}</span>
-                            <span className="text-[10px] text-slate-500 leading-tight block">{d.description}</span>
+                            <span className="text-[11px] font-extrabold text-[#102A43] block mb-0.5">{d.arabicName}</span>
+                            <span className="text-xs font-bold text-slate-600 leading-tight block">{d.description}</span>
                           </div>
                         </div>
                       );
@@ -481,36 +481,36 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
               {/* Step 5: Review & Submit */}
               {step === 5 && (
                 <div className="space-y-4">
-                  <h3 className="text-xs font-black text-[#102A43] pb-2 border-b border-slate-100">خامساً: مراجعة البيانات قبل تقديم طلب التسجيل</h3>
+                  <h3 className="text-[11px] font-black text-[#102A43] pb-2 border-b border-slate-100">خامساً: مراجعة البيانات قبل تقديم طلب التسجيل</h3>
                   
-                  <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3 text-xs">
+                  <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3 text-[11px]">
                     <div className="flex justify-between py-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">الاسم الرباعي:</span>
-                      <span className="font-bold text-[#102A43]">{fullName}</span>
+                      <span className="text-slate-600 font-bold">الاسم الرباعي:</span>
+                      <span className="font-extrabold text-[#102A43]">{fullName}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">الرقم القومي (١٤ رقماً):</span>
-                      <span className="num-cell text-[#102A43] font-bold">{toArabicNumerals(nationalId)}</span>
+                      <span className="text-slate-600 font-bold">الرقم القومي (١٤ رقماً):</span>
+                      <span className="num-cell text-[#102A43] font-extrabold">{toArabicNumerals(nationalId)}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">رقم الهاتف (١١ رقماً):</span>
-                      <span className="num-cell text-[#102A43] font-bold">{toArabicNumerals(phone)}</span>
+                      <span className="text-slate-600 font-bold">رقم الهاتف (١١ رقماً):</span>
+                      <span className="num-cell text-[#102A43] font-extrabold">{toArabicNumerals(phone)}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">اسم المستخدم:</span>
-                      <span className="text-[#102A43] font-bold">{username}</span>
+                      <span className="text-slate-600 font-bold">اسم المستخدم:</span>
+                      <span className="text-[#102A43] font-extrabold">{username}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">الدور الوظيفي:</span>
-                      <span className="font-bold text-[#102A43]">{getRoleArabicLabel(requestedRole)}</span>
+                      <span className="text-slate-600 font-bold">الدور الوظيفي:</span>
+                      <span className="font-extrabold text-[#102A43]">{getRoleArabicLabel(requestedRole)}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-200">
-                      <span className="text-slate-500 font-medium">الفروع المتاحة:</span>
-                      <span className="font-bold text-[#102A43]">{toArabicNumerals(selectedBranches.length)} فرع مصرح</span>
+                      <span className="text-slate-600 font-bold">الفروع المتاحة:</span>
+                      <span className="num-cell font-extrabold text-[#102A43]">{toArabicNumerals(selectedBranches.length)} فرع مصرح</span>
                     </div>
                     <div className="flex justify-between py-1.5">
-                      <span className="text-slate-500 font-medium">الأقسام المتاحة:</span>
-                      <span className="font-bold text-[#102A43]">{toArabicNumerals(selectedDepartments.length)} قسم مصرح</span>
+                      <span className="text-slate-600 font-bold">الأقسام المتاحة:</span>
+                      <span className="num-cell font-extrabold text-[#102A43]">{toArabicNumerals(selectedDepartments.length)} قسم مصرح</span>
                     </div>
                   </div>
                 </div>
@@ -522,7 +522,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                   <button
                     type="button"
                     onClick={handlePrevStep}
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold rounded-xl text-[11px] flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <ArrowRight className="w-4 h-4" />
                     <span>السابق</span>
@@ -533,7 +533,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className="px-7 py-3 bg-[#102A43] hover:bg-[#164E83] text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                    className="px-7 py-3 bg-[#102A43] hover:bg-[#164E83] text-white font-extrabold rounded-xl text-[11px] flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                   >
                     <span>التالي</span>
                     <ArrowLeft className="w-4 h-4" />
@@ -541,7 +541,7 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                 ) : (
                   <button
                     type="submit"
-                    className="px-7 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                    className="px-7 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl text-[11px] flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                   >
                     <span>إرسال طلب التسجيل للمراجعة</span>
                     <CheckCircle2 className="w-4 h-4" />

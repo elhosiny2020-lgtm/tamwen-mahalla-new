@@ -153,19 +153,19 @@ export default function AnimatedStatCard({
       <div className={`absolute top-0 right-0 left-0 h-1 ${styles.topBar}`} />
       <div className="flex items-start justify-between gap-2.5">
         <div className="min-w-0 flex-1">
-          <span className={`${compact ? 'text-[11px]' : 'text-xs'} font-extrabold text-slate-600 block truncate`} title={title}>
+          <span className={`${compact ? 'text-[11px]' : 'text-[12px]'} font-black text-slate-700 block truncate`} title={title}>
             {title}
           </span>
           <div
-            className={`${compact ? 'text-lg' : 'text-2xl'} font-black tabular-nums whitespace-nowrap my-1 ${styles.valueColor}`}
+            className={`num-cell ${compact ? 'text-lg' : 'text-[22px]'} font-black whitespace-nowrap my-0.5 ${styles.valueColor}`}
           >
             {formattedNumber}
           </div>
           <div className="flex items-center flex-wrap gap-1.5">
-            {unit && <span className="text-[10.5px] font-bold text-slate-500">{unit}</span>}
-            {subtitle && !unit && <span className="text-[10.5px] font-bold text-slate-500 truncate">{subtitle}</span>}
+            {unit && <span className="text-[10.5px] font-extrabold text-slate-600">{unit}</span>}
+            {subtitle && !unit && <span className="text-[10.5px] font-extrabold text-slate-600 truncate">{subtitle}</span>}
             {indicator && (
-              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${styles.indicatorBg}`}>
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${styles.indicatorBg}`}>
                 {indicator}
               </span>
             )}

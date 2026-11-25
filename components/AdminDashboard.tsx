@@ -17,17 +17,15 @@ import {
 } from '@/lib/mock-db';
 import {
   formatDateArabic,
-  compareTableValues,
   toArabicNumerals,
   getRoleArabicLabel,
   normalizeSearchText,
 } from '@/lib/utils';
 import { User, Branch, RegistrationRequest, AuditLog } from '@/types';
-import SortableTh from './SortableTh';
 import AnimatedStatCard from './AnimatedStatCard';
-import TableControlsBar from './TableControlsBar';
+import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ userId = 'default' }: { userId?: string }) {
   const [activeTab, setActiveTab] = useState<'users' | 'requests' | 'branches' | 'audit'>('requests');
 
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
@@ -38,6 +36,7 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pinnedCols, setPinnedCols] = useState<string[]>(['fullName']);
+  const [toastMsg, setToastMsg] = useState('');
 
   const [reqSort, setReqSort] = useState<{ key: string; asc: boolean }>({ key: 'createdAt', asc: false });
   const [userSort, setUserSort] = useState<{ key: string; asc: boolean }>({ key: 'fullName', asc: true });
@@ -53,40 +52,36 @@ export default function AdminDashboard() {
     return () => cancelAnimationFrame(frameId);
   }, []);
 
+  const showNotice = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 3000);
+  };
+
   const normQuery = normalizeSearchText(searchTerm);
 
-  const sortedRequests = useMemo(() => {
-    const filtered = normQuery
+  const filteredRequests = useMemo(() => {
+    return normQuery
       ? requests.filter((r) =>
           normalizeSearchText(`${r.fullName} ${r.username} ${r.nationalId} ${r.jobTitle} ${getRoleArabicLabel(r.requestedRole)}`).includes(normQuery)
         )
       : requests;
-    return [...filtered].sort((a, b) =>
-      compareTableValues(a[reqSort.key as keyof RegistrationRequest], b[reqSort.key as keyof RegistrationRequest], reqSort.asc)
-    );
-  }, [requests, reqSort, normQuery]);
+  }, [requests, normQuery]);
 
-  const sortedUsers = useMemo(() => {
-    const filtered = normQuery
+  const filteredUsers = useMemo(() => {
+    return normQuery
       ? users.filter((u) =>
           normalizeSearchText(`${u.fullName} ${u.username} ${u.jobTitle} ${getRoleArabicLabel(u.role)}`).includes(normQuery)
         )
       : users;
-    return [...filtered].sort((a, b) =>
-      compareTableValues(a[userSort.key as keyof User], b[userSort.key as keyof User], userSort.asc)
-    );
-  }, [users, userSort, normQuery]);
+  }, [users, normQuery]);
 
-  const sortedAuditLogs = useMemo(() => {
-    const filtered = normQuery
+  const filteredAuditLogs = useMemo(() => {
+    return normQuery
       ? auditLogs.filter((l) =>
           normalizeSearchText(`${l.fullName} ${l.action} ${l.module} ${l.details} ${l.ipAddress}`).includes(normQuery)
         )
       : auditLogs;
-    return [...filtered].sort((a, b) =>
-      compareTableValues(a[auditSort.key as keyof AuditLog], b[auditSort.key as keyof AuditLog], auditSort.asc)
-    );
-  }, [auditLogs, auditSort, normQuery]);
+  }, [auditLogs, normQuery]);
 
   const toggleSelectRow = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -135,6 +130,7 @@ export default function AdminDashboard() {
       status: 'success',
     });
     setAuditLogs(getStoredAuditLogs());
+    showNotice(`تم اعتماد حساب ${req.fullName} بنجاح`);
   };
 
   const handleRejectRequest = (reqId: string) => {
@@ -143,6 +139,7 @@ export default function AdminDashboard() {
     );
     setRequests(updatedReqs);
     saveStoredRegistrationRequests(updatedReqs);
+    showNotice('تم رفض طلب التسجيل');
   };
 
   const handleToggleUserStatus = (userId: string) => {
@@ -155,17 +152,261 @@ export default function AdminDashboard() {
     });
     setUsers(updated);
     saveStoredUsers(updated);
+    showNotice('تم تحديث حالة حساب المستخدم');
   };
 
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
   const activeCount = users.filter((u) => u.status === 'active').length;
 
-  const isPinned = (key: string) => pinnedCols.includes(key);
   const togglePin = (key: string) =>
     setPinnedCols((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
+  const requestColumns: SmartTableColumn<RegistrationRequest>[] = [
+    {
+      key: 'fullName',
+      label: 'الاسم الرباعي',
+      headerText: 'الاسم الرباعي',
+      type: 'name',
+      defaultWidth: 190,
+      render: (req) => <span className="font-extrabold text-[#102A43]">{req.fullName}</span>,
+    },
+    {
+      key: 'username',
+      label: 'اسم المستخدم',
+      headerText: 'اسم المستخدم',
+      type: 'text',
+      defaultWidth: 130,
+      render: (req) => <span className="text-slate-700 font-bold">{req.username}</span>,
+    },
+    {
+      key: 'nationalId',
+      label: 'الرقم القومي',
+      headerText: 'الرقم القومي',
+      type: 'numeric',
+      align: 'center',
+      defaultWidth: 145,
+      measureValue: (req) => toArabicNumerals(req.nationalId),
+      render: (req) => <span className="text-slate-800">{toArabicNumerals(req.nationalId)}</span>,
+    },
+    {
+      key: 'jobTitle',
+      label: 'المسمى الوظيفي',
+      headerText: 'المسمى الوظيفي',
+      type: 'name',
+      defaultWidth: 170,
+      render: (req) => <span className="text-slate-700">{req.jobTitle}</span>,
+    },
+    {
+      key: 'requestedRole',
+      label: 'الدور المطلوب',
+      headerText: 'الدور المطلوب',
+      type: 'badge',
+      defaultWidth: 150,
+      sortValue: (req) => getRoleArabicLabel(req.requestedRole),
+      measureValue: (req) => getRoleArabicLabel(req.requestedRole),
+      render: (req) => <span className="font-extrabold text-[#164E83]">{getRoleArabicLabel(req.requestedRole)}</span>,
+    },
+    {
+      key: 'status',
+      label: 'الحالة',
+      headerText: 'الحالة',
+      type: 'badge',
+      align: 'center',
+      defaultWidth: 115,
+      render: (req) => (
+        <>
+          {req.status === 'pending' && <span className="bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold">قيد المراجعة</span>}
+          {req.status === 'approved' && <span className="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold">تم الاعتماد</span>}
+          {req.status === 'rejected' && <span className="bg-red-100 text-red-900 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold">مرفوض</span>}
+        </>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'الإجراءات',
+      headerText: 'الإجراءات',
+      type: 'actions',
+      align: 'center',
+      sortable: false,
+      defaultWidth: 175,
+      render: (req) =>
+        req.status === 'pending' ? (
+          <div className="flex items-center justify-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleApproveRequest(req)}
+              className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10.5px] font-extrabold shadow-xs cursor-pointer"
+            >
+              اعتماد وتفعيل
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRejectRequest(req.id)}
+              className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white rounded-lg text-[10.5px] font-extrabold shadow-xs cursor-pointer"
+            >
+              رفض
+            </button>
+          </div>
+        ) : (
+          <span className="text-slate-400 text-[10.5px]">منجز</span>
+        ),
+    },
+  ];
+
+  const userColumns: SmartTableColumn<User>[] = [
+    {
+      key: 'fullName',
+      label: 'اسم الموظف',
+      headerText: 'اسم الموظف',
+      type: 'name',
+      defaultWidth: 190,
+      render: (u) => <span className="font-extrabold text-[#102A43]">{u.fullName}</span>,
+    },
+    {
+      key: 'username',
+      label: 'اسم المستخدم',
+      headerText: 'اسم المستخدم',
+      type: 'text',
+      defaultWidth: 130,
+      render: (u) => <span className="text-slate-700">{u.username}</span>,
+    },
+    {
+      key: 'jobTitle',
+      label: 'المسمى الوظيفي',
+      headerText: 'المسمى الوظيفي',
+      type: 'name',
+      defaultWidth: 175,
+      render: (u) => <span className="text-slate-700">{u.jobTitle}</span>,
+    },
+    {
+      key: 'role',
+      label: 'الدور الوظيفي',
+      headerText: 'الدور الوظيفي',
+      type: 'badge',
+      defaultWidth: 155,
+      sortValue: (u) => getRoleArabicLabel(u.role),
+      measureValue: (u) => getRoleArabicLabel(u.role),
+      render: (u) => <span className="font-extrabold text-[#164E83]">{getRoleArabicLabel(u.role)}</span>,
+    },
+    {
+      key: 'status',
+      label: 'الحالة',
+      headerText: 'الحالة',
+      type: 'badge',
+      align: 'center',
+      defaultWidth: 105,
+      render: (u) =>
+        u.status === 'active' ? (
+          <span className="bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold">نشط</span>
+        ) : (
+          <span className="bg-red-100 text-red-900 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold">موقوف</span>
+        ),
+    },
+    {
+      key: 'actions',
+      label: 'التحكم بالحساب',
+      headerText: 'التحكم بالحساب',
+      type: 'actions',
+      align: 'center',
+      sortable: false,
+      defaultWidth: 145,
+      render: (u) =>
+        u.role !== 'super_admin' ? (
+          <button
+            type="button"
+            onClick={() => handleToggleUserStatus(u.id)}
+            className={`px-3 py-1 rounded-lg text-[10.5px] font-extrabold cursor-pointer ${
+              u.status === 'active'
+                ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+            }`}
+          >
+            {u.status === 'active' ? 'إيقاف الحساب' : 'تفعيل الحساب'}
+          </button>
+        ) : (
+          <span className="text-slate-400 text-[10.5px]">حساب سيادي</span>
+        ),
+    },
+  ];
+
+  const auditColumns: SmartTableColumn<AuditLog>[] = [
+    {
+      key: 'timestamp',
+      label: 'التاريخ والوقت',
+      headerText: 'التاريخ والوقت',
+      type: 'date',
+      align: 'center',
+      defaultWidth: 155,
+      measureValue: (l) => formatDateArabic(l.timestamp, true),
+      render: (l) => <span className="text-slate-700">{formatDateArabic(l.timestamp, true)}</span>,
+    },
+    {
+      key: 'fullName',
+      label: 'المستخدم',
+      headerText: 'المستخدم',
+      type: 'name',
+      defaultWidth: 165,
+      render: (l) => <span className="font-extrabold text-[#102A43]">{l.fullName}</span>,
+    },
+    {
+      key: 'action',
+      label: 'العملية',
+      headerText: 'العملية',
+      type: 'text',
+      defaultWidth: 155,
+      render: (l) => <span className="font-extrabold text-[#164E83]">{l.action}</span>,
+    },
+    {
+      key: 'module',
+      label: 'القسم / الوحدة',
+      headerText: 'القسم / الوحدة',
+      type: 'text',
+      defaultWidth: 145,
+      render: (l) => <span className="text-slate-700">{l.module}</span>,
+    },
+    {
+      key: 'details',
+      label: 'التفاصيل',
+      headerText: 'التفاصيل',
+      type: 'longText',
+      defaultWidth: 260,
+      measureValue: (l) => toArabicNumerals(l.details),
+      render: (l) => <span className="text-slate-700">{toArabicNumerals(l.details)}</span>,
+    },
+    {
+      key: 'ipAddress',
+      label: 'عنوان الشبكة',
+      headerText: 'عنوان الشبكة',
+      type: 'numeric',
+      align: 'center',
+      defaultWidth: 130,
+      measureValue: (l) => toArabicNumerals(l.ipAddress),
+      render: (l) => <span className="text-slate-600">{toArabicNumerals(l.ipAddress)}</span>,
+    },
+    {
+      key: 'status',
+      label: 'النتيجة',
+      headerText: 'النتيجة',
+      type: 'badge',
+      align: 'center',
+      defaultWidth: 100,
+      render: (l) =>
+        l.status === 'success' ? (
+          <span className="text-emerald-800 font-extrabold">ناجح ✓</span>
+        ) : (
+          <span className="text-red-800 font-extrabold">فشل ✕</span>
+        ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
+      {toastMsg && (
+        <div className="bg-[#102A43] text-[#C6A15B] px-4 py-2.5 rounded-xl text-[11px] font-black shadow-md flex items-center justify-between">
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
       {/* Animated Colored KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnimatedStatCard
@@ -207,18 +448,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs Navigation & Search */}
-      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-2.5 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => { setActiveTab('requests'); setSelectedIds([]); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'requests' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
+              activeTab === 'requests' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             <span>طلبات التسجيل</span>
             {pendingCount > 0 && (
-              <span className="bg-[#C6A15B] text-[#102A43] px-1.5 py-0.5 rounded-md text-[10px] font-black tabular-nums">
+              <span className="bg-[#C6A15B] text-[#102A43] px-2 py-0.5 rounded-md text-[10px] font-black tabular-nums">
                 {toArabicNumerals(pendingCount)}
               </span>
             )}
@@ -227,8 +468,8 @@ export default function AdminDashboard() {
           <button
             type="button"
             onClick={() => { setActiveTab('users'); setSelectedIds([]); }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'users' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            className={`px-4 py-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
+              activeTab === 'users' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             إدارة المستخدمين ({toArabicNumerals(users.length)})
@@ -237,8 +478,8 @@ export default function AdminDashboard() {
           <button
             type="button"
             onClick={() => { setActiveTab('branches'); setSelectedIds([]); }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'branches' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            className={`px-4 py-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
+              activeTab === 'branches' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             إدارة الفروع ({toArabicNumerals(branches.length)} فرعاً)
@@ -247,229 +488,89 @@ export default function AdminDashboard() {
           <button
             type="button"
             onClick={() => { setActiveTab('audit'); setSelectedIds([]); }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'audit' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            className={`px-4 py-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
+              activeTab === 'audit' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             سجل التدقيق الأمني ({toArabicNumerals(auditLogs.length)})
           </button>
         </div>
 
-        <div className="relative min-w-[220px] flex-1 max-w-xs">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
+        <div className="relative min-w-[230px] flex-1 max-w-xs">
+          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="بحث فوري بالاسم أو الرقم القومي..."
-            className="w-full pr-8 pl-3 py-1.5 bg-[#F4F7FB] border border-slate-300 rounded-xl text-xs font-bold text-[#102A43] focus:outline-none focus:ring-2 focus:ring-[#164E83]"
+            className="w-full pr-9 pl-3 py-2 bg-[#F4F7FB] border border-slate-300 rounded-xl text-[11px] font-bold text-[#102A43] focus:outline-none focus:ring-2 focus:ring-[#164E83]"
           />
         </div>
       </div>
 
       {/* Tab Content: Registration Requests */}
       {activeTab === 'requests' && (
-        <div className="space-y-3">
-          <TableControlsBar
-            totalRecords={requests.length}
-            displayedRecords={sortedRequests.length}
-            filteredRecords={sortedRequests.length}
-            selectedRecords={selectedIds.length}
-            totalColumns={7}
-            visibleColumns={7}
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+          <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
+            <h3 className="text-[13px] font-black text-[#102A43]">طلبات إنشاء الحسابات الجديدة الواردة</h3>
+            <span className="text-[11px] font-bold text-slate-600">تتطلب مراجعة واعتماد مدير النظام</span>
+          </div>
+
+          <SmartAutoFitTable
+            tableId="admin_requests"
+            userId={userId}
+            rows={filteredRequests}
+            totalCount={requests.length}
+            getRowId={(r) => r.id}
+            columns={requestColumns}
+            sortKey={reqSort.key}
+            sortAsc={reqSort.asc}
+            onSort={(k) => setReqSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+            selectable
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelectRow}
             onClearSelection={() => setSelectedIds([])}
-            columns={[
-              { key: 'fullName', label: 'الاسم الرباعي', pinned: isPinned('fullName') },
-              { key: 'username', label: 'اسم المستخدم', pinned: isPinned('username') },
-              { key: 'nationalId', label: 'الرقم القومي', pinned: isPinned('nationalId') },
-              { key: 'jobTitle', label: 'المسمى الوظيفي', pinned: isPinned('jobTitle') },
-              { key: 'requestedRole', label: 'الدور المطلوب', pinned: isPinned('requestedRole') },
-            ]}
+            pinnedKeys={pinnedCols}
+            onTogglePinColumn={togglePin}
             onPinAll={() => setPinnedCols(['fullName', 'username'])}
             onUnpinAll={() => setPinnedCols([])}
-            onTogglePinColumn={togglePin}
             onResetPinDefaults={() => setPinnedCols(['fullName'])}
+            onNotify={showNotice}
+            emptyMessage="لا توجد طلبات تسجيل مطابقة حالياً."
           />
-
-          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-            <div className="p-3.5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="text-sm font-black text-[#102A43]">طلبات إنشاء الحسابات الجديدة الواردة</h3>
-              <span className="text-xs font-bold text-slate-500">تتطلب مراجعة واعتماد مدير النظام</span>
-            </div>
-
-            <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-[#102A43] text-white sticky top-0 z-10">
-                  <tr>
-                    <th className="w-9 text-center">تحديد</th>
-                    <SortableTh
-                      label="الاسم الرباعي"
-                      sortKey="fullName"
-                      activeSortKey={reqSort.key}
-                      sortAsc={reqSort.asc}
-                      onSort={(k) => setReqSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))}
-                      className={isPinned('fullName') ? 'sticky right-0 z-20 bg-[#102A43] pinned-col-edge' : ''}
-                    />
-                    <SortableTh label="اسم المستخدم" sortKey="username" activeSortKey={reqSort.key} sortAsc={reqSort.asc} onSort={(k) => setReqSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="الرقم القومي" sortKey="nationalId" activeSortKey={reqSort.key} sortAsc={reqSort.asc} onSort={(k) => setReqSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="المسمى الوظيفي" sortKey="jobTitle" activeSortKey={reqSort.key} sortAsc={reqSort.asc} onSort={(k) => setReqSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="الدور المطلوب" sortKey="requestedRole" activeSortKey={reqSort.key} sortAsc={reqSort.asc} onSort={(k) => setReqSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="الحالة" sortKey="status" activeSortKey={reqSort.key} sortAsc={reqSort.asc} onSort={(k) => setReqSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <th className="text-center">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sortedRequests.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-8 text-slate-400">لا توجد طلبات تسجيل مطابقة حالياً.</td>
-                    </tr>
-                  ) : (
-                    sortedRequests.map((req) => (
-                      <tr key={req.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(req.id)}
-                            onChange={() => toggleSelectRow(req.id)}
-                            className="w-3.5 h-3.5 accent-[#102A43] cursor-pointer"
-                          />
-                        </td>
-                        <td className={`font-bold text-[#102A43] ${isPinned('fullName') ? 'sticky right-0 z-10 bg-white pinned-col-edge' : ''}`}>
-                          {req.fullName}
-                        </td>
-                        <td className="text-slate-700">{req.username}</td>
-                        <td className="num-cell text-center text-slate-700">{toArabicNumerals(req.nationalId)}</td>
-                        <td className="text-slate-700">{req.jobTitle}</td>
-                        <td className="font-bold text-[#164E83]">{getRoleArabicLabel(req.requestedRole)}</td>
-                        <td className="text-center whitespace-nowrap">
-                          {req.status === 'pending' && <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-bold">قيد المراجعة</span>}
-                          {req.status === 'approved' && <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">تم الاعتماد</span>}
-                          {req.status === 'rejected' && <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] font-bold">مرفوض</span>}
-                        </td>
-                        <td className="text-center whitespace-nowrap">
-                          {req.status === 'pending' && (
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleApproveRequest(req)}
-                                className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold shadow-xs cursor-pointer"
-                              >
-                                اعتماد وتفعيل
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRejectRequest(req.id)}
-                                className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold shadow-xs cursor-pointer"
-                              >
-                                رفض
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       )}
 
       {/* Tab Content: Users */}
       {activeTab === 'users' && (
-        <div className="space-y-3">
-          <TableControlsBar
-            totalRecords={users.length}
-            displayedRecords={sortedUsers.length}
-            filteredRecords={sortedUsers.length}
-            selectedRecords={selectedIds.length}
-            totalColumns={6}
-            visibleColumns={6}
-            onClearSelection={() => setSelectedIds([])}
-            columns={[
-              { key: 'fullName', label: 'اسم الموظف', pinned: isPinned('fullName') },
-              { key: 'username', label: 'اسم المستخدم', pinned: isPinned('username') },
-              { key: 'jobTitle', label: 'المسمى الوظيفي', pinned: isPinned('jobTitle') },
-              { key: 'role', label: 'الدور الوظيفي', pinned: isPinned('role') },
-            ]}
-            onPinAll={() => setPinnedCols(['fullName'])}
-            onUnpinAll={() => setPinnedCols([])}
-            onTogglePinColumn={togglePin}
-            onResetPinDefaults={() => setPinnedCols(['fullName'])}
-          />
-
-          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-            <div className="p-3.5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="text-sm font-black text-[#102A43]">إدارة حسابات العاملين والموظفين</h3>
-              <span className="text-xs font-bold text-slate-500">إجمالي الحسابات: {toArabicNumerals(users.length)}</span>
-            </div>
-
-            <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-[#102A43] text-white sticky top-0 z-10">
-                  <tr>
-                    <th className="w-9 text-center">تحديد</th>
-                    <SortableTh
-                      label="اسم الموظف"
-                      sortKey="fullName"
-                      activeSortKey={userSort.key}
-                      sortAsc={userSort.asc}
-                      onSort={(k) => setUserSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))}
-                      className={isPinned('fullName') ? 'sticky right-0 z-20 bg-[#102A43] pinned-col-edge' : ''}
-                    />
-                    <SortableTh label="اسم المستخدم" sortKey="username" activeSortKey={userSort.key} sortAsc={userSort.asc} onSort={(k) => setUserSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="المسمى الوظيفي" sortKey="jobTitle" activeSortKey={userSort.key} sortAsc={userSort.asc} onSort={(k) => setUserSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="الدور الوظيفي" sortKey="role" activeSortKey={userSort.key} sortAsc={userSort.asc} onSort={(k) => setUserSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="الحالة" sortKey="status" activeSortKey={userSort.key} sortAsc={userSort.asc} onSort={(k) => setUserSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <th className="text-center">التحكم بالحساب</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sortedUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50">
-                      <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(u.id)}
-                          onChange={() => toggleSelectRow(u.id)}
-                          className="w-3.5 h-3.5 accent-[#102A43] cursor-pointer"
-                        />
-                      </td>
-                      <td className={`font-bold text-[#102A43] ${isPinned('fullName') ? 'sticky right-0 z-10 bg-white pinned-col-edge' : ''}`}>
-                        {u.fullName}
-                      </td>
-                      <td className="text-slate-700">{u.username}</td>
-                      <td className="text-slate-600">{u.jobTitle}</td>
-                      <td className="font-bold text-[#164E83]">{getRoleArabicLabel(u.role)}</td>
-                      <td className="text-center whitespace-nowrap">
-                        {u.status === 'active' ? (
-                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">نشط</span>
-                        ) : (
-                          <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[10px] font-bold">موقوف</span>
-                        )}
-                      </td>
-                      <td className="text-center whitespace-nowrap">
-                        {u.role !== 'super_admin' && (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUserStatus(u.id)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
-                              u.status === 'active'
-                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                            }`}
-                          >
-                            {u.status === 'active' ? 'إيقاف الحساب' : 'تفعيل الحساب'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+          <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
+            <h3 className="text-[13px] font-black text-[#102A43]">إدارة حسابات العاملين والموظفين</h3>
+            <span className="text-[11px] font-bold text-slate-600">إجمالي الحسابات: <span className="num-cell">{toArabicNumerals(users.length)}</span></span>
           </div>
+
+          <SmartAutoFitTable
+            tableId="admin_users"
+            userId={userId}
+            rows={filteredUsers}
+            totalCount={users.length}
+            getRowId={(u) => u.id}
+            columns={userColumns}
+            sortKey={userSort.key}
+            sortAsc={userSort.asc}
+            onSort={(k) => setUserSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+            selectable
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelectRow}
+            onClearSelection={() => setSelectedIds([])}
+            pinnedKeys={pinnedCols}
+            onTogglePinColumn={togglePin}
+            onPinAll={() => setPinnedCols(['fullName', 'username'])}
+            onUnpinAll={() => setPinnedCols([])}
+            onResetPinDefaults={() => setPinnedCols(['fullName'])}
+            onNotify={showNotice}
+            emptyMessage="لا توجد حسابات مطابقة حالياً."
+          />
         </div>
       )}
 
@@ -477,10 +578,10 @@ export default function AdminDashboard() {
       {activeTab === 'branches' && (
         <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-            <h3 className="text-sm font-black text-[#102A43]">
+            <h3 className="text-[13px] font-black text-[#102A43]">
               إدارة فروع وإدارات التموين بالمحافظة ({toArabicNumerals(branches.length)} فرعاً إدارياً)
             </h3>
-            <span className="text-xs font-bold text-emerald-700">العزل الإداري للفروع مفعل</span>
+            <span className="text-[11px] font-extrabold text-emerald-700">العزل الإداري للفروع مفعل</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
@@ -488,19 +589,19 @@ export default function AdminDashboard() {
               <div key={b.id} className="bg-[#FAFBFD] rounded-xl p-4 border border-slate-200 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs bg-[#102A43] text-[#C6A15B] px-2 py-0.5 rounded font-black">
+                    <span className="text-[11px] bg-[#102A43] text-[#C6A15B] px-2.5 py-0.5 rounded font-black">
                       إدارة رقم {toArabicNumerals(idx + 1)}
                     </span>
-                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                    <span className="text-[10px] text-emerald-800 font-extrabold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                       نشط ومؤمن
                     </span>
                   </div>
-                  <h4 className="text-sm font-black text-[#102A43] mb-1">{b.arabicName}</h4>
-                  <p className="text-xs font-bold text-slate-600 mb-1">المدير المسؤول: {b.managerName}</p>
-                  <p className="text-xs text-slate-600 font-bold">الهاتف: <span className="num-cell">{toArabicNumerals(b.phone)}</span></p>
+                  <h4 className="text-[13px] font-black text-[#102A43] mb-1">{b.arabicName}</h4>
+                  <p className="text-[11px] font-bold text-slate-700 mb-1">المدير المسؤول: {b.managerName}</p>
+                  <p className="text-[11px] text-slate-700 font-bold">الهاتف: <span className="num-cell">{toArabicNumerals(b.phone)}</span></p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center text-xs">
-                  <span className="text-slate-500">{b.address}</span>
+                <div className="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center text-[11px]">
+                  <span className="text-slate-600 font-bold">{b.address}</span>
                   <span className="text-[#164E83] font-black">صلاحيات كاملة</span>
                 </div>
               </div>
@@ -511,78 +612,34 @@ export default function AdminDashboard() {
 
       {/* Tab Content: Audit Logs */}
       {activeTab === 'audit' && (
-        <div className="space-y-3">
-          <TableControlsBar
-            totalRecords={auditLogs.length}
-            displayedRecords={sortedAuditLogs.length}
-            filteredRecords={sortedAuditLogs.length}
-            selectedRecords={selectedIds.length}
-            totalColumns={7}
-            visibleColumns={7}
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+          <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
+            <h3 className="text-[13px] font-black text-[#102A43]">سجل النشاط والتدقيق الأمني غير القابل للتعديل</h3>
+            <span className="text-[11px] font-bold text-slate-600">يوثق كافة العمليات والمحاولات</span>
+          </div>
+
+          <SmartAutoFitTable
+            tableId="admin_audit"
+            userId={userId}
+            rows={filteredAuditLogs}
+            totalCount={auditLogs.length}
+            getRowId={(l) => l.id}
+            columns={auditColumns}
+            sortKey={auditSort.key}
+            sortAsc={auditSort.asc}
+            onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))}
+            selectable
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelectRow}
             onClearSelection={() => setSelectedIds([])}
-            columns={[
-              { key: 'timestamp', label: 'التاريخ والوقت', pinned: isPinned('timestamp') },
-              { key: 'fullName', label: 'المستخدم', pinned: isPinned('fullName') },
-              { key: 'action', label: 'العملية', pinned: isPinned('action') },
-            ]}
+            pinnedKeys={pinnedCols}
+            onTogglePinColumn={togglePin}
             onPinAll={() => setPinnedCols(['timestamp', 'fullName'])}
             onUnpinAll={() => setPinnedCols([])}
-            onTogglePinColumn={togglePin}
-            onResetPinDefaults={() => setPinnedCols(['timestamp'])}
+            onResetPinDefaults={() => setPinnedCols(['fullName'])}
+            onNotify={showNotice}
+            emptyMessage="لا توجد سجلات تدقيق مطابقة."
           />
-
-          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-            <div className="p-3.5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="text-sm font-black text-[#102A43]">سجل النشاط والتدقيق الأمني غير القابل للتعديل</h3>
-              <span className="text-xs font-bold text-slate-500">يوثق كافة العمليات والمحاولات</span>
-            </div>
-
-            <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-              <table className="w-full text-right">
-                <thead className="bg-[#102A43] text-white sticky top-0 z-10">
-                  <tr>
-                    <th className="w-9 text-center">تحديد</th>
-                    <SortableTh label="التاريخ والوقت" sortKey="timestamp" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="المستخدم" sortKey="fullName" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="العملية" sortKey="action" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="القسم / الوحدة" sortKey="module" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="التفاصيل" sortKey="details" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} />
-                    <SortableTh label="عنوان الشبكة" sortKey="ipAddress" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                    <SortableTh label="النتيجة" sortKey="status" activeSortKey={auditSort.key} sortAsc={auditSort.asc} onSort={(k) => setAuditSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))} align="center" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sortedAuditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50">
-                      <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(log.id)}
-                          onChange={() => toggleSelectRow(log.id)}
-                          className="w-3.5 h-3.5 accent-[#102A43] cursor-pointer"
-                        />
-                      </td>
-                      <td className="num-cell text-center text-slate-600">{formatDateArabic(log.timestamp, true)}</td>
-                      <td className="font-bold text-[#102A43]">{log.fullName}</td>
-                      <td className="font-bold text-[#164E83]">{log.action}</td>
-                      <td className="text-slate-700">{log.module}</td>
-                      <td className="text-slate-600 max-w-[240px] truncate" title={log.details}>
-                        {toArabicNumerals(log.details)}
-                      </td>
-                      <td className="num-cell text-center text-slate-500">{toArabicNumerals(log.ipAddress)}</td>
-                      <td className="text-center whitespace-nowrap">
-                        {log.status === 'success' ? (
-                          <span className="text-emerald-700 font-bold">ناجح ✓</span>
-                        ) : (
-                          <span className="text-red-700 font-bold">فشل ✕</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       )}
     </div>

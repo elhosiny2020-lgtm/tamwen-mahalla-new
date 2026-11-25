@@ -11,8 +11,9 @@ import {
   Search,
   CheckCircle2,
   Printer,
+  Calculator,
 } from 'lucide-react';
-import { BakeryRecord, InspectionRecord, User } from '@/types';
+import { BakeryRecord, BakeryViolationRecord, DebtApprovalStatus, InspectionRecord, User } from '@/types';
 import {
   compareTableValues,
   formatArabicNumber,
@@ -20,9 +21,11 @@ import {
   normalizeSearchText,
   toArabicNumerals,
 } from '@/lib/utils';
-import SortableTh from './SortableTh';
+import { loadDebtsStore, saveDebtsStore } from '@/lib/debts-data';
+import { buildInitialDebtItems, computeDebtFinancials } from '@/lib/debts-engine';
 import AnimatedStatCard from './AnimatedStatCard';
-import TableControlsBar from './TableControlsBar';
+import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
+import ViolationCalculator, { WeightShortageCalculationOutput } from './ViolationCalculator';
 
 interface BakeryInspectionModuleProps {
   bakeries: BakeryRecord[];
@@ -34,6 +37,11 @@ interface BakeryInspectionModuleProps {
   onUpdateStatus: (id: string, status: InspectionRecord['status']) => void;
   onSelectBakeryDetails: (bakery: BakeryRecord) => void;
 }
+
+type EnrichedInspectionRecord = InspectionRecord & {
+  ownerName: string;
+  posNumber: string;
+};
 
 export default function BakeryInspectionModule({
   bakeries,
@@ -50,8 +58,15 @@ export default function BakeryInspectionModule({
   const [sortKey, setSortKey] = useState<string>('date');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [showCalculator, setShowCalculator] = useState<boolean>(activeFocus === 'ins-violations');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [pinnedCols, setPinnedCols] = useState<string[]>(['recordNumber']);
+  const [pinnedCols, setPinnedCols] = useState<string[]>([
+    'recordNumber',
+    'bakeryName',
+    'ownerName',
+    'posNumber',
+  ]);
+  const [toastMsg, setToastMsg] = useState<string>('');
 
   const [newBakeryId, setNewBakeryId] = useState<string>(bakeries[0]?.id || '');
   const [newType, setNewType] = useState<InspectionRecord['type']>('مخالفة');
@@ -68,6 +83,11 @@ export default function BakeryInspectionModule({
     }
   };
 
+  const notify = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 3500);
+  };
+
   const focusMeta: Record<string, { title: string; subtitle: string; typeFilter?: InspectionRecord['type'] }> = {
     'ins-campaigns': {
       title: 'الحملات التموينية المفاجئة والمخططة',
@@ -75,8 +95,8 @@ export default function BakeryInspectionModule({
       typeFilter: 'حملة تموينية',
     },
     'ins-violations': {
-      title: 'سجل المخالفات التموينية للمخابز',
-      subtitle: 'رصد مخالفات الأوزان والمواصفات والتصرف في الدقيق والغرامات المقررة',
+      title: 'سجل المخالفات التموينية للمخابز وحاسبة نقص الوزن (قرار ١٧٥ لسنة ٢٠٢٤)',
+      subtitle: 'رصد مخالفات الأوزان والمواصفات والتصرف في الدقيق والغرامات المقررة والربط التلقائي بالمديونيات',
       typeFilter: 'مخالفة',
     },
     'ins-minutes': {
@@ -97,22 +117,41 @@ export default function BakeryInspectionModule({
 
   const currentMeta = focusMeta[activeFocus] || focusMeta['ins-reports'];
 
+  // سحب اسم صاحب المخبز ورقم ماكينة POS تلقائياً من منظومة إدارة المخابز الحالية
+  const enrichedInspections: EnrichedInspectionRecord[] = useMemo(() => {
+    return inspections.map((rec) => {
+      const matchedBakery = bakeries.find(
+        (b) => b.id === rec.bakeryId || b.name === rec.bakeryName
+      );
+      return {
+        ...rec,
+        ownerName: matchedBakery?.ownerName || 'غير مسجل',
+        posNumber: matchedBakery?.posNumber || '—',
+      };
+    });
+  }, [inspections, bakeries]);
+
   const filteredRecords = useMemo(() => {
     const q = normalizeSearchText(searchTerm);
-    return inspections
-      .filter((rec) => {
-        if (currentMeta.typeFilter && rec.type !== currentMeta.typeFilter) return false;
-        if (statusFilter !== 'all' && rec.status !== statusFilter) return false;
-        if (q) {
-          const text = normalizeSearchText(
-            `${rec.recordNumber} ${rec.bakeryName} ${rec.village} ${rec.inspectorName} ${rec.violationTitle} ${rec.notes}`
-          );
-          if (!text.includes(q)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => compareTableValues(a[sortKey as keyof InspectionRecord], b[sortKey as keyof InspectionRecord], sortAsc));
-  }, [inspections, currentMeta.typeFilter, statusFilter, searchTerm, sortKey, sortAsc]);
+    const list = enrichedInspections.filter((rec) => {
+      if (currentMeta.typeFilter && rec.type !== currentMeta.typeFilter) return false;
+      if (statusFilter !== 'all' && rec.status !== statusFilter) return false;
+      if (q) {
+        const text = normalizeSearchText(
+          `${rec.recordNumber} ${rec.bakeryName} ${rec.ownerName} ${rec.posNumber} ${rec.village} ${rec.inspectorName} ${rec.violationTitle} ${rec.notes}`
+        );
+        if (!text.includes(q)) return false;
+      }
+      return true;
+    });
+    return [...list].sort((a, b) =>
+      compareTableValues(
+        (a as unknown as Record<string, unknown>)[sortKey],
+        (b as unknown as Record<string, unknown>)[sortKey],
+        sortAsc
+      )
+    );
+  }, [enrichedInspections, currentMeta.typeFilter, statusFilter, searchTerm, sortKey, sortAsc]);
 
   const stats = useMemo(() => {
     const total = inspections.length;
@@ -152,14 +191,368 @@ export default function BakeryInspectionModule({
     setNewFine(0);
     setNewNotes('');
     setShowAddForm(false);
+    notify('تم تسجيل المخالفة / السجل الرقابي بنجاح.');
   };
 
-  const isPinned = (key: string) => pinnedCols.includes(key);
+  // ربط نتيجة حاسبة نقص الوزن (قرار 175 لسنة 2024) تلقائياً بسجل المخالفات وسجل مديونيات المخابز
+  const handleRecordFromCalculator = (
+    output: WeightShortageCalculationOutput,
+    approvalStatus: DebtApprovalStatus,
+    autoLinkToDebt: boolean
+  ) => {
+    onAddInspection({
+      recordNumber: output.minutesNumber,
+      bakeryId: output.bakeryId,
+      bakeryName: output.bakeryName,
+      village: output.village,
+      type: 'مخالفة',
+      date: output.violationDate,
+      inspectorName: currentUser.fullName,
+      violationTitle: `نقص وزن خبز بلدي مدعم (${output.shortageGrams} جم — ${output.tierLabel} — معامل ×${output.legalMultiplier})`,
+      fineAmountEgp: output.finalFineAmountEgp,
+      status: 'قيد التحقيق',
+      notes: output.formulaEquationText,
+    });
+
+    if (typeof window !== 'undefined') {
+      const store = loadDebtsStore();
+      const serial = store.debts.length + 1;
+      const debtNumber = `DBT-2026-${String(serial).padStart(3, '0')}`;
+      const debtId = `debt-${Date.now()}`;
+      const violId = `viol-${Date.now()}`;
+      const violationNumber = `VL-2026-${String(store.violations.length + 1).padStart(3, '0')}`;
+
+      const newViol: BakeryViolationRecord = {
+        id: violId,
+        violationNumber,
+        minutesNumber: output.minutesNumber,
+        bakeryId: output.bakeryId,
+        bakeryName: output.bakeryName,
+        ownerName: output.ownerName,
+        posNumber: output.posNumber,
+        village: output.village,
+        localUnit: output.localUnit,
+        phone: output.phone,
+        violationDate: output.violationDate,
+        ruleId: 'rule-14',
+        ruleCode: 'W-175-14',
+        violationName: 'إنتاج خبز بلدي مدعم ناقص الوزن (قرار ١٧٥ لسنة ٢٠٢٤)',
+        groupName: 'مخالفات الوزن والجودة',
+        breadCategory: 'خبز بلدي مدعم',
+        decreeRef: 'القرار الوزاري رقم ١٧٥ لسنة ٢٠٢٤',
+        articleRef: `المادة ١٤ — ${output.tierLabel}`,
+        officialWeightGrams: output.officialWeightGrams,
+        actualWeightGrams: output.actualWeightGrams,
+        shortageGrams: output.shortageGrams,
+        shortagePercent: output.shortagePercent,
+        weightTier: output.tierNumber,
+        dailyInsuranceQuotaSnapshot: output.insuranceQuota,
+        flourUnitPriceSnapshot: output.sackPriceEgp,
+        quotaUnitLabel: 'شيكارة',
+        priceUnitLabel: 'شيكارة',
+        isRepeat: output.isRepeat,
+        repeatCountInWindow: output.isRepeat ? 1 : 0,
+        multiplierApplied: output.legalMultiplier,
+        baseAmount: output.baseAmountEgp,
+        finalFineAmount: output.finalFineAmountEgp,
+        closureMeasure: output.administrativeMeasure,
+        closureDays: output.closureDays,
+        quotaDeductionPct: 0,
+        quotaDeductionMonths: 0,
+        calculationSteps: [output.formulaEquationText],
+        legalBasisText: 'طبقاً للقرار الوزاري رقم ١٧٥ لسنة ٢٠٢٤',
+        effectiveRuleDate: '2024-10-15',
+        status: approvalStatus,
+        linkedDebtId: autoLinkToDebt ? debtId : undefined,
+        linkedDebtNumber: autoLinkToDebt ? debtNumber : undefined,
+        recordedBy: currentUser.fullName,
+        approvedBy: approvalStatus === 'معتمد' ? currentUser.fullName : undefined,
+        approvedAt: approvalStatus === 'معتمد' ? new Date().toISOString() : undefined,
+        notes: output.notes,
+        createdAt: new Date().toISOString(),
+      };
+
+      let nextDebts = store.debts;
+      let nextItems = store.items;
+
+      if (autoLinkToDebt) {
+        const newDebt = computeDebtFinancials(
+          {
+            id: debtId,
+            serialNumber: serial,
+            debtNumber,
+            bakeryId: output.bakeryId,
+            bakeryFileNumber: bakeries.find((b) => b.id === output.bakeryId)?.bakeryNumber || '',
+            bakeryName: output.bakeryName,
+            ownerName: output.ownerName,
+            posNumber: output.posNumber,
+            village: output.village,
+            localUnit: output.localUnit,
+            phone: output.phone,
+            issuingAuthority: 'إدارة تموين مركز المحلة الكبرى',
+            violationType: 'مخالفة نقص وزن خبز بلدي مدعم (١٧٥/٢٠٢٤)',
+            minutesNumber: output.minutesNumber,
+            violationDate: output.violationDate,
+            dueDate: todayRef,
+            description: `${output.tierLabel} — ${output.formulaEquationText}`,
+            notes: output.notes,
+            recordedBy: currentUser.fullName,
+            recordedByUserId: currentUser.id,
+            approvalStatus: 'معتمد',
+            approvedBy: currentUser.fullName,
+            approvedAt: new Date().toISOString(),
+            originalAmount: output.finalFineAmountEgp,
+            priorViolationsAmount: 0,
+            additionsAmount: 0,
+            disposalsAmount: 0,
+            approvedSettlementsAmount: 0,
+            advancePaidAmount: 0,
+            grossBeforeSettlements: output.finalFineAmountEgp,
+            netDueAmount: output.finalFineAmountEgp,
+            totalPaidAmount: 0,
+            remainingAmount: output.finalFineAmountEgp,
+            paymentPercentage: 0,
+            remainingPercentage: 100,
+            paymentStatus: 'غير مسدد',
+            scheduleStatus: 'غير مجدول',
+            delayDays: 0,
+            linkedViolationId: violId,
+            breadTypeLabel: 'خبز بلدي مدعم',
+            officialWeightGrams: output.officialWeightGrams,
+            actualWeightGrams: output.actualWeightGrams,
+            shortageGrams: output.shortageGrams,
+            weightTierLabel: output.tierLabel,
+            penaltyMultiplier: output.legalMultiplier,
+            sackPriceAtViolation: output.sackPriceEgp,
+            insuranceQuotaAtViolation: output.insuranceQuota,
+            baseFineAmount: output.baseAmountEgp,
+            finalFineAmount: output.finalFineAmountEgp,
+            createdAt: new Date().toISOString(),
+          },
+          [],
+          [],
+          todayRef
+        );
+        nextDebts = [newDebt, ...store.debts];
+        nextItems = [...buildInitialDebtItems(newDebt), ...store.items];
+      }
+
+      saveDebtsStore({
+        ...store,
+        debts: nextDebts,
+        items: nextItems,
+        violations: [newViol, ...store.violations],
+      });
+    }
+    notify('تم قيد مخالفة نقص الوزن وربطها بسجل المديونيات بنجاح.');
+  };
+
   const togglePin = (key: string) =>
     setPinnedCols((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
+  const columns: SmartTableColumn<EnrichedInspectionRecord>[] = useMemo(
+    () => [
+      {
+        key: 'recordNumber',
+        label: 'رقم السجل',
+        headerText: 'رقم السجل',
+        type: 'numeric',
+        defaultWidth: 120,
+        measureValue: (rec) => toArabicNumerals(rec.recordNumber),
+        render: (rec) => <span className="num-cell font-black text-[#164E83]">{toArabicNumerals(rec.recordNumber)}</span>,
+      },
+      {
+        key: 'bakeryName',
+        label: 'المخبز',
+        headerText: 'المخبز',
+        type: 'name',
+        defaultWidth: 168,
+        render: (rec) => {
+          const bakery = bakeries.find((b) => b.id === rec.bakeryId || b.name === rec.bakeryName);
+          return bakery ? (
+            <button
+              type="button"
+              onClick={() => onSelectBakeryDetails(bakery)}
+              className="font-extrabold text-[#102A43] hover:text-[#164E83] hover:underline text-right cursor-pointer"
+            >
+              {rec.bakeryName}
+            </button>
+          ) : (
+            <span className="font-extrabold text-[#102A43]">{rec.bakeryName}</span>
+          );
+        },
+      },
+      {
+        key: 'ownerName',
+        label: 'اسم صاحب المخبز',
+        headerText: 'اسم صاحب المخبز',
+        type: 'name',
+        defaultWidth: 165,
+        measureValue: (rec) => rec.ownerName,
+        render: (rec) => {
+          const bakery = bakeries.find((b) => b.id === rec.bakeryId || b.name === rec.bakeryName);
+          return bakery ? (
+            <button
+              type="button"
+              onClick={() => onSelectBakeryDetails(bakery)}
+              className="font-black text-slate-800 hover:text-[#164E83] hover:underline text-right cursor-pointer"
+            >
+              {rec.ownerName}
+            </button>
+          ) : (
+            <span className="font-bold text-slate-800">{rec.ownerName}</span>
+          );
+        },
+      },
+      {
+        key: 'posNumber',
+        label: 'رقم ماكينة POS',
+        headerText: 'رقم ماكينة POS',
+        type: 'numeric',
+        align: 'center',
+        defaultWidth: 130,
+        measureValue: (rec) => toArabicNumerals(rec.posNumber),
+        render: (rec) => {
+          const bakery = bakeries.find((b) => b.id === rec.bakeryId || b.name === rec.bakeryName);
+          return bakery ? (
+            <button
+              type="button"
+              onClick={() => onSelectBakeryDetails(bakery)}
+              title="اضغط لفتح ملف المخبز"
+              className="num-cell font-black px-2 py-0.5 rounded bg-slate-100 hover:bg-[#102A43] hover:text-white text-[#102A43] transition-colors cursor-pointer"
+            >
+              {toArabicNumerals(rec.posNumber)}
+            </button>
+          ) : (
+            <span className="num-cell font-black text-slate-700">{toArabicNumerals(rec.posNumber)}</span>
+          );
+        },
+      },
+      {
+        key: 'date',
+        label: 'التاريخ',
+        headerText: 'التاريخ',
+        type: 'date',
+        align: 'center',
+        defaultWidth: 108,
+        measureValue: (rec) => formatDateArabic(rec.date),
+        render: (rec) => <span className="num-cell text-slate-700">{formatDateArabic(rec.date)}</span>,
+      },
+      {
+        key: 'village',
+        label: 'القرية',
+        headerText: 'القرية',
+        type: 'text',
+        defaultWidth: 105,
+        render: (rec) => <span className="text-slate-700">{rec.village}</span>,
+      },
+      {
+        key: 'type',
+        label: 'النوع',
+        headerText: 'النوع',
+        type: 'badge',
+        align: 'center',
+        defaultWidth: 112,
+        render: (rec) => (
+          <span
+            className={`px-2 py-0.5 rounded text-[10px] font-extrabold border whitespace-nowrap ${
+              rec.type === 'مخالفة' || rec.type === 'محضر رسمي'
+                ? 'bg-red-50 text-red-800 border-red-200'
+                : 'bg-blue-50 text-blue-900 border-blue-200'
+            }`}
+          >
+            {rec.type}
+          </span>
+        ),
+      },
+      {
+        key: 'violationTitle',
+        label: 'بيان التفتيش / المخالفة',
+        headerText: 'بيان التفتيش / المخالفة',
+        type: 'longText',
+        defaultWidth: 230,
+        measureValue: (rec) => toArabicNumerals(rec.violationTitle),
+        render: (rec) => <span className="text-slate-800">{toArabicNumerals(rec.violationTitle)}</span>,
+      },
+      {
+        key: 'inspectorName',
+        label: 'المفتش المسؤول',
+        headerText: 'المفتش المسؤول',
+        type: 'name',
+        defaultWidth: 155,
+        render: (rec) => <span className="text-slate-800">{rec.inspectorName}</span>,
+      },
+      {
+        key: 'fineAmountEgp',
+        label: 'الغرامة (ج.م)',
+        headerText: 'الغرامة (ج.م)',
+        type: 'currency',
+        align: 'center',
+        defaultWidth: 115,
+        measureValue: (rec) => (rec.fineAmountEgp > 0 ? `${formatArabicNumber(rec.fineAmountEgp)} ج.م` : '—'),
+        render: (rec) => (
+          <span className="num-cell font-black text-red-800">
+            {rec.fineAmountEgp > 0 ? `${formatArabicNumber(rec.fineAmountEgp)} ج.م` : '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'status',
+        label: 'الحالة',
+        headerText: 'الحالة',
+        type: 'badge',
+        align: 'center',
+        defaultWidth: 115,
+        render: (rec) => (
+          <span
+            className={`px-2 py-0.5 rounded text-[10px] font-extrabold border whitespace-nowrap ${
+              rec.status === 'مطابق' || rec.status === 'تم التسوية' || rec.status === 'مغلق'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : rec.status === 'محال للنيابة'
+                ? 'bg-red-700 text-white border-red-800'
+                : 'bg-amber-50 text-amber-800 border-amber-200'
+            }`}
+          >
+            {rec.status}
+          </span>
+        ),
+      },
+      {
+        key: 'actions',
+        label: 'إجراء',
+        headerText: 'إجراء',
+        type: 'actions',
+        align: 'center',
+        sortable: false,
+        defaultWidth: 96,
+        render: (rec) =>
+          rec.status !== 'تم التسوية' && rec.status !== 'مطابق' ? (
+            <button
+              type="button"
+              onClick={() => onUpdateStatus(rec.id, 'تم التسوية')}
+              className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer"
+              title="تحديث الحالة إلى تم التسوية"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>تسوية</span>
+            </button>
+          ) : (
+            <span className="text-slate-400 text-xs font-bold">مكتمل</span>
+          ),
+      },
+    ],
+    [bakeries, onSelectBakeryDetails, onUpdateStatus]
+  );
+
   return (
     <div className="space-y-4">
+      {toastMsg && (
+        <div className="bg-emerald-800 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-md flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-[#C6A15B]" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
       {/* Animated Colored KPI Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <AnimatedStatCard
@@ -201,53 +594,52 @@ export default function BakeryInspectionModule({
         />
       </div>
 
-      {/* Table Counters & Pinning Controls */}
-      <TableControlsBar
-        totalRecords={inspections.length}
-        displayedRecords={filteredRecords.length}
-        filteredRecords={filteredRecords.length}
-        selectedRecords={selectedIds.length}
-        totalColumns={10}
-        visibleColumns={10}
-        onClearSelection={() => setSelectedIds([])}
-        columns={[
-          { key: 'recordNumber', label: 'رقم السجل', pinned: isPinned('recordNumber') },
-          { key: 'date', label: 'التاريخ', pinned: isPinned('date') },
-          { key: 'bakeryName', label: 'المخبز', pinned: isPinned('bakeryName') },
-          { key: 'village', label: 'القرية', pinned: isPinned('village') },
-          { key: 'fineAmountEgp', label: 'الغرامة', pinned: isPinned('fineAmountEgp') },
-        ]}
-        onPinAll={() => setPinnedCols(['recordNumber', 'bakeryName'])}
-        onUnpinAll={() => setPinnedCols([])}
-        onTogglePinColumn={togglePin}
-        onResetPinDefaults={() => setPinnedCols(['recordNumber'])}
-      />
+      {/* حاسبة نقص وزن الخبز البلدي المدعم طبقاً للقرار الوزاري ١٧٥ لسنة ٢٠٢٤ */}
+      {(showCalculator || activeFocus === 'ins-violations') && (
+        <ViolationCalculator
+          bakeries={bakeries}
+          todayRef={todayRef}
+          onOpenBakeryProfile={(bakeryId) => {
+            const b = bakeries.find((x) => x.id === bakeryId);
+            if (b) onSelectBakeryDetails(b);
+          }}
+          onRecordAndLinkDebt={handleRecordFromCalculator}
+        />
+      )}
 
-      {/* Header & Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      {/* Header & Filter Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
         <div className="p-4 bg-[#102A43] text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h2 className="text-sm font-black flex items-center gap-2">
+            <h2 className="text-base font-black flex items-center gap-2">
               <FileBarChart2 className="w-4 h-4 text-[#C6A15B]" />
               <span>{currentMeta.title}</span>
             </h2>
-            <p className="text-[11px] text-slate-300 mt-0.5">{currentMeta.subtitle}</p>
+            <p className="text-xs font-bold text-slate-300 mt-0.5">{currentMeta.subtitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="px-3 py-1.5 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer"
+              onClick={() => setShowCalculator(!showCalculator)}
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer"
             >
-              <PlusCircle className="w-3.5 h-3.5" />
+              <Calculator className="w-4 h-4 text-[#C6A15B]" />
+              <span>{showCalculator ? 'إخفاء حاسبة نقص الوزن' : 'حاسبة نقص الوزن (١٧٥/٢٠٢٤)'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="px-3.5 py-2 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
               <span>تسجيل حملة / مخالفة / محضر</span>
             </button>
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3 py-1.5 bg-[#164E83] hover:bg-[#1e609e] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-[#164E83] hover:bg-[#1e609e] text-white rounded-lg text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5 text-[#C6A15B]" />
+              <Printer className="w-4 h-4 text-[#C6A15B]" />
               <span>طباعة التقرير الرقابي</span>
             </button>
           </div>
@@ -255,27 +647,27 @@ export default function BakeryInspectionModule({
 
         {/* Add New Inspection Form */}
         {showAddForm && (
-          <form onSubmit={handleSubmitNew} className="p-4 bg-[#F4F7FB] border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+          <form onSubmit={handleSubmitNew} className="p-4 bg-[#F4F7FB] border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs font-bold">
             <div>
-              <label className="block font-bold text-[#102A43] mb-1">المخبز المعني *</label>
+              <label className="block font-extrabold text-[#102A43] mb-1">المخبز المعني *</label>
               <select
                 value={newBakeryId}
                 onChange={(e) => setNewBakeryId(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold"
               >
                 {bakeries.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.name} — {b.village} ({toArabicNumerals(b.bakeryNumber)})
+                    {b.name} — POS: {b.posNumber} — ({b.ownerName})
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block font-bold text-[#102A43] mb-1">تصنيف الإجراء الرقابي *</label>
+              <label className="block font-extrabold text-[#102A43] mb-1">تصنيف الإجراء الرقابي *</label>
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as InspectionRecord['type'])}
-                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold"
               >
                 <option value="حملة تموينية">حملة تموينية</option>
                 <option value="مخالفة">مخالفة</option>
@@ -284,32 +676,32 @@ export default function BakeryInspectionModule({
               </select>
             </div>
             <div>
-              <label className="block font-bold text-[#102A43] mb-1">قيمة الغرامة المقدرة (ج.م)</label>
+              <label className="block font-extrabold text-[#102A43] mb-1">قيمة الغرامة المقدرة (ج.م)</label>
               <input
                 type="number"
                 min={0}
                 value={newFine}
                 onChange={(e) => setNewFine(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono font-bold"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block font-bold text-[#102A43] mb-1">وصف المخالفة أو نتيجة المرور *</label>
+              <label className="block font-extrabold text-[#102A43] mb-1">وصف المخالفة أو نتيجة المرور *</label>
               <input
                 type="text"
                 required
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="مثال: نقص وزن الرغيف / عدم نظافة أدوات العجين / مطابقة تامة..."
-                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold"
               />
             </div>
             <div>
-              <label className="block font-bold text-[#102A43] mb-1">حالة الإجراء</label>
+              <label className="block font-extrabold text-[#102A43] mb-1">حالة الإجراء</label>
               <select
                 value={newStatus}
                 onChange={(e) => setNewStatus(e.target.value as InspectionRecord['status'])}
-                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold"
               >
                 <option value="قيد التحقيق">قيد التحقيق</option>
                 <option value="محال للنيابة">محال للنيابة</option>
@@ -324,11 +716,11 @@ export default function BakeryInspectionModule({
                 value={newNotes}
                 onChange={(e) => setNewNotes(e.target.value)}
                 placeholder="ملاحظات المفتش الميداني (اختياري)..."
-                className="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg"
+                className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold"
               />
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold cursor-pointer shrink-0"
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-extrabold cursor-pointer shrink-0"
               >
                 حفظ وتوثيق السجل
               </button>
@@ -337,22 +729,22 @@ export default function BakeryInspectionModule({
         )}
 
         {/* Filter Bar */}
-        <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div className="p-3 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
+            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="بحث برقم المحضر، اسم المخبز، القرية، المفتش أو وصف المخالفة..."
-              className="w-full pr-8 pl-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+              placeholder="بحث برقم المحضر، رقم ماكينة POS، اسم صاحب المخبز، المخبز، القرية أو وصف المخالفة..."
+              className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold"
             />
           </div>
           <div className="flex items-center gap-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-[#102A43]"
+              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-extrabold text-[#102A43]"
             >
               <option value="all">جميع الحالات</option>
               <option value="قيد التحقيق">قيد التحقيق</option>
@@ -363,130 +755,34 @@ export default function BakeryInspectionModule({
             </select>
           </div>
         </div>
-
-        {/* Sortable Compact Table */}
-        <div className="overflow-auto max-h-[60vh] compact-table-scroll">
-          <table className="w-full text-right">
-            <thead className="bg-slate-100 text-[#102A43] border-b border-slate-300 sticky top-0 z-10">
-              <tr>
-                <th className="w-9 text-center">تحديد</th>
-                <SortableTh
-                  label="رقم السجل"
-                  sortKey="recordNumber"
-                  activeSortKey={sortKey}
-                  sortAsc={sortAsc}
-                  onSort={handleSort}
-                  className={isPinned('recordNumber') ? 'sticky right-0 z-20 bg-slate-100 pinned-col-edge' : ''}
-                />
-                <SortableTh label="التاريخ" sortKey="date" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="center" />
-                <SortableTh label="المخبز" sortKey="bakeryName" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                <SortableTh label="القرية" sortKey="village" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                <SortableTh label="النوع" sortKey="type" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="center" />
-                <SortableTh label="بيان التفتيش / المخالفة" sortKey="violationTitle" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                <SortableTh label="المفتش المسؤول" sortKey="inspectorName" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                <SortableTh label="الغرامة (ج.م)" sortKey="fineAmountEgp" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="center" />
-                <SortableTh label="الحالة" sortKey="status" activeSortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="center" />
-                <th className="text-center">إجراء</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-10 text-center text-slate-500">
-                    لا توجد سجلات رقابية مطابقة في هذا القسم حالياً.
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map((rec, idx) => {
-                  const bakery = bakeries.find((b) => b.id === rec.bakeryId);
-                  return (
-                    <tr key={rec.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#F4F7FB]/60'} hover:bg-blue-50/60`}>
-                      <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(rec.id)}
-                          onChange={() =>
-                            setSelectedIds((prev) =>
-                              prev.includes(rec.id) ? prev.filter((x) => x !== rec.id) : [...prev, rec.id]
-                            )
-                          }
-                          className="w-3.5 h-3.5 accent-[#102A43] cursor-pointer"
-                        />
-                      </td>
-                      <td
-                        className={`num-cell font-bold text-[#164E83] ${
-                          isPinned('recordNumber') ? 'sticky right-0 z-10 bg-white pinned-col-edge' : ''
-                        }`}
-                      >
-                        {toArabicNumerals(rec.recordNumber)}
-                      </td>
-                      <td className="num-cell text-center text-slate-700">{formatDateArabic(rec.date)}</td>
-                      <td className="font-bold text-[#102A43] max-w-[140px] truncate" title={rec.bakeryName}>
-                        {bakery ? (
-                          <button
-                            type="button"
-                            onClick={() => onSelectBakeryDetails(bakery)}
-                            className="hover:underline text-right cursor-pointer"
-                          >
-                            {rec.bakeryName}
-                          </button>
-                        ) : (
-                          rec.bakeryName
-                        )}
-                      </td>
-                      <td className="text-slate-700 whitespace-nowrap">{rec.village}</td>
-                      <td className="text-center whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10.5px] font-bold border ${
-                            rec.type === 'مخالفة' || rec.type === 'محضر رسمي'
-                              ? 'bg-red-50 text-red-800 border-red-200'
-                              : 'bg-blue-50 text-blue-900 border-blue-200'
-                          }`}
-                        >
-                          {rec.type}
-                        </span>
-                      </td>
-                      <td className="max-w-[230px] truncate text-slate-800" title={`${rec.violationTitle} — ${rec.notes}`}>
-                        {toArabicNumerals(rec.violationTitle)}
-                      </td>
-                      <td className="text-slate-700 whitespace-nowrap">{rec.inspectorName}</td>
-                      <td className="num-cell text-center font-bold text-red-800">
-                        {rec.fineAmountEgp > 0 ? `${formatArabicNumber(rec.fineAmountEgp)} ج.م` : '—'}
-                      </td>
-                      <td className="text-center whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10.5px] font-bold border ${
-                            rec.status === 'مطابق' || rec.status === 'تم التسوية' || rec.status === 'مغلق'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : rec.status === 'محال للنيابة'
-                              ? 'bg-red-700 text-white border-red-800'
-                              : 'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}
-                        >
-                          {rec.status}
-                        </span>
-                      </td>
-                      <td className="text-center whitespace-nowrap">
-                        {rec.status !== 'تم التسوية' && rec.status !== 'مطابق' && (
-                          <button
-                            type="button"
-                            onClick={() => onUpdateStatus(rec.id, 'تم التسوية')}
-                            className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer"
-                            title="تحديث الحالة إلى تم التسوية"
-                          >
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>تسوية</span>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
+
+      {/* Unified Smart Auto-Fit Inspection Table */}
+      <SmartAutoFitTable
+        tableId={`inspections_${activeFocus}`}
+        userId={currentUser.id}
+        rows={filteredRecords}
+        totalCount={inspections.length}
+        getRowId={(r) => r.id}
+        columns={columns}
+        sortKey={sortKey}
+        sortAsc={sortAsc}
+        onSort={handleSort}
+        selectable
+        selectedIds={selectedIds}
+        onToggleSelect={(id) =>
+          setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+        }
+        onClearSelection={() => setSelectedIds([])}
+        pinnedKeys={pinnedCols}
+        onPinAll={() => setPinnedCols(['recordNumber', 'bakeryName', 'ownerName', 'posNumber'])}
+        onUnpinAll={() => setPinnedCols([])}
+        onTogglePinColumn={togglePin}
+        onResetPinDefaults={() => setPinnedCols(['recordNumber', 'bakeryName', 'ownerName', 'posNumber'])}
+        onNotify={notify}
+        theadClassName="bg-slate-100 text-[#102A43] border-b border-slate-300"
+        emptyMessage="لا توجد سجلات رقابية مطابقة في هذا القسم حالياً."
+      />
     </div>
   );
 }

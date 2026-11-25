@@ -202,14 +202,14 @@ export default function BakeryNavigationGrid({
       {/* Top Quick Primary Access Strip (Dashboard / Add Bakery / Registry / Search) */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-black text-[#102A43]">الوصول السريع لوظائف منظومة الرقابة على المخابز</span>
-          <span className="text-[11px] font-bold text-slate-500">({toArabicNumerals(6)} مجموعات رئيسية — عرض كامل بدون تمرير)</span>
+          <span className="text-[14px] font-black text-[#102A43]">الوصول السريع لوظائف منظومة الرقابة على المخابز</span>
+          <span className="text-xs font-extrabold text-slate-600">({toArabicNumerals(6)} مجموعات رئيسية — عرض كامل بدون تمرير)</span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={() => onSelect('dashboard', 'dashboard')}
-            className={`px-3 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
+            className={`px-3 py-1.5 rounded-lg text-[12.5px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
               activeSubTab === 'dashboard'
                 ? 'bg-[#C6A15B] text-[#102A43] border-[#C6A15B] shadow-xs'
                 : 'bg-[#102A43] hover:bg-[#164E83] text-white border-[#102A43]'
@@ -221,7 +221,7 @@ export default function BakeryNavigationGrid({
           <button
             type="button"
             onClick={() => onSelect('add', 'add')}
-            className={`px-3 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
               activeSubTab === 'add'
                 ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs'
                 : 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-700'
@@ -233,7 +233,7 @@ export default function BakeryNavigationGrid({
           <button
             type="button"
             onClick={() => onSelect('registry', 'registry')}
-            className={`px-3 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
               activeSubTab === 'registry' && activeFocus !== 'registry-search'
                 ? 'bg-[#164E83] text-white border-[#164E83] shadow-xs'
                 : 'bg-[#F4F7FB] hover:bg-slate-200 text-[#102A43] border-slate-300'
@@ -245,7 +245,7 @@ export default function BakeryNavigationGrid({
           <button
             type="button"
             onClick={() => onSelect('registry', 'registry-search')}
-            className={`px-3 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
               activeFocus === 'registry-search'
                 ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
                 : 'bg-teal-50 hover:bg-teal-100 text-teal-900 border-teal-200'
@@ -266,12 +266,12 @@ export default function BakeryNavigationGrid({
               key={group.id}
               className={`rounded-xl border ${group.borderAccent} bg-[#FAFBFD] overflow-hidden flex flex-col`}
             >
-              <div className={`px-2.5 py-1 text-[11px] font-black flex items-center justify-between ${group.headerBg}`}>
+              <div className={`px-2.5 py-1.5 text-[11px] font-black flex items-center justify-between ${group.headerBg}`}>
                 <span className="flex items-center gap-1.5 truncate">
                   <GroupIcon className="w-3.5 h-3.5 text-[#C6A15B] shrink-0" />
                   <span className="truncate">{group.title}</span>
                 </span>
-                <span className="text-[10px] opacity-85 shrink-0">{toArabicNumerals(group.items.length)} وظائف</span>
+                <span className="text-[10px] font-extrabold opacity-90 shrink-0">{toArabicNumerals(group.items.length)} وظائف</span>
               </div>
               <div className="p-1.5 grid grid-cols-2 sm:grid-cols-3 gap-1">
                 {group.items.map((item) => {
@@ -287,7 +287,7 @@ export default function BakeryNavigationGrid({
                       key={item.id}
                       type="button"
                       onClick={() => onSelect(item.tab, item.focus || item.tab)}
-                      className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center justify-between gap-1 text-right cursor-pointer border ${
+                      className={`px-2 py-1 rounded-lg text-[10.5px] font-extrabold transition-all flex items-center justify-between gap-1 text-right cursor-pointer border ${
                         isSelected
                           ? `${group.activeBg} border-transparent shadow-xs`
                           : 'bg-white text-[#102A43] border-slate-200/90 hover:bg-slate-100 hover:border-slate-300'
@@ -295,7 +295,7 @@ export default function BakeryNavigationGrid({
                     >
                       <span className="flex items-center gap-1 min-w-0">
                         <Icon
-                          className={`w-3.5 h-3.5 shrink-0 ${
+                          className={`w-3 h-3 shrink-0 ${
                             isSelected ? 'text-[#C6A15B]' : group.iconAccent
                           }`}
                         />
@@ -303,7 +303,7 @@ export default function BakeryNavigationGrid({
                       </span>
                       {typeof item.badgeCount === 'number' && item.badgeCount > 0 && (
                         <span
-                          className={`px-1 py-0.2 rounded text-[10px] font-black tabular-nums shrink-0 ${
+                          className={`num-cell px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
                             isSelected ? 'bg-[#C6A15B] text-[#102A43]' : 'bg-red-700 text-white'
                           }`}
                         >

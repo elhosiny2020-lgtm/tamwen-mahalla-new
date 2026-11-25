@@ -284,3 +284,440 @@ export interface DebtTransactionRecord {
   notes: string;
 }
 
+// =========================================================================
+// منظومة إدارة مديونيات أصحاب المخابز وحاسبة المخالفات (النظام المالي المتكامل)
+// =========================================================================
+
+export type DebtApprovalStatus = 'مسودة' | 'قيد المراجعة' | 'معتمد' | 'مرفوض';
+export type DebtPaymentStatus = 'غير مسدد' | 'مسدد جزئيًا' | 'مسدد بالكامل' | 'متأخر';
+export type DebtScheduleStatus = 'غير مجدول' | 'مجدول نشط' | 'مكتمل' | 'متعثر' | 'ملغي';
+
+export type DebtItemType =
+  | 'قيمة المخالفة'
+  | 'المخالفات السابقة'
+  | 'الإضافات'
+  | 'التصرفات'
+  | 'التسويات'
+  | 'الخصومات المعتمدة'
+  | 'بنود مالية أخرى';
+
+export interface BakeryDebtItem {
+  id: string;
+  debtId: string;
+  itemNumber: string;
+  itemType: DebtItemType;
+  description: string;
+  dueDate: string;
+  amount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: 'مستحق' | 'مسدد جزئيًا' | 'مسدد' | 'ملغي';
+  notes: string;
+}
+
+export interface BakeryDebtRecord {
+  id: string;
+  serialNumber: number;
+  debtNumber: string;
+  bakeryId: string;
+  bakeryFileNumber: string;
+  bakeryName: string;
+  ownerName: string;
+  posNumber: string;
+  village: string;
+  localUnit: string;
+  phone: string;
+  issuingAuthority: string;
+  violationType: string;
+  minutesNumber: string;
+  violationDate: string;
+  dueDate: string;
+  description: string;
+  notes: string;
+  attachmentRef?: string;
+  recordedBy: string;
+  recordedByUserId?: string;
+  approvalStatus: DebtApprovalStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  // البنود المالية الأساسية
+  originalAmount: number;
+  priorViolationsAmount: number;
+  additionsAmount: number;
+  disposalsAmount: number;
+  approvedSettlementsAmount: number;
+  advancePaidAmount: number;
+  // القيم المحسوبة
+  grossBeforeSettlements: number;
+  netDueAmount: number;
+  totalPaidAmount: number;
+  remainingAmount: number;
+  paymentPercentage: number;
+  remainingPercentage: number;
+  // حالات المتابعة
+  paymentStatus: DebtPaymentStatus;
+  scheduleStatus: DebtScheduleStatus;
+  lastPaymentDate?: string;
+  nextInstallmentDate?: string;
+  delayDays: number;
+  linkedViolationId?: string;
+  // حقول نقص الوزن عند ربطها بمخالفة وزن
+  breadTypeLabel?: string;
+  officialWeightGrams?: number;
+  actualWeightGrams?: number;
+  shortageGrams?: number;
+  weightTierLabel?: string;
+  penaltyMultiplier?: number;
+  sackPriceAtViolation?: number;
+  insuranceQuotaAtViolation?: number;
+  baseFineAmount?: number;
+  finalFineAmount?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type DebtPaymentMethod =
+  | 'نقدي'
+  | 'تحويل بنكي'
+  | 'فودافون كاش'
+  | 'إنستاباي'
+  | 'دفع إلكتروني'
+  | 'طرق أخرى معتمدة';
+
+export interface DebtPaymentRecord {
+  id: string;
+  paymentNumber: string;
+  debtId: string;
+  debtNumber: string;
+  bakeryId: string;
+  bakeryName: string;
+  ownerName: string;
+  posNumber: string;
+  paymentDate: string;
+  amount: number;
+  paymentKind: 'دفعة كاملة' | 'دفعة جزئية' | 'دفعة مقدمة' | 'دفعة قسط' | 'تسوية / رد معتمد';
+  paymentMethod: string;
+  receiptNumber: string;
+  collectionAuthority: string;
+  collectorName: string;
+  balanceBefore: number;
+  balanceAfter: number;
+  status: 'معتمد' | 'قيد المراجعة' | 'ملغي';
+  installmentId?: string;
+  notes: string;
+  approvedBy?: string;
+  cancelledBy?: string;
+  cancelReason?: string;
+  createdAt: string;
+}
+
+export type ScheduleFrequencyType =
+  | 'سداد أسبوعي'
+  | 'سداد شهري'
+  | 'سداد كل 15 يومًا'
+  | 'سداد بمواعيد مخصصة'
+  | 'سداد دفعة واحدة'
+  | 'سداد بمبالغ غير متساوية'
+  | 'سداد بمبالغ متساوية'
+  | 'سداد بمواعيد موسمية وفق اعتماد المسؤول';
+
+export type InstallmentStatus =
+  | 'مجدول'
+  | 'مستحق اليوم'
+  | 'تم السداد'
+  | 'مسدد جزئيًا'
+  | 'متأخر'
+  | 'متأخر جزئيًا'
+  | 'مؤجل بموافقة'
+  | 'ملغي بقرار معتمد';
+
+export interface DebtInstallmentRecord {
+  id: string;
+  scheduleId: string;
+  scheduleNumber: string;
+  installmentSerial: number;
+  debtId: string;
+  debtNumber: string;
+  bakeryId: string;
+  bakeryName: string;
+  ownerName: string;
+  posNumber: string;
+  dueDate: string;
+  amount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  actualPaidDate?: string;
+  delayDays: number;
+  status: InstallmentStatus;
+  paymentMethod?: string;
+  receiptNumber?: string;
+  postponeReason?: string;
+  notes?: string;
+}
+
+export interface DebtSchedulePlan {
+  id: string;
+  scheduleNumber: string;
+  bakeryId: string;
+  bakeryName: string;
+  ownerName: string;
+  posNumber: string;
+  debtId: string;
+  debtNumber: string;
+  totalRemainingAtCreation: number;
+  downPayment: number;
+  scheduledAmount: number;
+  scheduleType: ScheduleFrequencyType;
+  startDate: string;
+  installmentsCount: number;
+  installmentAmount: number;
+  firstInstallmentDate: string;
+  paymentDayHint: string;
+  lastInstallmentDate: string;
+  notes: string;
+  responsibleUser: string;
+  status: 'مسودة' | 'معتمد نشط' | 'مكتمل' | 'متعثر' | 'ملغي';
+  createdAt: string;
+}
+
+export interface DebtFollowupRecord {
+  id: string;
+  followupDate: string;
+  bakeryId: string;
+  bakeryName: string;
+  ownerName: string;
+  posNumber: string;
+  debtId: string;
+  debtNumber: string;
+  actionType: 'إشعار بقرب موعد السداد' | 'مطالبة بسداد قسط مستحق' | 'إخطار بتأخر السداد' | 'بيان بالمديونية المتبقية' | 'إشعار بمراجعة موقف المديونية' | 'متابعة ميدانية / هاتفية';
+  noticeDate: string;
+  noticeNumber: string;
+  notifyMethod: 'تسليم باليد' | 'اتصال هاتفي' | 'بريد مسجل' | 'توقيع استلام بالإدارة';
+  notifyResult: 'تم الإخطار والتعهد بالسداد' | 'قيد المتابعة' | 'طلب تأجيل / جدولة' | 'لم يستجب';
+  employeeNotes: string;
+  nextAction: string;
+  nextFollowupDate: string;
+  employeeName: string;
+  approvedBy?: string;
+  createdAt: string;
+}
+
+export interface DebtSettlementRecord {
+  id: string;
+  debtId: string;
+  debtNumber: string;
+  bakeryId: string;
+  bakeryName: string;
+  settlementType: 'تسوية معتمدة' | 'خصم معتمد' | 'رد مبلغ' | 'عكس حركة';
+  amount: number;
+  reason: string;
+  referenceDoc: string;
+  createdBy: string;
+  approvedBy: string;
+  createdAt: string;
+}
+
+export interface DebtAuditLogRecord {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  operation:
+    | 'إضافة مديونية'
+    | 'تعديل مديونية'
+    | 'اعتماد مديونية'
+    | 'رفض مديونية'
+    | 'تسجيل دفعة'
+    | 'إلغاء دفعة'
+    | 'إنشاء جدول سداد'
+    | 'تعديل جدول سداد'
+    | 'تأجيل قسط'
+    | 'إصدار إشعار'
+    | 'تسجيل متابعة'
+    | 'تسوية مالية'
+    | 'تغيير إعدادات النظام'
+    | 'حساب مخالفة'
+    | 'اعتماد مخالفة'
+    | 'تعديل قاعدة قانونية'
+    | 'تسجيل تظلم';
+  recordRef: string;
+  beforeData: string;
+  afterData: string;
+  reason: string;
+}
+
+export type RiskClassification =
+  | 'منتظم'
+  | 'يحتاج متابعة'
+  | 'متأخر'
+  | 'متعثر'
+  | 'شديد التعثر';
+
+export type ViolationBreadCategory =
+  | 'خبز بلدي مدعم'
+  | 'خبز سياحي حر'
+  | 'خبز فينو'
+  | 'أنواع أخرى وفق الترخيص';
+
+export type ViolationGroupName =
+  | 'مخالفات منظومة صرف الخبز'
+  | 'مخالفات الدقيق والتصرف في الحصص'
+  | 'مخالفات الوزن والجودة'
+  | 'مخالفات التشغيل والنظافة'
+  | 'مخالفات التفتيش والرقابة';
+
+export type ViolationFormulaKind =
+  | 'weight_shortage_175'
+  | 'support_cost_daily_sales'
+  | 'flour_disposal_value'
+  | 'daily_quota_support_cost'
+  | 'fixed_per_day'
+  | 'fixed_fine'
+  | 'tourist_fino_directive_5'
+  | 'custom_manual';
+
+export interface ViolationRuleConfig {
+  id: string;
+  code: string;
+  name: string;
+  groupName: ViolationGroupName;
+  breadCategory: ViolationBreadCategory;
+  decreeNumber: string;
+  articleRef: string;
+  formulaKind: ViolationFormulaKind;
+  firstOffenseAmountOrMultiplier: number;
+  repeatAmountOrMultiplier: number;
+  repeatWindowDays: number;
+  closureMeasureFirst: string;
+  closureDaysFirst: number;
+  closureMeasureRepeat: string;
+  closureDaysRepeat: number;
+  quotaDeductionPct: number;
+  quotaDeductionMonths: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  legalSource: string;
+  version: number;
+  isActive: boolean;
+  requiredFields: ('weight' | 'dailySupportCost' | 'flourQtyAndPrice' | 'stopDays' | 'manualAmount')[];
+  notes: string;
+}
+
+export interface ViolationLegalVersion {
+  id: string;
+  ruleId: string;
+  ruleCode: string;
+  version: number;
+  decreeNumber: string;
+  effectiveFrom: string;
+  snapshotSummary: string;
+  changedBy: string;
+  officialReference: string;
+  changedAt: string;
+}
+
+export interface BakeryViolationRecord {
+  id: string;
+  violationNumber: string;
+  minutesNumber: string;
+  bakeryId: string;
+  bakeryName: string;
+  ownerName: string;
+  posNumber: string;
+  village: string;
+  localUnit: string;
+  phone: string;
+  violationDate: string;
+  ruleId: string;
+  ruleCode: string;
+  violationName: string;
+  groupName: ViolationGroupName;
+  breadCategory: ViolationBreadCategory;
+  decreeRef: string;
+  articleRef: string;
+  // مدخلات نقص الوزن / الحساب
+  officialWeightGrams?: number;
+  actualWeightGrams?: number;
+  shortageGrams?: number;
+  shortagePercent?: number;
+  weightTier?: number;
+  dailyInsuranceQuotaSnapshot?: number;
+  flourUnitPriceSnapshot?: number;
+  quotaUnitLabel?: string;
+  priceUnitLabel?: string;
+  dailySupportCostInput?: number;
+  flourDisposedQty?: number;
+  flourDisposedUnitPrice?: number;
+  stopDaysCount?: number;
+  // التكرار والنتيجة
+  isRepeat: boolean;
+  repeatCountInWindow: number;
+  priorViolationId?: string;
+  priorViolationDate?: string;
+  priorMinutesNumber?: string;
+  multiplierApplied: number;
+  baseAmount: number;
+  finalFineAmount: number;
+  closureMeasure: string;
+  closureDays: number;
+  quotaDeductionPct: number;
+  quotaDeductionMonths: number;
+  calculationSteps: string[];
+  legalBasisText: string;
+  effectiveRuleDate: string;
+  status: DebtApprovalStatus;
+  recordedBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  linkedDebtId?: string;
+  linkedDebtNumber?: string;
+  notes: string;
+  createdAt: string;
+}
+
+export interface ViolationAppealRecord {
+  id: string;
+  appealNumber: string;
+  violationId: string;
+  violationNumber: string;
+  bakeryId: string;
+  bakeryName: string;
+  posNumber: string;
+  appealDate: string;
+  reason: string;
+  decisionStatus: 'قيد الفحص' | 'مقبول (تعديل/إلغاء)' | 'مرفوض';
+  adjustedAmount?: number;
+  decidedBy?: string;
+  decisionNotes?: string;
+}
+
+export interface DebtModuleSettings {
+  authorities: string[];
+  violationCategories: string[];
+  additionsAndDisposalsTypes: string[];
+  paymentMethods: string[];
+  scheduleTypes: ScheduleFrequencyType[];
+  notifyBeforeDays: number[]; // e.g., [7, 3, 1, 0]
+  notifyOverdueDays: number[]; // e.g., [1, 3, 7, 15, 30]
+  defaultBaladiWeightGrams: number; // 90
+  defaultTouristWeightGrams: number; // 80
+  defaultFinoWeightGrams: number; // 60
+  defaultFlourSackPriceEgp: number; // 235
+  soundEnabled: boolean;
+  soundVolume: number;
+  enforceSeparationOfDuties: boolean;
+  riskThresholds: {
+    needsFollowupDays: number;
+    lateDays: number;
+    defaultedDays: number;
+    severelyDefaultedDays: number;
+  };
+  readNotificationIds: string[];
+  snoozedAlerts: Record<string, { untilDate: string; reason: string; approvedBy: string }>;
+  favoriteFilters: { id: string; name: string; search: string; status: string; authority: string }[];
+  noticeTemplates: Record<string, string>;
+}
+
+

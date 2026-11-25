@@ -676,6 +676,7 @@ const STORAGE_KEYS = {
   BAKERY_INSPECTIONS: 'gharbia_supply_bakery_inspections_v1',
   BAKERY_DEBTS: 'gharbia_supply_bakery_debts_v1',
   TABLE_PIN_PREFS: 'gharbia_supply_table_pins_v1',
+  TABLE_WIDTH_PREFS: 'gharbia_supply_table_widths_v1',
 };
 
 export function getStoredUsers(): User[] {
@@ -867,6 +868,33 @@ export function saveUserTablePinnedColumns(tableId: string, pinnedKeys: string[]
   if (typeof window === 'undefined') return;
   const key = `${STORAGE_KEYS.TABLE_PIN_PREFS}_${userId || 'default'}_${tableId}`;
   localStorage.setItem(key, JSON.stringify(pinnedKeys));
+}
+
+export function getUserTableColumnWidths(tableId: string, userId?: string): Record<string, number> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const key = `${STORAGE_KEYS.TABLE_WIDTH_PREFS}_${userId || 'default'}_${tableId}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveUserTableColumnWidths(
+  tableId: string,
+  widths: Record<string, number>,
+  userId?: string
+) {
+  if (typeof window === 'undefined') return;
+  const key = `${STORAGE_KEYS.TABLE_WIDTH_PREFS}_${userId || 'default'}_${tableId}`;
+  localStorage.setItem(key, JSON.stringify(widths));
+}
+
+export function clearUserTableColumnWidths(tableId: string, userId?: string) {
+  if (typeof window === 'undefined') return;
+  const key = `${STORAGE_KEYS.TABLE_WIDTH_PREFS}_${userId || 'default'}_${tableId}`;
+  localStorage.removeItem(key);
 }
 
 export function getStoredBakeryColumnGroups(): BakeryColumnGroupConfig {
