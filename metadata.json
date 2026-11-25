@@ -1,0 +1,6 @@
+{
+  "name": "منظومة الإدارة والرقابة التموينية الموحدة - محافظة الغربية",
+  "description": "البوابة الحكومية الرقمية الموحدة لمديرية التموين والتجارة الداخلية بالغربية - الإدارة والرقابة وإدارة الفروع والصلاحيات",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

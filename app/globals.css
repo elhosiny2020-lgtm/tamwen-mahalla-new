@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-cairo), var(--font-ibm-arabic), system-ui, -apple-system, sans-serif;
+}
+
+@keyframes blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.animate-blink {
+  animation: blink 4s infinite;
+}
+
+.animate-wiggle {
+  animation: wiggle 0.4s ease-in-out;
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+.clip-triangle {
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+/* Global Compact & Consistent Arabic Table Typography System */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+  font-family: var(--font-cairo), var(--font-ibm-arabic), system-ui, -apple-system, sans-serif;
+}
+
+table thead th {
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+  font-weight: 700 !important;
+  padding: 6px 8px !important;
+  vertical-align: middle;
+}
+
+table thead tr.table-group-header th {
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  padding: 5px 8px !important;
+}
+
+table tbody td {
+  font-size: 11.5px !important;
+  line-height: 1.35 !important;
+  font-weight: 600 !important;
+  padding: 5px 8px !important;
+  vertical-align: middle;
+}
+
+/* Dedicated Numeric Cell Discipline — Zero Wrapping & Uniform Tabular Sizing */
+.num-cell,
+table td.num-cell,
+table th.num-cell {
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: "tnum" 1 !important;
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+
+/* Pinned Column Shadow Divider for RTL Sticky Columns */
+.pinned-col-edge {
+  box-shadow: -4px 0 8px -4px rgba(16, 42, 67, 0.22);
+}
+
+/* Smooth compact table scrollbars */
+.compact-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.compact-table-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.compact-table-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.compact-table-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.compact-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
