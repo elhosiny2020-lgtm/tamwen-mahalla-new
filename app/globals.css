@@ -245,6 +245,7 @@ html[data-theme="custom"] {
     background-color: var(--app-canvas-bg);
     color: var(--app-text);
     transition: background-color 0.2s ease, color 0.2s ease;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -259,6 +260,44 @@ html[data-theme="custom"] {
     font-size: calc(12px * var(--font-scale, 1));
     font-weight: 700;
   }
+
+  button {
+    max-width: 100%;
+  }
+}
+
+/* Scale fixed-px utility classes smoothly with --font-scale across cards, menus, tabs, buttons, modals & alerts */
+html[data-font-scaled="true"] .text-\[9\.5px\],
+html[data-font-scaled="true"] .text-\[10px\] {
+  font-size: calc(10px * var(--font-scale, 1)) !important;
+}
+
+html[data-font-scaled="true"] .text-\[10\.5px\] {
+  font-size: calc(10.5px * var(--font-scale, 1)) !important;
+}
+
+html[data-font-scaled="true"] .text-\[11px\] {
+  font-size: calc(11px * var(--font-scale, 1)) !important;
+}
+
+html[data-font-scaled="true"] .text-\[11\.5px\] {
+  font-size: calc(11.5px * var(--font-scale, 1)) !important;
+}
+
+html[data-font-scaled="true"] .text-\[12px\] {
+  font-size: calc(12px * var(--font-scale, 1)) !important;
+}
+
+html[data-font-scaled="true"] .text-\[12\.5px\] {
+  font-size: calc(12.5px * var(--font-scale, 1)) !important;
+}
+
+html[data-font-scaled="true"] .text-\[13px\] {
+  font-size: calc(13px * var(--font-scale, 1)) !important;
+}
+
+html[data-font-scaled="true"] .text-\[14px\] {
+  font-size: calc(14px * var(--font-scale, 1)) !important;
 }
 
 /* Semantic Theme Application across All Modules (Leaves default gov_navy 100% intact) */
@@ -285,17 +324,25 @@ html:not([data-theme="gov_navy"]) aside.app-sidebar {
   color: var(--app-header-text);
 }
 
-html:not([data-theme="gov_navy"]) main .bg-white {
+html:not([data-theme="gov_navy"]) main .bg-white,
+html:not([data-theme="gov_navy"]) .app-popover,
+html:not([data-theme="gov_navy"]) .fixed .bg-white {
   background-color: var(--app-surface-bg);
 }
 
 html:not([data-theme="gov_navy"]) main .bg-\[\#F4F7FB\],
-html:not([data-theme="gov_navy"]) main .bg-slate-50 {
+html:not([data-theme="gov_navy"]) main .bg-slate-50,
+html:not([data-theme="gov_navy"]) .app-popover .bg-slate-50,
+html:not([data-theme="gov_navy"]) .fixed .bg-slate-50,
+html:not([data-theme="gov_navy"]) .fixed .bg-\[\#F4F7FB\] {
   background-color: var(--app-surface-alt);
 }
 
 html:not([data-theme="gov_navy"]) main .border-slate-200,
-html:not([data-theme="gov_navy"]) main .border-slate-300 {
+html:not([data-theme="gov_navy"]) main .border-slate-300,
+html:not([data-theme="gov_navy"]) .app-popover,
+html:not([data-theme="gov_navy"]) .app-popover .border-slate-200,
+html:not([data-theme="gov_navy"]) .fixed .border-slate-200 {
   border-color: var(--app-border);
 }
 
@@ -304,29 +351,55 @@ html:not([data-theme="gov_navy"]) main table thead tr {
   color: var(--app-table-head-text);
 }
 
-/* High-Contrast Dark Mode Pairing (prevents dark text on dark surfaces) */
+/* High-Contrast Dark Mode Pairing (prevents dark text on dark surfaces across main, popovers & modals) */
 html.dark main .text-\[\#102A43\],
 html.dark main .text-slate-900,
 html.dark main .text-slate-800,
-html.dark main .text-slate-700 {
+html.dark main .text-slate-700,
+html.dark .app-popover,
+html.dark .app-popover .text-\[\#102A43\],
+html.dark .app-popover .text-slate-800,
+html.dark .app-popover .text-slate-700,
+html.dark .fixed .text-\[\#102A43\],
+html.dark .fixed .text-slate-900,
+html.dark .fixed .text-slate-800,
+html.dark .fixed .text-slate-700 {
   color: var(--app-text);
 }
 
 html.dark main .text-slate-600,
-html.dark main .text-slate-500 {
+html.dark main .text-slate-500,
+html.dark .app-popover .text-slate-600,
+html.dark .app-popover .text-slate-500,
+html.dark .fixed .text-slate-600,
+html.dark .fixed .text-slate-500 {
   color: var(--app-text-muted);
 }
 
-html.dark main .text-\[\#164E83\] {
+html.dark main .text-\[\#164E83\],
+html.dark .app-popover .text-\[\#164E83\],
+html.dark .fixed .text-\[\#164E83\] {
   color: #7DD3FC;
 }
 
 html.dark main input,
 html.dark main select,
-html.dark main textarea {
+html.dark main textarea,
+html.dark .app-popover input,
+html.dark .app-popover select,
+html.dark .fixed input,
+html.dark .fixed select,
+html.dark .fixed textarea {
   background-color: #0F172A;
   color: #F8FAFC;
   border-color: #334155;
+}
+
+html.dark .app-popover .bg-slate-100,
+html.dark .app-popover .bg-slate-200,
+html.dark main .bg-slate-100 {
+  background-color: #1E293B;
+  color: #F1F5F9;
 }
 
 html.dark main table tbody tr:nth-child(odd) {
@@ -341,12 +414,17 @@ html.dark main table tbody tr:hover {
   background-color: var(--app-table-row-hover);
 }
 
-/* Preserve readable light badges/buttons inside dark mode */
+/* Preserve readable light badges/alerts inside dark mode */
 html.dark main .bg-amber-50,
 html.dark main .bg-emerald-50,
 html.dark main .bg-blue-50,
 html.dark main .bg-red-50,
-html.dark main .bg-orange-50 {
+html.dark main .bg-orange-50,
+html.dark .fixed .bg-amber-50,
+html.dark .fixed .bg-emerald-50,
+html.dark .fixed .bg-blue-50,
+html.dark .fixed .bg-red-50,
+html.dark .fixed .bg-orange-50 {
   color: #0F172A;
 }
 

@@ -560,7 +560,7 @@ export default function DropdownListsManagerModule({
   const activeVillageNamesList = useMemo(
     () =>
       villages
-        .filter((v) => v.status === 'نشط')
+        .filter((v) => v.isActive)
         .map((v) => v.villageName)
         .filter(Boolean),
     [villages]
@@ -617,7 +617,8 @@ export default function DropdownListsManagerModule({
 
   const openAddDoc = () => {
     const defaultVillage = activeVillageNamesList[0] || '';
-    const defaultUnit = defaultVillage ? getActiveLocalUnitsForVillage(defaultVillage)[0] || '' : '';
+    const matchedVillage = villages.find((v) => v.villageName === defaultVillage);
+    const defaultUnit = matchedVillage?.localUnits.find((u) => u.isActive)?.name || '';
     const rec: MasterDocumentExpiryEntry = {
       id: makeUid('mde'),
       sectionLabel: 'المخابز البلدية',

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toArabicNumerals } from '@/lib/utils';
 import { AutoFitMode } from '@/lib/table-autofit';
+import { useSystemPreferences } from '@/lib/user-preferences-store';
 
 export interface TableColumnItem {
   key: string;
@@ -88,6 +89,7 @@ export default function TableToolbar({
   onSaveWidths,
   compact = false,
 }: TableToolbarProps) {
+  const { isRtl, t } = useSystemPreferences();
   const [showColumnManager, setShowColumnManager] = useState(false);
 
   const effectiveUnpinAll = onUnpinAll || onClearPins;
@@ -123,8 +125,8 @@ export default function TableToolbar({
             <Columns3 className="w-3.5 h-3.5 text-[#C6A15B] shrink-0" />
             <span>{tableName}</span>
             {typeof totalRows === 'number' && (
-              <span className="px-2 py-0.5 rounded-full bg-[#F4F7FB] border border-slate-200 text-[10.5px] font-black text-[#164E83]">
-                {toArabicNumerals(totalRows)} سجل
+              <span className="num-cell px-2 py-0.5 rounded-full bg-[#F4F7FB] border border-slate-200 text-[10.5px] font-black text-[#164E83]">
+                {isRtl ? toArabicNumerals(totalRows) : totalRows} {t('recordsCount')}
               </span>
             )}
           </div>
@@ -133,7 +135,7 @@ export default function TableToolbar({
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-[11px] font-black text-[#164E83] flex items-center gap-1 ml-1">
               <Maximize2 className="w-3 h-3 text-[#C6A15B]" />
-              <span>أدوات الأعمدة:</span>
+              <span>{isRtl ? 'أدوات الأعمدة:' : 'Column Tools:'}</span>
             </span>
 
             {onAutoFitAll && (
@@ -148,7 +150,7 @@ export default function TableToolbar({
                 title="تعديل عرض جميع الأعمدة تلقائياً حسب العنوان والمحتوى"
               >
                 <Maximize2 className="w-3 h-3 text-[#C6A15B]" />
-                <span>احتواء تلقائي</span>
+                <span>{isRtl ? 'احتواء تلقائي' : 'Auto Fit'}</span>
               </button>
             )}
 
@@ -161,10 +163,10 @@ export default function TableToolbar({
                     ? 'bg-[#164E83] text-white border-[#164E83]'
                     : 'bg-white hover:bg-slate-100 text-[#102A43] border-slate-300'
                 }`}
-                title="ضبط عرض الأعمدة لاحتواء نصوص العناوين بالكامل"
+                title={isRtl ? 'ضبط عرض الأعمدة لاحتواء نصوص العناوين بالكامل' : 'Fit columns to header labels'}
               >
                 <Type className="w-3 h-3" />
-                <span>احتواء العناوين</span>
+                <span>{isRtl ? 'احتواء العناوين' : 'Fit Headers'}</span>
               </button>
             )}
 
@@ -177,10 +179,10 @@ export default function TableToolbar({
                     ? 'bg-[#164E83] text-white border-[#164E83]'
                     : 'bg-white hover:bg-slate-100 text-[#102A43] border-slate-300'
                 }`}
-                title="ضبط عرض الأعمدة لاحتواء قيم البيانات"
+                title={isRtl ? 'ضبط عرض الأعمدة لاحتواء قيم البيانات' : 'Fit columns to data values'}
               >
                 <Database className="w-3 h-3" />
-                <span>احتواء البيانات</span>
+                <span>{isRtl ? 'احتواء البيانات' : 'Fit Data'}</span>
               </button>
             )}
 
@@ -193,10 +195,10 @@ export default function TableToolbar({
                     ? 'bg-[#164E83] text-white border-[#164E83]'
                     : 'bg-white hover:bg-slate-100 text-[#102A43] border-slate-300'
                 }`}
-                title="توزيع عرض الجدول بالتساوي على جميع الأعمدة"
+                title={isRtl ? 'توزيع عرض الجدول بالتساوي على جميع الأعمدة' : 'Distribute columns equally'}
               >
                 <AlignJustify className="w-3 h-3" />
-                <span>توزيع بالتساوي</span>
+                <span>{isRtl ? 'توزيع بالتساوي' : 'Equal Width'}</span>
               </button>
             )}
 
@@ -209,10 +211,10 @@ export default function TableToolbar({
                     ? 'bg-slate-700 text-white border-slate-700'
                     : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
                 }`}
-                title="استعادة العروض والتخطيط الافتراضي للجدول"
+                title={isRtl ? 'استعادة العروض والتخطيط الافتراضي للجدول' : 'Reset default column widths'}
               >
                 <Undo2 className="w-3 h-3" />
-                <span>استعادة الافتراضي</span>
+                <span>{isRtl ? 'استعادة الافتراضي' : 'Reset Default'}</span>
               </button>
             )}
 
@@ -225,10 +227,10 @@ export default function TableToolbar({
                     ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-700'
                     : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
                 }`}
-                title="حفظ تخطيط الأعمدة وعروضها لحسابك الحالي"
+                title={isRtl ? 'حفظ تخطيط الأعمدة وعروضها لحسابك الحالي' : 'Save layout for your account'}
               >
                 <Save className="w-3 h-3" />
-                <span>حفظ التخطيط</span>
+                <span>{isRtl ? 'حفظ التخطيط' : 'Save Layout'}</span>
               </button>
             )}
           </div>
@@ -245,10 +247,10 @@ export default function TableToolbar({
                     ? 'bg-red-700 text-white border-red-700'
                     : 'bg-red-50 hover:bg-red-100 text-red-800 border-red-300'
                 }`}
-                title="الخيار الأول: إلغاء تثبيت جميع الأعمدة والعودة للعرض الطبيعي"
+                title={isRtl ? 'إلغاء تثبيت جميع الأعمدة والعودة للعرض الطبيعي' : 'Unpin all columns'}
               >
                 <PinOff className={`w-3 h-3 ${pinnedCount === 0 ? 'text-white' : 'text-red-700'}`} />
-                <span>إلغاء التثبيت</span>
+                <span>{t('unpinAll')}</span>
               </button>
             )}
 
@@ -268,10 +270,10 @@ export default function TableToolbar({
                     ? 'bg-[#C6A15B] text-[#102A43] border-[#C6A15B]'
                     : 'bg-[#102A43] hover:bg-[#164E83] text-white border-[#102A43]'
                 }`}
-                title="الخيار الثاني: اختيار وتثبيت الأعمدة يدوياً عموداً بعمود"
+                title={isRtl ? 'اختيار وتثبيت الأعمدة يدوياً عموداً بعمود' : 'Pin or hide columns manually'}
               >
                 <Pin className={`w-3 h-3 ${showColumnManager || (typeof pinnedCount === 'number' && pinnedCount > 0) ? 'text-[#102A43]' : 'text-[#C6A15B]'}`} />
-                <span>إكمال التثبيت يدوياً</span>
+                <span>{t('manualPin')}</span>
               </button>
             )}
 
@@ -280,10 +282,10 @@ export default function TableToolbar({
                 type="button"
                 onClick={onPinAll}
                 className="px-2 py-0.5 bg-[#F4F7FB] hover:bg-slate-200 text-[#102A43] border border-slate-300 rounded-md text-[10.5px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors"
-                title="تثبيت الأعمدة التعريفية تلقائياً مع الحفاظ على التمرير الأفقي"
+                title={isRtl ? 'تثبيت الأعمدة التعريفية تلقائياً مع الحفاظ على التمرير الأفقي' : 'Auto-pin key columns'}
               >
                 <Columns3 className="w-3 h-3 text-[#164E83]" />
-                <span>تثبيت تلقائي</span>
+                <span>{isRtl ? 'تثبيت تلقائي' : 'Auto Pin'}</span>
               </button>
             )}
 
@@ -294,7 +296,7 @@ export default function TableToolbar({
                 className="px-2 py-0.5 bg-[#164E83] hover:bg-[#102A43] text-white rounded-md text-[10.5px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <SlidersHorizontal className="w-3 h-3 text-[#C6A15B]" />
-                <span>تخصيص الرؤوس</span>
+                <span>{isRtl ? 'تخصيص الرؤوس' : 'Headers'}</span>
               </button>
             )}
 

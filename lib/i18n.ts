@@ -512,3 +512,59 @@ export function getLocalizedDepartmentDesc(
   }
   return arabicDesc;
 }
+
+/** قاموس مركزي لترجمة رؤوس الأعمدة الشائعة دون المساس ببيانات الصفوف المدخلة */
+export const COMMON_COLUMN_HEADER_EN: Record<string, string> = {
+  'م': '#',
+  'الإجراءات': 'Actions',
+  'إجراءات': 'Actions',
+  'الحالة': 'Status',
+  'ملاحظات': 'Notes',
+  'القرية': 'Village',
+  'القرية / الشياخة': 'Village',
+  'الوحدة المحلية': 'Local Unit',
+  'الإدارة التموينية': 'Supply Admin',
+  'رقم ماكينة POS': 'POS Machine #',
+  'رقم POS': 'POS #',
+  'اسم المخبز': 'Bakery Name',
+  'اسم صاحب المخبز': 'Bakery Owner',
+  'اسم التاجر': 'Merchant Name',
+  'اسم المنشأة': 'Establishment Name',
+  'رقم الملف': 'File #',
+  'الكود': 'Code',
+  'رقم الترخيص': 'License #',
+  'تاريخ انتهاء الترخيص': 'License Expiry',
+  'انتهاء الترخيص': 'License Expiry',
+  'البطاقة الضريبية': 'Tax Card #',
+  'رقم البطاقة الضريبية': 'Tax Card #',
+  'انتهاء البطاقة الضريبية': 'Tax Card Expiry',
+  'تاريخ انتهاء الضريبية': 'Tax Card Expiry',
+  'السجل التجاري': 'Commercial Reg #',
+  'رقم السجل التجاري': 'Commercial Reg #',
+  'انتهاء السجل التجاري': 'CR Expiry',
+  'تاريخ انتهاء السجل': 'CR Expiry',
+  'الهاتف': 'Phone',
+  'رقم الهاتف': 'Phone',
+  'الإجمالي': 'Total',
+  'المسدد': 'Paid',
+  'المتبقي': 'Remaining',
+  'التاريخ': 'Date',
+  'تاريخ الاستحقاق': 'Due Date',
+  'اسم السلعة': 'Commodity',
+  'الكمية': 'Quantity',
+  'الوحدة': 'Unit',
+  'السعر الرسمي': 'Official Price',
+  'المخزن': 'Warehouse',
+  'الحصة المعتمدة': 'Approved Quota',
+  'المنصرف': 'Dispensed',
+  'المورد': 'Supplied',
+  'رقم البطاقة': 'Card #',
+  'عدد المستفيدين': 'Beneficiaries',
+};
+
+export function translateColumnHeader(label: string, lang: AppLanguage): string {
+  if (lang !== 'en') return label;
+  const trimmed = label.trim();
+  return COMMON_COLUMN_HEADER_EN[trimmed] ?? label;
+}
+

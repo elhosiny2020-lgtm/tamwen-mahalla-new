@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AutoFitColumnSchema, AutoFitColumnType } from '@/lib/table-autofit';
 import { useSmartAutoFit } from '@/hooks/useSmartAutoFit';
 import { compareTableValues, toArabicNumerals } from '@/lib/utils';
+import { translateColumnHeader } from '@/lib/i18n';
+import { useSystemPreferences } from '@/lib/user-preferences-store';
 import TableStats, { PinnableColumnItem } from './TableStats';
 import SortableTh from './SortableTh';
 
@@ -75,6 +77,7 @@ export default function SmartAutoFitTable<T>({
   theadClassName = 'bg-[#102A43] text-white',
   selectable = false,
 }: SmartAutoFitTableProps<T>) {
+  const { isRtl, prefs } = useSystemPreferences();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
   const [internalPinnedKeys, setInternalPinnedKeys] = useState<string[]>(() =>
@@ -267,35 +270,48 @@ export default function SmartAutoFitTable<T>({
       />
 
       <div ref={scrollContainerRef} className={`overflow-auto ${maxHeightClass} compact-table-scroll border border-slate-200 rounded-xl bg-white shadow-2xs`}>
-        <table className="min-w-full w-max text-right">
+        <table className={`min-w-full w-max ${isRtl ? 'text-right' : 'text-left'}`}>
           <thead className={`${theadClassName} sticky top-0 z-20`}>
             <tr>
               {selectable && (
-                <th className={`w-[34px] min-w-[34px] max-w-[34px] text-center sticky right-0 z-40 ${theadClassName}`}>تحديد</th>
+                <th className={`w-[34px] min-w-[34px] max-w-[34px] text-center sticky ${isRtl ? 'right-0' : 'left-0'} z-40 ${theadClassName}`}>
+                  {isRtl ? 'تحديد' : 'Sel'}
+                </th>
               )}
               {visibleColumns.map((col) => {
                 const isPinned = effectivePinnedKeys.includes(col.key) && pinnedOffsetsMap[col.key] !== undefined;
                 const isLastPinned = lastPinnedKey === col.key;
+                const pinPosStyle = isPinned
+                  ? isRtl
+                    ? { right: `${pinnedOffsetsMap[col.key]}px` }
+                    : { left: `${pinnedOffsetsMap[col.key]}px` }
+                  : {};
                 const style: React.CSSProperties = {
                   ...getColStyle(col.key),
-                  ...(isPinned ? { right: `${pinnedOffsetsMap[col.key]}px` } : {}),
+                  ...pinPosStyle,
                 };
                 const pinClasses = isPinned
                   ? `sticky z-30 ${theadClassName.includes('bg-slate-100') ? 'bg-slate-100' : 'bg-[#102A43]'} ${
                       isLastPinned ? 'pinned-col-edge' : ''
                     }`
                   : '';
+                const localizedLabel =
+                  prefs.language === 'en' && typeof col.label === 'string'
+                    ? translateColumnHeader(col.headerText || col.label, 'en')
+                    : col.label;
+                const defaultAlign = isRtl ? 'right' : 'left';
+                const colAlign = col.align || defaultAlign;
 
                 if (col.sortable !== false && onSort) {
                   return (
                     <SortableTh
                       key={col.key}
-                      label={col.label}
+                      label={localizedLabel}
                       sortKey={col.key}
                       activeSortKey={sortKey}
                       sortAsc={sortAsc}
                       onSort={onSort}
-                      align={col.align || 'right'}
+                      align={colAlign}
                       style={style}
                       className={`autofit-header-cell ${pinClasses}`}
                     />
@@ -306,9 +322,9 @@ export default function SmartAutoFitTable<T>({
                   <th
                     key={col.key}
                     style={style}
-                    className={`autofit-header-cell ${col.align === 'center' ? 'text-center' : 'text-right'} ${pinClasses}`}
+                    className={`autofit-header-cell ${colAlign === 'center' ? 'text-center' : isRtl ? 'text-right' : 'text-left'} ${pinClasses}`}
                   >
-                    {col.label}
+                    {localizedLabel}
                   </th>
                 );
               })}
@@ -318,7 +334,9 @@ export default function SmartAutoFitTable<T>({
             {sortedRows.length === 0 ? (
               <tr>
                 <td colSpan={visibleColumns.length + (selectable ? 1 : 0)} className="py-10 text-center text-slate-500">
-                  {emptyMessage}
+                  {prefs.language === 'en' && emptyMessage === 'لا توجد بيانات مطابقة حالياً.'
+                    ? 'No matching records found.'
+                    : emptyMessage}
                 </td>
               </tr>
             ) : (
@@ -329,7 +347,7 @@ export default function SmartAutoFitTable<T>({
                 return (
                   <tr key={rowId} className={`${rowBg} hover:bg-blue-50/70 transition-colors`}>
                     {selectable && onToggleSelect && (
-                      <td className={`w-[34px] min-w-[34px] max-w-[34px] text-center sticky right-0 z-10 ${rowBg}`}>
+                      <td className={`w-[34px] min-w-[34px] max-w-[34px] text-center sticky ${isRtl ? 'right-0' : 'left-0'} z-10 ${rowBg}`}>
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -344,15 +362,20 @@ export default function SmartAutoFitTable<T>({
                       const isNum = col.type === 'numeric' || col.type === 'currency' || col.type === 'date';
                       const extraCls =
                         typeof col.cellClassName === 'function' ? col.cellClassName(row) : col.cellClassName || '';
+                      const pinPosStyle = isPinned
+                        ? isRtl
+                          ? { right: `${pinnedOffsetsMap[col.key]}px` }
+                          : { left: `${pinnedOffsetsMap[col.key]}px` }
+                        : {};
                       return (
                         <td
                           key={col.key}
                           style={{
                             ...getColStyle(col.key),
-                            ...(isPinned ? { right: `${pinnedOffsetsMap[col.key]}px` } : {}),
+                            ...pinPosStyle,
                           }}
                           className={`${isNum ? 'num-cell' : getCellWrapClass(col.key)} ${
-                            col.align === 'center' ? 'text-center' : 'text-right'
+                            col.align === 'center' ? 'text-center' : isRtl ? 'text-right' : 'text-left'
                           } ${isPinned ? `sticky z-10 ${rowBg}` : ''} ${
                             isLastPinned ? 'pinned-col-edge' : ''
                           } ${extraCls}`}

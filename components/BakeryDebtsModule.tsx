@@ -1286,7 +1286,7 @@ export default function BakeryDebtsModule({
                 { tableName: 'سجل التحصيلات والسدادات', count: store.payments.length },
                 { tableName: 'جداول الجدولة والأقساط', count: store.schedules.length + store.installments.length },
                 { tableName: 'سجل المخالفات والتصالحات والتظلمات', count: store.violations.length + store.settlements.length + store.appeals.length },
-                { tableName: 'سجل المتابعات والمديونيات الكبرى', count: store.followups.length + store.majorDebtFollowups.length },
+                { tableName: 'سجل المتابعات والمديونيات الكبرى', count: store.followups.length },
               ]}
               onCaptureBackup={() => ({ store })}
               onRestoreBackup={(snap) => {

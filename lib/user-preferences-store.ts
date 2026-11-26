@@ -176,6 +176,63 @@ export function saveUserPreferences(userId: string, prefs: UserDisplayPreference
   }
 }
 
+async function fetchRemoteUserPreferences(userId: string): Promise<UserDisplayPreferences | null> {
+  if (typeof window === 'undefined' || !userId || userId === 'guest') return null;
+  try {
+    const res = await fetch(`/api/user-preferences?userId=${encodeURIComponent(userId)}`, {
+      method: 'GET',
+      headers: { 'x-actor-user-id': userId },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      synced?: boolean;
+      preferences?: Partial<UserDisplayPreferences> | null;
+    };
+    if (!data.synced || !data.preferences) return null;
+    return {
+      ...DEFAULT_USER_PREFERENCES,
+      ...data.preferences,
+      fontScale: Math.min(150, Math.max(80, Number(data.preferences.fontScale) || 100)),
+      language: data.preferences.language === 'en' ? 'en' : 'ar',
+      customColors: {
+        ...DEFAULT_USER_PREFERENCES.customColors,
+        ...(data.preferences.customColors || {}),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function syncRemoteUserPreferences(
+  userId: string,
+  prefs: UserDisplayPreferences
+): Promise<void> {
+  if (typeof window === 'undefined' || !userId || userId === 'guest') return;
+  try {
+    await fetch('/api/user-preferences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-actor-user-id': userId,
+      },
+      body: JSON.stringify({
+        userId,
+        fontScale: prefs.fontScale,
+        language: prefs.language,
+        themeId: prefs.themeId,
+        customColors: prefs.customColors,
+        displayMode: prefs.displayMode,
+        density: prefs.density,
+        updatedAt: prefs.updatedAt,
+      }),
+    });
+  } catch {
+    // Offline or Supabase not configured — local persistence remains authoritative
+  }
+}
+
 /** حساب سطوع اللون لاختيار نص متباين (WCAG AA) تلقائياً للون المخصص */
 function getLuminance(hex: string): number {
   const clean = hex.replace('#', '');
@@ -294,6 +351,18 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
     setActiveUserIdState(cleanId);
     const loaded = loadUserPreferences(cleanId);
     setPrefs(loaded);
+
+    if (cleanId !== 'guest') {
+      void fetchRemoteUserPreferences(cleanId).then((remote) => {
+        if (!remote) return;
+        const localTime = Date.parse(loaded.updatedAt || '0') || 0;
+        const remoteTime = Date.parse(remote.updatedAt || '0') || 0;
+        if (remoteTime > localTime) {
+          saveUserPreferences(cleanId, remote);
+          setPrefs(remote);
+        }
+      });
+    }
   }, []);
 
   // مراقبة أبعاد مساحة العرض الفعلية ونسبة كثافة البكسلات وتكبير Windows
@@ -345,6 +414,7 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
     // متغير مقياس الخط المركزي (حقيقي بدون zoom)
     const scaleRatio = Number((effectiveFontScale / 100).toFixed(3));
     root.style.setProperty('--font-scale', String(scaleRatio));
+    root.setAttribute('data-font-scaled', effectiveFontScale !== 100 ? 'true' : 'false');
 
     // متغيرات الكثافة والمسافات حسب المقاس التلقائي أو اليدوي
     if (effectiveDensity === 'compact') {
@@ -393,8 +463,14 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
   const updatePrefs = useCallback(
     (updater: (prev: UserDisplayPreferences) => UserDisplayPreferences) => {
       setPrefs((prev) => {
-        const next = updater(prev);
+        const next: UserDisplayPreferences = {
+          ...updater(prev),
+          updatedAt: new Date().toISOString(),
+        };
         saveUserPreferences(activeUserId, next);
+        if (activeUserId !== 'guest') {
+          void syncRemoteUserPreferences(activeUserId, next);
+        }
         return next;
       });
     },

@@ -45,6 +45,7 @@ export default function GlobalControlBar() {
     setCustomColors,
     setDisplayMode,
     setDensity,
+    resetAllPreferences,
   } = useSystemPreferences();
 
   const [openMenu, setOpenMenu] = useState<OpenPopover>(null);
@@ -73,7 +74,9 @@ export default function GlobalControlBar() {
   const fmtPct = (v: number) => (isRtl ? `${toArabicNumerals(v)}٪` : `${v}%`);
   const fmtNum = (v: number | string) => (isRtl ? toArabicNumerals(String(v)) : String(v));
 
-  const popoverAlign = isRtl ? 'right-0' : 'left-0';
+  const popoverAlign = isRtl
+    ? 'left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-0'
+    : 'left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:right-0';
 
   return (
     <div ref={barRef} className="flex flex-wrap items-center gap-1.5 relative">
@@ -96,7 +99,7 @@ export default function GlobalControlBar() {
 
         {openMenu === 'font' && (
           <div
-            className={`absolute ${popoverAlign} mt-2 w-72 sm:w-80 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3`}
+            className={`app-popover absolute ${popoverAlign} mt-2 w-72 sm:w-80 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3`}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-1.5 font-black text-xs text-[#102A43]">
@@ -192,7 +195,7 @@ export default function GlobalControlBar() {
 
         {openMenu === 'language' && (
           <div
-            className={`absolute ${popoverAlign} mt-2 w-72 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3`}
+            className={`app-popover absolute ${popoverAlign} mt-2 w-72 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3`}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-1.5 font-black text-xs text-[#102A43]">
@@ -272,7 +275,7 @@ export default function GlobalControlBar() {
 
         {openMenu === 'theme' && (
           <div
-            className={`absolute ${popoverAlign} mt-2 w-80 sm:w-96 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3 max-h-[82vh] overflow-y-auto`}
+            className={`app-popover absolute ${popoverAlign} mt-2 w-80 sm:w-96 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3 max-h-[82vh] overflow-y-auto`}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-1.5 font-black text-xs text-[#102A43]">
@@ -409,7 +412,7 @@ export default function GlobalControlBar() {
 
         {openMenu === 'display' && (
           <div
-            className={`absolute ${popoverAlign} mt-2 w-80 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3`}
+            className={`app-popover absolute ${popoverAlign} mt-2 w-80 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3`}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-1.5 font-black text-xs text-[#102A43]">
@@ -498,10 +501,22 @@ export default function GlobalControlBar() {
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-slate-600">{t('detectedProfile')}:</span>
-                <span className="font-black text-emerald-800 text-left">
+                <span className="font-black text-emerald-700 text-left">
                   {isRtl ? diagnostics.profileLabelAr : diagnostics.profileLabelEn}
                 </span>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+              <span className="text-[10px] font-bold text-slate-500">{t('savedForUser')}</span>
+              <button
+                type="button"
+                onClick={resetAllPreferences}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[#102A43] text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>{isRtl ? 'استعادة كل الإعدادات' : 'Reset All'}</span>
+              </button>
             </div>
           </div>
         )}
