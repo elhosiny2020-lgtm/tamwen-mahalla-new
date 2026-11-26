@@ -1,18 +1,59 @@
 import type { NextConfig } from 'next';
 
 const isProd = process.env.NODE_ENV === 'production';
-// Allow AI Studio preview framing in the iframe container while supporting custom FRAME_ANCESTORS
-const frameAncestors =
-  process.env.FRAME_ANCESTORS?.trim() ||
-  "'self' https://aistudio.google.com https://*.aistudio.google.com https://*.google.com https://*.run.app";
+
+// Baseline trusted origins required for AI Studio preview iframes and Cloud Run deployments.
+const DEFAULT_FRAME_ANCESTORS = [
+  "'self'",
+  'https://aistudio.google.com',
+  'https://*.aistudio.google.com',
+  'https://*.google.com',
+  'https://*.googleusercontent.com',
+  'https://*.usercontent.goog',
+  'https://*.run.app',
+  'https://*.web.app',
+  'https://*.firebaseapp.com',
+];
+
+const VALID_CSP_ORIGIN_RE =
+  /^(?:'self'|https?:|https?:\/\/(?:\*\.)?[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*(?::\d{1,5})?)$/;
+
+/**
+ * Validates and merges optional FRAME_ANCESTORS env values with trusted defaults.
+ * Prevents malformed or misconfigured environment variables from breaking iframe framing
+ * (which causes browser "refused to connect" errors) or injecting invalid CSP tokens.
+ */
+function buildFrameAncestors(rawEnv?: string): string {
+  const allowed = new Set<string>(DEFAULT_FRAME_ANCESTORS);
+
+  if (rawEnv) {
+    const tokens = rawEnv
+      .split(/[\s,]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    for (const token of tokens) {
+      if (VALID_CSP_ORIGIN_RE.test(token)) {
+        allowed.add(token);
+      }
+    }
+  }
+
+  return Array.from(allowed).join(' ');
+}
+
+const frameAncestors = buildFrameAncestors(process.env.FRAME_ANCESTORS);
 
 const csp = [
-  "default-src 'self'",
+  "default-src 'self' https://*.run.app https://*.google.com",
   `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  `connect-src 'self'${isProd ? '' : ' ws: wss:'}`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https: https://fonts.gstatic.com",
+  `connect-src 'self' https://*.run.app https://*.google.com https://*.supabase.co wss://*.supabase.co${
+    isProd ? '' : ' ws: wss: http://localhost:* http://127.0.0.1:*'
+  }`,
+  "frame-src 'self' https://*.run.app https://*.google.com",
   `frame-ancestors ${frameAncestors}`,
   "object-src 'none'",
   "base-uri 'self'",
@@ -25,7 +66,8 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
   { key: 'X-DNS-Prefetch-Control', value: 'off' },
-  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+  { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
   ...(isProd
     ? [{ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }]
     : []),
@@ -35,11 +77,34 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  httpAgentOptions: {
+    keepAlive: true,
+  },
+  allowedDevOrigins: [
+    '*.run.app',
+    '*.aistudio.google.com',
+    '*.googleusercontent.com',
+    '*.usercontent.goog',
+    'localhost',
+    '127.0.0.1',
+  ],
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        '*.run.app',
+        '*.aistudio.google.com',
+        '*.googleusercontent.com',
+        '*.usercontent.goog',
+        'localhost:3000',
+      ],
+    },
+  },
   eslint: {
     ignoreDuringBuilds: false,
   },
-  typescript: { ignoreBuildErrors: false },
-  output: 'standalone',
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   async headers() {
     return [
       { source: '/(.*)', headers: securityHeaders },
