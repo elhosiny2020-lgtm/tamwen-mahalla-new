@@ -34,34 +34,14 @@ export function canUserExecuteFactoryReset(user: User | null | undefined): boole
 }
 
 /**
- * التحقق الإداري من الهوية / كلمة المرور قبل تنفيذ إعادة ضبط المصنع
- * (يقبل كلمة المرور الإدارية أو اسم المستخدم أو الرقم الوظيفي للمسؤول المصرح له)
+ * التحقق المبدئي من تنسيق بيانات التحقق الإداري قبل الإرسال للتحقق الآمن على الخادم (/api/auth/verify-admin)
  */
 export function verifyAdminResetCredential(
   user: User | null | undefined,
   enteredCredential: string
 ): boolean {
   if (!user || !canUserExecuteFactoryReset(user)) return false;
-  const trimmed = enteredCredential.trim();
-  if (trimmed.length < 4) return false;
-  const validCandidates = [
-    user.username.toLowerCase(),
-    (user.employeeNumber || '').toLowerCase(),
-    'admin123',
-    '123456',
-    'gharbia@2026',
-  ].filter(Boolean);
-
-  // التحقق من تطابق كلمة المرور المخزنة لحساب المستخدم إن وجدت أو إحدى بيانات التحقق المعتمدة
-  if (typeof window !== 'undefined') {
-    try {
-      const savedPass = localStorage.getItem(`gharbia_user_pass_${user.username.toLowerCase()}`);
-      if (savedPass && trimmed === savedPass) return true;
-    } catch {
-      // ignore
-    }
-  }
-  return validCandidates.includes(trimmed.toLowerCase()) || trimmed.length >= 6;
+  return enteredCredential.trim().length >= 4;
 }
 
 export function loadFactoryResetBackups(): FactoryResetBackupRecord[] {

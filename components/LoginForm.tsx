@@ -44,24 +44,24 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     setShowPassword(!showPassword);
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
+    try {
       const users = getStoredUsers();
       const trimmedUser = username.trim().toLowerCase();
 
-      let found = users.find(u => u.username.toLowerCase() === trimmedUser);
+      let found = users.find((u) => u.username.toLowerCase() === trimmedUser);
 
       if (!found && trimmedUser === 'admin') {
         found = users[0];
       }
 
       if (!found) {
+        setLoading(false);
         setErrorMsg('اسم المستخدم غير مسجل في المنظومة. يرجى التأكد من البيانات أو تقديم طلب إنشاء حساب جديد.');
         addAuditLog({
           userId: 'anonymous',
@@ -72,17 +72,36 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
           details: 'اسم مستخدم غير موجود',
           ipAddress: '10.20.30.50',
           deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
-          status: 'failed'
+          status: 'failed',
         });
         return;
       }
 
       if (found.status === 'suspended' || found.status === 'inactive') {
+        setLoading(false);
         setErrorMsg('عذراً، هذا الحساب موقوف إدارياً. يرجى مراجعة مدير النظام بالمديرية.');
         return;
       }
 
       const activeBranchId = selectedBranchId || found.primaryBranchId || 'b-03';
+      const authRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: found.username,
+          password,
+          branchId: activeBranchId,
+        }),
+      });
+
+      // Enforce 401/403/429 server auth checks whenever server bootstrap auth is active
+      if (!authRes.ok && authRes.status !== 503) {
+        const authErr = (await authRes.json().catch(() => ({}))) as { error?: string };
+        setLoading(false);
+        setErrorMsg(authErr.error || 'بيانات الدخول غير صحيحة.');
+        return;
+      }
+
       const updatedUser: UserType = {
         ...found,
         primaryBranchId: activeBranchId,
@@ -90,6 +109,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         lastLogin: new Date().toISOString(),
       };
 
+      setLoading(false);
       setSuccessMsg('تم التحقق من الهوية والصلاحيات بنجاح، جاري فتح المنظومة الرقمية...');
       setCurrentSessionUser(updatedUser);
       setSelectedBranchSession(null);
@@ -104,13 +124,16 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         details: `تم الدخول بنجاح بدور (${getRoleArabicLabel(updatedUser.role)})`,
         ipAddress: '10.20.30.50',
         deviceInfo: 'متصفح الويب المعتمد',
-        status: 'success'
+        status: 'success',
       });
 
       setTimeout(() => {
         onLoginSuccess(updatedUser);
-      }, 500);
-    }, 500);
+      }, 400);
+    } catch {
+      setLoading(false);
+      setErrorMsg('تعذر الاتصال بخدمة المصادقة. يرجى المحاولة مرة أخرى.');
+    }
   };
 
   const handleForgotPasswordSubmit = (e: React.FormEvent) => {

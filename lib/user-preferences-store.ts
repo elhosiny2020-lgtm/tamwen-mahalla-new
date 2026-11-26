@@ -2,6 +2,10 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { AppLanguage, TranslationDictionary, translate } from './i18n';
+import {
+  enableFullEnglishDomTranslation,
+  restoreOriginalArabicDom,
+} from './full-ui-translator';
 
 export type ThemePresetId =
   | 'gov_navy'
@@ -459,6 +463,22 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
       root.style.removeProperty('--custom-border');
     }
   }, [prefs, effectiveFontScale, effectiveDensity]);
+
+  // ترجمة كاملة وفورية لجميع مكونات وشاشات المنظومة عند تبديل اللغة مع استعادة عربية دقيقة ١٠٠٪
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (prefs.language === 'en') {
+      const frameId = requestAnimationFrame(() => {
+        enableFullEnglishDomTranslation();
+      });
+      return () => {
+        cancelAnimationFrame(frameId);
+      };
+    } else {
+      restoreOriginalArabicDom();
+      return undefined;
+    }
+  }, [prefs.language]);
 
   const updatePrefs = useCallback(
     (updater: (prev: UserDisplayPreferences) => UserDisplayPreferences) => {

@@ -3,42 +3,43 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock } from 'lucide-react';
 import { toArabicNumerals } from '@/lib/utils';
+import { useIsClient } from '@/hooks/use-is-client';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
 
 export default function ClientClock() {
   const { prefs, t } = useSystemPreferences();
   const isAr = prefs.language === 'ar';
-
-  const [dayName, setDayName] = useState<string>('');
-  const [dateText, setDateText] = useState<string>('');
-  const [timeText, setTimeText] = useState<string>('');
+  const isClient = useIsClient();
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
   useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      const locale = isAr ? 'ar-EG' : 'en-GB';
-      setDayName(now.toLocaleDateString(locale, { weekday: 'long' }));
-      const formattedDate = now.toLocaleDateString(locale, {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const locale = isAr ? 'ar-EG' : 'en-GB';
+  const now = isClient ? new Date(nowMs) : null;
+  const dayName = now ? now.toLocaleDateString(locale, { weekday: 'long' }) : '';
+  const formattedDate = now
+    ? now.toLocaleDateString(locale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-      });
-      const formattedTime = now.toLocaleTimeString(locale, {
+      })
+    : '';
+  const formattedTime = now
+    ? now.toLocaleTimeString(locale, {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
         hour12: true,
-      });
-      setDateText(isAr ? toArabicNumerals(formattedDate) : formattedDate);
-      setTimeText(isAr ? toArabicNumerals(formattedTime) : formattedTime);
-    };
-    const frameId = requestAnimationFrame(updateClock);
-    const timer = setInterval(updateClock, 1000);
-    return () => {
-      cancelAnimationFrame(frameId);
-      clearInterval(timer);
-    };
-  }, [isAr]);
+      })
+    : '';
+
+  const dateText = isClient ? (isAr ? toArabicNumerals(formattedDate) : formattedDate) : '';
+  const timeText = isClient ? (isAr ? toArabicNumerals(formattedTime) : formattedTime) : '';
 
   return (
     <div className="flex flex-wrap items-center gap-2 bg-[#0B1F33]/80 px-3 py-1.5 rounded-xl border border-[#C6A15B]/40 shadow-xs">

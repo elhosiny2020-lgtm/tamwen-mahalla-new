@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { requireApiSession } from '@/lib/server/auth-guard';
+import { getValidatedSupabaseAdminConfig } from '@/lib/server/supabase-admin';
 
 const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
@@ -29,44 +31,25 @@ const PreferencesPayloadSchema = z.object({
   updatedAt: z.string().max(64).optional(),
 });
 
-function getValidatedSupabaseConfig(): { baseUrl: string; serviceKey: string } | null {
-  const rawUrl = process.env.SUPABASE_URL?.trim() || '';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || '';
-  if (!rawUrl || !serviceKey) return null;
-
-  try {
-    const parsed = new URL(rawUrl);
-    if (parsed.protocol !== 'https:') return null;
-    const host = parsed.hostname.toLowerCase();
-    if (
-      host === 'localhost' ||
-      host === '127.0.0.1' ||
-      host === '169.254.169.254' ||
-      host.startsWith('10.') ||
-      host.startsWith('192.168.')
-    ) {
-      return null;
-    }
-    return { baseUrl: parsed.origin, serviceKey };
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get('userId')?.trim() || '';
-  const actorUserId = req.headers.get('x-actor-user-id')?.trim() || '';
+  // Always verify session directly in route handler before touching Supabase
+  const auth = await requireApiSession(req);
+  if (auth.errorResponse) return auth.errorResponse;
 
+  const userId = req.nextUrl.searchParams.get('userId')?.trim() || '';
   if (!USER_ID_REGEX.test(userId) || userId === 'guest') {
     return NextResponse.json({ synced: false, source: 'local', preferences: null });
   }
 
-  // Enforce strict per-user isolation: callers may only read their own record
-  if (actorUserId && actorUserId !== userId) {
-    return NextResponse.json({ error: 'Forbidden cross-user preference read' }, { status: 403 });
+  // Enforce strict per-user isolation: callers may only read their own preferences
+  if (auth.session.userId !== userId) {
+    return NextResponse.json(
+      { ok: false, error: 'غير مسموح بقراءة تفضيلات مستخدم آخر.' },
+      { status: 403 }
+    );
   }
 
-  const sb = getValidatedSupabaseConfig();
+  const sb = getValidatedSupabaseAdminConfig();
   if (!sb) {
     return NextResponse.json({ synced: false, source: 'local', preferences: null });
   }
@@ -117,31 +100,35 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Always verify session directly in route handler before touching Supabase
+  const auth = await requireApiSession(req);
+  if (auth.errorResponse) return auth.errorResponse;
+
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'صيغة JSON غير صالحة.' }, { status: 400 });
   }
 
   const parsed = PreferencesPayloadSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid preference settings' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'إعدادات العرض غير صالحة.' }, { status: 400 });
   }
 
   const data = parsed.data;
-  const actorUserId = req.headers.get('x-actor-user-id')?.trim() || '';
-
-  // Prevent any user from modifying another user's preferences
-  if (actorUserId && actorUserId !== data.userId) {
-    return NextResponse.json({ error: 'Forbidden cross-user preference update' }, { status: 403 });
+  if (auth.session.userId !== data.userId) {
+    return NextResponse.json(
+      { ok: false, error: 'غير مسموح بتعديل تفضيلات مستخدم آخر.' },
+      { status: 403 }
+    );
   }
 
   if (data.userId === 'guest') {
     return NextResponse.json({ synced: false, source: 'local' });
   }
 
-  const sb = getValidatedSupabaseConfig();
+  const sb = getValidatedSupabaseAdminConfig();
   if (!sb) {
     return NextResponse.json({ synced: false, source: 'local' });
   }

@@ -152,7 +152,7 @@ export default function FactoryResetButton({
   const credentialValid = verifyAdminResetCredential(effectiveUser, adminCredential);
   const canExecute = Boolean(createdBackup && phraseMatches && credentialValid);
 
-  const handleExecuteReset = () => {
+  const handleExecuteReset = async () => {
     setErrorMsg(null);
     if (!effectiveUser || !isAuthorized) {
       setErrorMsg(t('factoryResetAdminOnly'));
@@ -173,13 +173,29 @@ export default function FactoryResetButton({
     if (!credentialValid) {
       setErrorMsg(
         isRtl
-          ? 'فشل التحقق الإداري: يرجى إدخال كلمة المرور أو اسم المستخدم الإداري الصحيح.'
+          ? 'فشل التحقق الإداري: يرجى إدخال كلمة المرور الإدارية الصحيحة.'
           : 'Administrative verification failed: please enter your valid admin credential.'
       );
       return;
     }
 
     try {
+      const verifyRes = await fetch('/api/auth/verify-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminCredential }),
+      });
+      if (!verifyRes.ok) {
+        const verifyData = (await verifyRes.json().catch(() => ({}))) as { error?: string };
+        setErrorMsg(
+          verifyData.error ||
+            (isRtl
+              ? 'فشل التحقق الإداري على الخادم — تم إيقاف عملية إعادة الضبط.'
+              : 'Server administrative verification failed.')
+        );
+        return;
+      }
+
       onConfirmReset({ clearCustomLists: includeCustomLists });
       recordFactoryResetAudit({
         user: effectiveUser,

@@ -63,6 +63,7 @@ export default function Home() {
   };
 
   const handleLogout = () => {
+    void fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setCurrentSessionUser(null);
     setSelectedBranchSession(null);
     setCurrentUser(null);

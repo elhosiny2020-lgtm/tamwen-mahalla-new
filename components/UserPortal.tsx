@@ -168,6 +168,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     grp_bakery: true,
     grp_trade: true,
     grp_ration: true,
+    grp_grain: true,
     grp_citizens: true,
     grp_admin: true,
   });
@@ -432,7 +433,8 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       { id: 'grp_cmd', title: t('grp_cmd'), codes: ['DASH', 'CTRL'] },
       { id: 'grp_bakery', title: t('grp_bakery'), codes: ['BAK', 'DEBTS'] },
       { id: 'grp_trade', title: t('grp_trade'), codes: ['TRADE', 'GAS', 'INSP', 'VIOL'] },
-      { id: 'grp_ration', title: t('grp_ration'), codes: ['COMM', 'GRAIN', 'SILOS', 'MILLS', 'COLD'] },
+      { id: 'grp_ration', title: t('grp_ration'), codes: ['COMM'] },
+      { id: 'grp_grain', title: t('grp_grain'), codes: ['GRAIN', 'SILOS', 'MILLS', 'COLD'] },
       { id: 'grp_citizens', title: t('grp_citizens'), codes: ['COMP', 'TASKS'] },
       {
         id: 'grp_admin',

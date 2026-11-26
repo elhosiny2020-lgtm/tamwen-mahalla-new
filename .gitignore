@@ -10,3 +10,9 @@ coverage/
 *.log
 .env*
 !.env.example
+next-env.d.ts
+*.pem
+*.key
+*.p12
+*.pfx
+npm-debug.log*

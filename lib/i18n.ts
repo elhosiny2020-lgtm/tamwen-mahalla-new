@@ -70,6 +70,7 @@ export interface TranslationDictionary {
   grp_bakery: string;
   grp_trade: string;
   grp_ration: string;
+  grp_grain: string;
   grp_citizens: string;
   grp_admin: string;
 
@@ -222,7 +223,8 @@ const AR: TranslationDictionary = {
   grp_cmd: 'القيادة والعمليات اليومية',
   grp_bakery: 'منظومة المخابز والمديونيات',
   grp_trade: 'التجارة الداخلية والوقود',
-  grp_ration: 'السلع التموينية والغذاء',
+  grp_ration: 'قسم السلع التموينية',
+  grp_grain: 'صيانة الحبوب',
   grp_citizens: 'الرقابة والتفتيش والمواطنين',
   grp_admin: 'الإدارة المركزية والقوائم والحوكمة',
 
@@ -370,7 +372,8 @@ const EN: TranslationDictionary = {
   grp_cmd: 'Command & Daily Operations',
   grp_bakery: 'Bakeries & Debts System',
   grp_trade: 'Internal Trade & Fuel',
-  grp_ration: 'Ration Commodities & Food',
+  grp_ration: 'Ration Commodities',
+  grp_grain: 'Grain Maintenance',
   grp_citizens: 'Inspection, Control & Citizens',
   grp_admin: 'Central Governance & Lists',
 
