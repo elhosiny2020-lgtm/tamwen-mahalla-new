@@ -627,6 +627,29 @@ export default function RationCommoditiesModule({ currentUserName }: RationCommo
           <div className="flex flex-wrap items-center gap-2">
             <FactoryResetButton
               sectionName="قسم السلع التموينية"
+              sectionKey="ration_commodities"
+              tableSummary={[
+                { tableName: 'سجل السلع التموينية وتاريخ الأسعار', count: commodities.length + priceHistory.length },
+                { tableName: 'سجل التجار التموينيين والمتابعات', count: merchants.length + followups.length },
+                { tableName: 'سجل الحصص التموينية', count: quotas.length },
+                { tableName: 'سجل المخازن والمشتريات والحركة والتحويلات والجرد', count: warehouses.length + receipts.length + ledger.length + transfers.length + stocktakes.length },
+                { tableName: 'سجل البطاقات والمستفيدين وعمليات الصرف', count: cards.length + beneficiaryStats.length + citizenIssues.length },
+                { tableName: 'سجل الرقابة الميدانية والشكاوى التموينية', count: inspections.length + complaints.length },
+              ]}
+              onCaptureBackup={() => ({
+                commodities,
+                priceHistory,
+                merchants,
+                quotas,
+                warehouses,
+                receipts,
+                ledger,
+                cards,
+                beneficiaryStats,
+                citizenIssues,
+                inspections,
+                complaints,
+              })}
               onConfirmReset={handleFactoryReset}
             />
           </div>

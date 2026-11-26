@@ -1279,6 +1279,22 @@ export default function BakeryDebtsModule({
             </button>
             <FactoryResetButton
               sectionName="منظومة مديونيات أصحاب المخابز"
+              sectionKey="bakery_debts"
+              currentUser={currentUser}
+              tableSummary={[
+                { tableName: 'سجل المديونيات الرئيسية', count: store.debts.length },
+                { tableName: 'سجل التحصيلات والسدادات', count: store.payments.length },
+                { tableName: 'جداول الجدولة والأقساط', count: store.schedules.length + store.installments.length },
+                { tableName: 'سجل المخالفات والتصالحات والتظلمات', count: store.violations.length + store.settlements.length + store.appeals.length },
+                { tableName: 'سجل المتابعات والمديونيات الكبرى', count: store.followups.length + store.majorDebtFollowups.length },
+              ]}
+              onCaptureBackup={() => ({ store })}
+              onRestoreBackup={(snap) => {
+                if (snap.store && typeof snap.store === 'object') {
+                  updateStore(() => snap.store as typeof store);
+                  notify('تم استرجاع النسخة الاحتياطية لمديونيات المخابز بنجاح.');
+                }
+              }}
               compact
               onConfirmReset={() => {
                 updateStore((prev) => ({

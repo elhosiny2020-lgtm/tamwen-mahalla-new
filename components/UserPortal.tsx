@@ -104,7 +104,9 @@ import {
   loadRationCommodities,
   loadRationMerchants,
 } from '@/lib/ration-commodities-store';
-import { loadMasterDocExpiries } from '@/lib/dropdown-lists-store';
+import { loadMasterDocExpiries, subscribeDropdownLists } from '@/lib/dropdown-lists-store';
+import { useSystemPreferences } from '@/lib/user-preferences-store';
+import { getLocalizedDepartmentDesc, getLocalizedDepartmentName } from '@/lib/i18n';
 
 interface UserPortalProps {
   currentUser: User;
@@ -144,6 +146,7 @@ function renderDeptIcon(iconName: string, className: string) {
 const ACTIVE_TAB_STORAGE_KEY = 'gharbia_supply_active_dept_tab_v1';
 
 export default function UserPortal({ currentUser, activeBranchId }: UserPortalProps) {
+  const { prefs, effectiveDensity, isRtl, t } = useSystemPreferences();
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
   const [allDepartments, setAllDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
   const [bakeries, setBakeries] = useState<BakeryRecord[]>(INITIAL_BAKERIES);
@@ -210,7 +213,16 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         // Ignore storage errors
       }
     });
-    return () => cancelAnimationFrame(frameId);
+    const unsubDropdowns = subscribeDropdownLists(() => {
+      setLiveExtraCounts((prev) => ({
+        ...prev,
+        managedDocs: loadMasterDocExpiries().length,
+      }));
+    });
+    return () => {
+      cancelAnimationFrame(frameId);
+      unsubDropdowns();
+    };
   }, []);
 
   const handleSelectDept = (deptId: string) => {
@@ -414,17 +426,17 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     [ultraMetrics, bakeries, debtTransactions.length, liveExtraCounts, inspections.length, complaintsList.length, allUsers.length, branches.length, auditLogs.length]
   );
 
-  // تنظيم القائمة الجانبية اليمنى في مجموعات منطقية مترابطة
+  // تنظيم القائمة الجانبية في مجموعات منطقية مترابطة مع دعم العربية والإنجليزية
   const sidebarGroupedSections = useMemo(() => {
     const groupsDef: { id: string; title: string; codes: string[] }[] = [
-      { id: 'grp_cmd', title: 'القيادة والمركز الرقابي', codes: ['DASH', 'CTRL'] },
-      { id: 'grp_bakery', title: 'منظومة المخابز والمديونيات', codes: ['BAK', 'DEBTS'] },
-      { id: 'grp_trade', title: 'التجارة الداخلية والوقود والتفتيش', codes: ['TRADE', 'GAS', 'INSP', 'VIOL'] },
-      { id: 'grp_ration', title: 'السلع التموينية والحبوب والمطاحن', codes: ['COMM', 'GRAIN', 'SILOS', 'MILLS', 'COLD'] },
-      { id: 'grp_citizens', title: 'الشكاوى والمهام والمتابعة', codes: ['COMP', 'TASKS'] },
+      { id: 'grp_cmd', title: t('grp_cmd'), codes: ['DASH', 'CTRL'] },
+      { id: 'grp_bakery', title: t('grp_bakery'), codes: ['BAK', 'DEBTS'] },
+      { id: 'grp_trade', title: t('grp_trade'), codes: ['TRADE', 'GAS', 'INSP', 'VIOL'] },
+      { id: 'grp_ration', title: t('grp_ration'), codes: ['COMM', 'GRAIN', 'SILOS', 'MILLS', 'COLD'] },
+      { id: 'grp_citizens', title: t('grp_citizens'), codes: ['COMP', 'TASKS'] },
       {
         id: 'grp_admin',
-        title: 'القوائم المنسدلة والأرشيف والحفظ والإدارة',
+        title: t('grp_admin'),
         codes: ['LISTS', 'REP', 'DOCS', 'BACK', 'SETT', 'USERS', 'ROLES', 'AUDIT', 'HR', 'FIN', 'STORE'],
       },
     ];
@@ -441,10 +453,10 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
 
     const remaining = filteredSidebarDepts.filter((d) => !usedIds.has(d.id));
     if (remaining.length > 0) {
-      sections.push({ id: 'grp_other', title: 'أقسام أخرى', items: remaining });
+      sections.push({ id: 'grp_other', title: isRtl ? 'أقسام أخرى' : 'Other Sections', items: remaining });
     }
     return sections;
-  }, [filteredSidebarDepts]);
+  }, [filteredSidebarDepts, t, isRtl]);
 
   const handleStandaloneAddInspection = (record: Omit<InspectionRecord, 'id'>) => {
     const updated = [{ ...record, id: `ins-${Date.now()}` }, ...inspections];
@@ -538,20 +550,20 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       {/* Quick Search Inside Sidebar */}
       {(!sidebarCollapsed || isMobile) && (
         <div className="relative mb-3">
-          <Search className="w-3.5 h-3.5 text-slate-300 absolute right-3 top-3" />
+          <Search className={`w-3.5 h-3.5 text-slate-300 absolute ${isRtl ? 'right-3' : 'left-3'} top-3`} />
           <input
             type="text"
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
-            placeholder="بحث سريع في تبويبات الأقسام..."
-            className="w-full pr-9 pl-3 py-2 bg-[#164E83]/50 border border-white/15 rounded-xl text-[11px] text-white font-bold placeholder:text-slate-300 focus:outline-none focus:border-[#C6A15B]"
+            placeholder={t('searchDepartments')}
+            className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-[#164E83]/50 border border-white/15 rounded-xl text-[11px] text-white font-bold placeholder:text-slate-300 focus:outline-none focus:border-[#C6A15B]`}
           />
         </div>
       )}
 
       {/* القائمة الجانبية المنظمة حسب التخصص مع عدادات رقمية حية بجانب كل قسم */}
       <nav
-        aria-label="تبويبات الأقسام الرئيسية"
+        aria-label={t('departments')}
         className="space-y-2.5 max-h-[calc(100vh-14.5rem)] overflow-y-auto compact-table-scroll pl-0.5"
       >
         {sidebarGroupedSections.map((section) => {
@@ -581,23 +593,28 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                   const isPinned = pinnedDeptIds.includes(dept.id);
                   const liveCount = deptLiveCounts[dept.code];
                   const isSubNested = dept.code === 'GAS' || dept.code === 'INSP' || dept.code === 'VIOL';
+                  const localizedDeptName = getLocalizedDepartmentName(dept.code, dept.arabicName, prefs.language);
 
                   return (
                     <motion.button
                       key={dept.id}
                       type="button"
                       onClick={() => handleSelectDept(dept.id)}
-                      whileHover={{ x: -3 }}
+                      whileHover={{ x: isRtl ? -3 : 3 }}
                       whileTap={{ scale: 0.98 }}
                       transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-                      className={`relative w-full flex items-center justify-between gap-1.5 py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer text-right border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A15B] ${
-                        isSubNested && (!sidebarCollapsed || isMobile) ? 'pr-4 pl-2.5' : 'px-2.5'
+                      className={`relative w-full flex items-center justify-between gap-1.5 py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${isRtl ? 'text-right' : 'text-left'} border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A15B] ${
+                        isSubNested && (!sidebarCollapsed || isMobile)
+                          ? isRtl
+                            ? 'pr-4 pl-2.5'
+                            : 'pl-4 pr-2.5'
+                          : 'px-2.5'
                       } ${
                         isActive
                           ? 'text-[#102A43] border-[#C6A15B] shadow-md'
                           : 'bg-[#164E83]/25 border-white/10 text-slate-100 hover:bg-[#164E83]/60 hover:border-white/25'
                       }`}
-                      title={dept.arabicName}
+                      title={localizedDeptName}
                     >
                       {isActive && (
                         <motion.span
@@ -610,7 +627,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                         <motion.span
                           layoutId={isMobile ? 'mobileActiveTabBar' : 'desktopActiveTabBar'}
                           transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                          className="absolute right-0 top-1.5 bottom-1.5 w-1 rounded-l-full bg-[#102A43] z-10"
+                          className={`absolute ${isRtl ? 'right-0 rounded-l-full' : 'left-0 rounded-r-full'} top-1.5 bottom-1.5 w-1 bg-[#102A43] z-10`}
                         />
                       )}
 
@@ -623,8 +640,8 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                           {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5')}
                         </span>
                         {(!sidebarCollapsed || isMobile) && (
-                          <span className="leading-snug break-words whitespace-normal text-right">
-                            {dept.arabicName}
+                          <span className={`leading-snug break-words whitespace-normal ${isRtl ? 'text-right' : 'text-left'}`}>
+                            {localizedDeptName}
                           </span>
                         )}
                       </div>
@@ -638,9 +655,8 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                                   ? 'bg-[#102A43] text-[#C6A15B]'
                                   : 'bg-[#0B1F33]/80 text-[#C6A15B] border border-[#C6A15B]/35'
                               }`}
-                              title="العدد المسجل حالياً في هذا القسم"
                             >
-                              {toArabicNumerals(liveCount)}
+                              {isRtl ? toArabicNumerals(liveCount) : liveCount}
                             </span>
                           )}
                           <span
@@ -718,14 +734,22 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         )}
       </AnimatePresence>
 
-      {/* Desktop Right-Hand Animated Tabbed Sidebar */}
+      {/* Desktop Animated Tabbed Sidebar (adaptive width per Display Density) */}
       <motion.aside
         initial={false}
-        animate={{ width: sidebarCollapsed ? '84px' : '276px' }}
+        animate={{
+          width: sidebarCollapsed
+            ? '84px'
+            : effectiveDensity === 'compact'
+            ? '252px'
+            : effectiveDensity === 'spacious'
+            ? '292px'
+            : '276px',
+        }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         onMouseEnter={() => !isSidebarPinned && setSidebarCollapsed(false)}
         onMouseLeave={() => !isSidebarPinned && setSidebarCollapsed(true)}
-        className="hidden lg:block bg-gradient-to-b from-[#0B1F33] via-[#102A43] to-[#0B1F33] text-white rounded-2xl shadow-lg border border-[#164E83] shrink-0 print:hidden overflow-hidden p-3 self-start sticky top-20"
+        className="app-sidebar hidden lg:block bg-gradient-to-b from-[#0B1F33] via-[#102A43] to-[#0B1F33] text-white rounded-2xl shadow-lg border border-[#164E83] shrink-0 print:hidden overflow-hidden p-3 self-start sticky top-20"
       >
         {renderSidebarTabs(false)}
       </motion.aside>
@@ -764,13 +788,13 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                     </div>
                     <div>
                       <p className="text-[11px] font-black text-[#C6A15B] mb-1">
-                        جمهورية مصر العربية · وزارة التموين والتجارة الداخلية · محافظة الغربية
+                        {t('republicSubtitle')}
                       </p>
                       <h2 className="text-xl sm:text-2xl font-black">
-                        لوحة القيادة المركزية الموحدة — {currentBranch?.arabicName}
+                        {t('centralDashboardTitle')} — {currentBranch?.arabicName}
                       </h2>
                       <p className="text-[11px] text-slate-200 font-bold mt-1">
-                        منصة حكومية رقمية متكاملة لإدارة البيانات والخدمات التموينية، وتعزيز كفاءة المتابعة والرقابة، ودعم اتخاذ القرار.
+                        {t('centralDashboardDesc')}
                       </p>
                     </div>
                   </div>
@@ -780,7 +804,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                     className="px-5 py-3 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] font-black rounded-xl text-[11px] flex items-center gap-2 shrink-0 shadow-md cursor-pointer"
                   >
                     <Flame className="w-4 h-4" />
-                    <span>فتح منظومة الرقابة على المخابز</span>
+                    <span>{t('openBakerySystem')}</span>
                     <ArrowLeft className="w-4 h-4" />
                   </button>
                 </div>
@@ -873,11 +897,11 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>
-                      <h3 className="text-[15px] font-black text-[#102A43]">الأقسام الرئيسية لمنظومة الإدارة الرقمية المتكاملة</h3>
-                      <p className="text-[11px] font-bold text-slate-600">اضغط على أي قسم للانتقال المباشر إلى سجلاته وإحصائياته الحية</p>
+                      <h3 className="text-[15px] font-black text-[#102A43]">{t('mainDepartmentsTitle')}</h3>
+                      <p className="text-[11px] font-bold text-slate-600">{t('mainDepartmentsDesc')}</p>
                     </div>
                     <span className="num-cell text-[11px] font-black text-[#164E83]">
-                      {toArabicNumerals(allowedDepartments.length)} قسماً مصرحاً
+                      {isRtl ? toArabicNumerals(allowedDepartments.length) : allowedDepartments.length} {t('authorizedSections')}
                     </span>
                   </div>
 
@@ -893,16 +917,22 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                             {renderDeptIcon(dept.iconName, 'w-5 h-5')}
                           </div>
                           <div>
-                            <h4 className="text-[13px] font-black text-[#102A43]">{dept.arabicName}</h4>
-                            <p className="text-[11px] font-bold text-slate-600 mt-0.5 leading-relaxed">{dept.description}</p>
+                            <h4 className="text-[13px] font-black text-[#102A43]">
+                              {getLocalizedDepartmentName(dept.code, dept.arabicName, prefs.language)}
+                            </h4>
+                            <p className="text-[11px] font-bold text-slate-600 mt-0.5 leading-relaxed">
+                              {getLocalizedDepartmentDesc(dept.code, dept.description, prefs.language)}
+                            </p>
                           </div>
                         </div>
                         <div className="mt-3.5 pt-2.5 border-t border-slate-200/70 flex items-center justify-between text-[10.5px] font-black text-[#164E83]">
                           <span>
-                            {dept.code === 'BAK' ? `${toArabicNumerals(ultraMetrics.totalBakeries)} مخبز مسجل` : 'قسم مفعل بالبيانات'}
+                            {dept.code === 'BAK'
+                              ? `${isRtl ? toArabicNumerals(ultraMetrics.totalBakeries) : ultraMetrics.totalBakeries} ${t('registeredBakeries')}`
+                              : t('activeWithData')}
                           </span>
                           <span className="flex items-center gap-1">
-                            <span>فتح القسم</span>
+                            <span>{t('openSection')}</span>
                             <ArrowLeft className="w-3.5 h-3.5" />
                           </span>
                         </div>
@@ -993,6 +1023,17 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                       </div>
                       <FactoryResetButton
                         sectionName="الشكاوى وخدمة المواطنين"
+                        sectionKey="complaints"
+                        currentUser={currentUser}
+                        tableSummary={[
+                          { tableName: 'سجل شكاوى وبلاغات المواطنين', count: complaintsList.length },
+                        ]}
+                        onCaptureBackup={() => ({ complaintsList })}
+                        onRestoreBackup={(snap) => {
+                          if (Array.isArray(snap.complaintsList)) {
+                            setComplaintsList(snap.complaintsList as typeof complaintsList);
+                          }
+                        }}
                         compact
                         onConfirmReset={() => {
                           setComplaintsList([]);

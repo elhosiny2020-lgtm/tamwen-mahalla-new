@@ -107,6 +107,12 @@ import AnimatedStatCard from './AnimatedStatCard';
 import TableStats from './TableStats';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import FactoryResetButton from './FactoryResetButton';
+import {
+  getActiveLocalUnitsForVillage,
+  getActiveVillageNames,
+  getAllActiveLocalUnitNames,
+  subscribeDropdownLists,
+} from '@/lib/dropdown-lists-store';
 
 export type { BakerySubTab };
 
@@ -169,6 +175,24 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
     });
     return () => cancelAnimationFrame(frameId);
   }, [currentUser.id]);
+
+  // اشتراك حي في قائمة القرى والوحدات المحلية المترابطة
+  const [dropdownVersion, setDropdownVersion] = useState(0);
+  useEffect(() => {
+    return subscribeDropdownLists(() => setDropdownVersion((v) => v + 1));
+  }, []);
+
+  const liveVillages = useMemo(() => {
+    void dropdownVersion;
+    const active = getActiveVillageNames();
+    return active.length > 0 ? active : MAHALLA_VILLAGES;
+  }, [dropdownVersion]);
+
+  const liveAllLocalUnits = useMemo(() => {
+    void dropdownVersion;
+    const active = getAllActiveLocalUnitNames();
+    return active.length > 0 ? active : MAHALLA_LOCAL_UNITS;
+  }, [dropdownVersion]);
 
   // Sound settings
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -665,7 +689,11 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
 
   // Handle Village Change -> Auto-link Local Unit (Section 4)
   const handleWizardVillageChange = (village: string) => {
-    const autoUnit = MAHALLA_VILLAGE_TO_LOCAL_UNIT[village] || 'الوحدة المحلية بمركز المحلة الكبرى';
+    const cascadedUnits = getActiveLocalUnitsForVillage(village);
+    const autoUnit =
+      cascadedUnits[0] ||
+      MAHALLA_VILLAGE_TO_LOCAL_UNIT[village] ||
+      'الوحدة المحلية بمركز المحلة الكبرى';
     setFormBakery(prev => ({
       ...prev,
       village,
@@ -1446,6 +1474,40 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           </button>
           <FactoryResetButton
             sectionName="منظومة إدارة المخابز"
+            sectionKey="bakeries"
+            currentUser={currentUser}
+            tableSummary={[
+              { tableName: 'سجل المخابز البلدية المدعمة', count: bakeries.length },
+              { tableName: 'سجل الحملات والتفتيش والمخالفات', count: inspections.length },
+              { tableName: 'سجل معاملات المديونيات المرتبطة', count: debtTransactions.length },
+              { tableName: 'سجل إجراءات التنبيهات والمراجعة', count: alertActions.length + auditChanges.length },
+            ]}
+            onCaptureBackup={() => ({
+              bakeries,
+              inspections,
+              debtTransactions,
+              alertActions,
+              auditChanges,
+            })}
+            onRestoreBackup={(snap) => {
+              if (Array.isArray(snap.bakeries)) {
+                setBakeries(snap.bakeries as BakeryRecord[]);
+                saveStoredBakeries(snap.bakeries as BakeryRecord[]);
+              }
+              if (Array.isArray(snap.inspections)) {
+                setInspections(snap.inspections as InspectionRecord[]);
+                saveStoredInspections(snap.inspections as InspectionRecord[]);
+              }
+              if (Array.isArray(snap.debtTransactions)) {
+                setDebtTransactions(snap.debtTransactions as DebtTransactionRecord[]);
+                saveStoredDebtTransactions(snap.debtTransactions as DebtTransactionRecord[]);
+              }
+              if (Array.isArray(snap.alertActions)) {
+                setAlertActions(snap.alertActions as AlertActionRecord[]);
+                saveStoredAlertActions(snap.alertActions as AlertActionRecord[]);
+              }
+              showToast('تم استرجاع النسخة الاحتياطية لبيانات المخابز بنجاح.');
+            }}
             compact
             onConfirmReset={() => {
               setBakeries([]);
@@ -1769,12 +1831,13 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   value={filterVillage}
                   onChange={(e) => {
                     setFilterVillage(e.target.value);
+                    setFilterLocalUnit('all');
                     setCurrentPage(1);
                   }}
                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
                 >
                   <option value="all">جميع القرى</option>
-                  {MAHALLA_VILLAGES.map(v => (
+                  {liveVillages.map(v => (
                     <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
@@ -1791,7 +1854,10 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
                 >
                   <option value="all">جميع الوحدات المحلية</option>
-                  {MAHALLA_LOCAL_UNITS.map(u => (
+                  {(filterVillage !== 'all'
+                    ? getActiveLocalUnitsForVillage(filterVillage)
+                    : liveAllLocalUnits
+                  ).map(u => (
                     <option key={u} value={u}>{u}</option>
                   ))}
                 </select>
@@ -2743,23 +2809,36 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <div>
                   <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">القرية (تربط الوحدة المحلية تلقائياً) *</label>
                   <select
-                    value={formBakery.village || 'صفط تراب'}
+                    value={formBakery.village || liveVillages[0] || 'صفط تراب'}
                     onChange={(e) => handleWizardVillageChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-extrabold"
                   >
-                    {MAHALLA_VILLAGES.map(v => (
+                    {Array.from(
+                      new Set([
+                        ...(formBakery.village ? [formBakery.village] : []),
+                        ...liveVillages,
+                      ])
+                    ).map(v => (
                       <option key={v} value={v}>{v}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الوحدة المحلية التابعة (تلقائي)</label>
-                  <input
-                    type="text"
-                    readOnly
+                  <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">الوحدة المحلية التابعة للقرية المختارة *</label>
+                  <select
                     value={formBakery.localUnit || ''}
-                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-[11px] font-extrabold text-[#164E83]"
-                  />
+                    onChange={(e) => setFormBakery({ ...formBakery, localUnit: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-extrabold text-[#164E83]"
+                  >
+                    {Array.from(
+                      new Set([
+                        ...(formBakery.localUnit ? [formBakery.localUnit] : []),
+                        ...getActiveLocalUnitsForVillage(formBakery.village || liveVillages[0] || ''),
+                      ])
+                    ).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[11px] font-extrabold text-[#102A43] mb-1">حالة النشاط</label>
@@ -4575,7 +4654,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                     onChange={(e) => setPrintVillageName(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold"
                   >
-                    {MAHALLA_VILLAGES.map(v => (
+                    {liveVillages.map(v => (
                       <option key={v} value={v}>{v}</option>
                     ))}
                   </select>

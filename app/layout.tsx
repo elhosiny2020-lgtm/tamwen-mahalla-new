@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Cairo, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { SystemPreferencesProvider } from '@/lib/user-preferences-store';
 import './globals.css'; // Global styles
 
 const cairo = Cairo({
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} ${ibmPlexArabic.variable}`}>
       <body className="bg-[#FAFBFD] text-[#102A43] font-sans text-[13px] font-bold antialiased min-h-screen selection:bg-[#102A43] selection:text-white">
-        {children}
+        <SystemPreferencesProvider>{children}</SystemPreferencesProvider>
       </body>
     </html>
   );

@@ -1154,6 +1154,26 @@ export default function InternalTradeModule({
             </button>
             <FactoryResetButton
               sectionName="قسم التجارة الداخلية"
+              sectionKey="internal_trade"
+              tableSummary={[
+                { tableName: 'سجل المحلات والمنشآت التجارية والأنشطة', count: establishments.length + activities.length },
+                { tableName: 'سجل التراخيص والتجديدات', count: licenses.length },
+                { tableName: 'سجل الحملات والمحاضر والتصالحات والمضبوطات', count: campaigns.length + reports.length + settlements.length + seizures.length },
+                { tableName: 'سجل مستودعات البوتاجاز ومحطات الوقود والمواد البترولية', count: butaneWarehouses.length + fuelStations.length + butaneAllocations.length + petroleumAllocations.length },
+                { tableName: 'سجل رصد الأسعار والأسواق', count: priceObservations.length },
+              ]}
+              onCaptureBackup={() => ({
+                establishments,
+                activities,
+                licenses,
+                campaigns,
+                reports,
+                settlements,
+                seizures,
+                priceObservations,
+                butaneWarehouses,
+                fuelStations,
+              })}
               compact
               onConfirmReset={() => {
                 factoryResetInternalTradeStore();

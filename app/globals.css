@@ -1,7 +1,202 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --font-sans: var(--font-cairo), var(--font-ibm-arabic), system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  --font-scale: 1;
+  --ui-row-pad-y: 4.5px;
+  --ui-row-pad-x: 7px;
+  --ui-sidebar-width: 276px;
+
+  /* Default Official Government Navy & White Tokens (Untouched Default) */
+  --app-canvas-bg: #F4F7FB;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F4F7FB;
+  --app-text: #102A43;
+  --app-text-muted: #475569;
+  --app-border: #CBD5E1;
+  --app-header-bg: #102A43;
+  --app-header-border: #164E83;
+  --app-header-text: #FFFFFF;
+  --app-accent: #C6A15B;
+  --app-primary: #102A43;
+  --app-primary-soft: #164E83;
+  --app-table-head-bg: #102A43;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F4F7FB;
+  --app-table-row-hover: #EFF6FF;
+}
+
+/* 1. Comfort White */
+html[data-theme="soft_white"] {
+  --app-canvas-bg: #FAFBFC;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F1F5F9;
+  --app-text: #1E293B;
+  --app-text-muted: #475569;
+  --app-border: #CBD5E1;
+  --app-header-bg: #1E3A5F;
+  --app-header-border: #2B5284;
+  --app-header-text: #FFFFFF;
+  --app-accent: #60A5FA;
+  --app-primary: #1E3A5F;
+  --app-primary-soft: #2563EB;
+  --app-table-head-bg: #1E3A5F;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F8FAFC;
+  --app-table-row-hover: #EFF6FF;
+}
+
+/* 2. Calm Gray */
+html[data-theme="calm_gray"] {
+  --app-canvas-bg: #E9EDF2;
+  --app-surface-bg: #F8FAFC;
+  --app-surface-alt: #E2E8F0;
+  --app-text: #1E293B;
+  --app-text-muted: #475569;
+  --app-border: #CBD5E1;
+  --app-header-bg: #334155;
+  --app-header-border: #475569;
+  --app-header-text: #F8FAFC;
+  --app-accent: #E2B86B;
+  --app-primary: #334155;
+  --app-primary-soft: #475569;
+  --app-table-head-bg: #334155;
+  --app-table-head-text: #F8FAFC;
+  --app-table-row-bg: #F8FAFC;
+  --app-table-row-alt: #EEF2F6;
+  --app-table-row-hover: #E2E8F0;
+}
+
+/* 3. Calm Blue */
+html[data-theme="calm_blue"] {
+  --app-canvas-bg: #EAF2FA;
+  --app-surface-bg: #F8FBFF;
+  --app-surface-alt: #DFECF8;
+  --app-text: #0F2942;
+  --app-text-muted: #335577;
+  --app-border: #BBD4EC;
+  --app-header-bg: #164E83;
+  --app-header-border: #1E63A3;
+  --app-header-text: #FFFFFF;
+  --app-accent: #F4C46A;
+  --app-primary: #164E83;
+  --app-primary-soft: #0284C7;
+  --app-table-head-bg: #164E83;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #F8FBFF;
+  --app-table-row-alt: #EDF5FC;
+  --app-table-row-hover: #DCEBFA;
+}
+
+/* 4. Calm Green */
+html[data-theme="calm_green"] {
+  --app-canvas-bg: #EBF5EF;
+  --app-surface-bg: #F9FCFA;
+  --app-surface-alt: #DDF0E4;
+  --app-text: #102F1E;
+  --app-text-muted: #2F5D44;
+  --app-border: #B7DEC6;
+  --app-header-bg: #14532D;
+  --app-header-border: #166534;
+  --app-header-text: #FFFFFF;
+  --app-accent: #D9B45A;
+  --app-primary: #14532D;
+  --app-primary-soft: #15803D;
+  --app-table-head-bg: #14532D;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #F9FCFA;
+  --app-table-row-alt: #EDF7F1;
+  --app-table-row-hover: #DCF0E4;
+}
+
+/* 5. Warm Beige */
+html[data-theme="warm_beige"] {
+  --app-canvas-bg: #F5EFE6;
+  --app-surface-bg: #FCF9F4;
+  --app-surface-alt: #EDE4D5;
+  --app-text: #2F241B;
+  --app-text-muted: #5F4E3F;
+  --app-border: #D9CBB6;
+  --app-header-bg: #4A3728;
+  --app-header-border: #644A36;
+  --app-header-text: #FFFDF9;
+  --app-accent: #E2B366;
+  --app-primary: #4A3728;
+  --app-primary-soft: #6F513A;
+  --app-table-head-bg: #4A3728;
+  --app-table-head-text: #FFFDF9;
+  --app-table-row-bg: #FCF9F4;
+  --app-table-row-alt: #F3ECE0;
+  --app-table-row-hover: #EAE0CF;
+}
+
+/* 6. Eye Comfort Mode (Low Blue Light Warm Paper) */
+html[data-theme="eye_comfort"] {
+  --app-canvas-bg: #EFE7D2;
+  --app-surface-bg: #F8F3E6;
+  --app-surface-alt: #E7DEC7;
+  --app-text: #2A2518;
+  --app-text-muted: #574F3A;
+  --app-border: #D4C8AA;
+  --app-header-bg: #3D3522;
+  --app-header-border: #554A30;
+  --app-header-text: #FAF6EB;
+  --app-accent: #D8B165;
+  --app-primary: #3D3522;
+  --app-primary-soft: #5C5033;
+  --app-table-head-bg: #3D3522;
+  --app-table-head-text: #FAF6EB;
+  --app-table-row-bg: #F8F3E6;
+  --app-table-row-alt: #F0E8D5;
+  --app-table-row-hover: #E6DCBF;
+}
+
+/* 7. Dark Mode (High-Contrast WCAG AA Slate) */
+html[data-theme="dark_mode"] {
+  --app-canvas-bg: #0B1220;
+  --app-surface-bg: #131E31;
+  --app-surface-alt: #1A2840;
+  --app-text: #F1F5F9;
+  --app-text-muted: #CBD5E1;
+  --app-border: #2C3E5A;
+  --app-header-bg: #080E1A;
+  --app-header-border: #1E2E47;
+  --app-header-text: #F8FAFC;
+  --app-accent: #E2BE70;
+  --app-primary: #1E3A5F;
+  --app-primary-soft: #2563EB;
+  --app-table-head-bg: #0F172A;
+  --app-table-head-text: #F8FAFC;
+  --app-table-row-bg: #131E31;
+  --app-table-row-alt: #18253C;
+  --app-table-row-hover: #213454;
+}
+
+/* 8. Custom User Theme */
+html[data-theme="custom"] {
+  --app-canvas-bg: var(--custom-bg, #F4F7FB);
+  --app-surface-bg: var(--custom-surface, #FFFFFF);
+  --app-surface-alt: var(--custom-surface-alt, #EEF2F7);
+  --app-text: var(--custom-text, #102A43);
+  --app-text-muted: var(--custom-text-muted, #475569);
+  --app-border: var(--custom-border, #CBD5E1);
+  --app-header-bg: var(--custom-primary, #102A43);
+  --app-header-border: var(--custom-primary, #164E83);
+  --app-header-text: var(--custom-primary-text, #FFFFFF);
+  --app-accent: var(--custom-accent, #C6A15B);
+  --app-primary: var(--custom-primary, #102A43);
+  --app-primary-soft: var(--custom-primary, #164E83);
+  --app-table-head-bg: var(--custom-primary, #102A43);
+  --app-table-head-text: var(--custom-primary-text, #FFFFFF);
+  --app-table-row-bg: var(--custom-surface, #FFFFFF);
+  --app-table-row-alt: var(--custom-surface-alt, #F4F7FB);
+  --app-table-row-hover: var(--custom-surface-alt, #E8EFF7);
 }
 
 @keyframes blink {
@@ -37,16 +232,19 @@
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
 }
 
-/* Global Bold Typography Hierarchy (-2 Scale Steps for High-Density Arabic Clarity) */
+/* Global Dynamic Font Scaling via --font-scale (80% to 150%, zero browser zoom hacks) */
 @layer base {
   html {
-    font-size: 14px;
+    font-size: calc(14px * var(--font-scale, 1));
   }
 
   body {
-    font-size: 13px;
+    font-size: calc(13px * var(--font-scale, 1));
     font-weight: 700;
     line-height: 1.5;
+    background-color: var(--app-canvas-bg);
+    color: var(--app-text);
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -58,12 +256,101 @@
   }
 
   input, select, textarea {
-    font-size: 12px;
+    font-size: calc(12px * var(--font-scale, 1));
     font-weight: 700;
   }
 }
 
-/* Global Smart Auto-Fit & Compact Arabic Table Typography System (Tuned & High-Density) */
+/* Semantic Theme Application across All Modules (Leaves default gov_navy 100% intact) */
+html:not([data-theme="gov_navy"]) .app-shell {
+  background-color: var(--app-canvas-bg);
+  color: var(--app-text);
+}
+
+html:not([data-theme="gov_navy"]) header.app-header {
+  background-color: var(--app-header-bg);
+  border-color: var(--app-header-border);
+  color: var(--app-header-text);
+}
+
+html:not([data-theme="gov_navy"]) footer.app-footer {
+  background-color: var(--app-header-bg);
+  border-color: var(--app-header-border);
+  color: var(--app-header-text);
+}
+
+html:not([data-theme="gov_navy"]) aside.app-sidebar {
+  background: var(--app-header-bg);
+  border-color: var(--app-header-border);
+  color: var(--app-header-text);
+}
+
+html:not([data-theme="gov_navy"]) main .bg-white {
+  background-color: var(--app-surface-bg);
+}
+
+html:not([data-theme="gov_navy"]) main .bg-\[\#F4F7FB\],
+html:not([data-theme="gov_navy"]) main .bg-slate-50 {
+  background-color: var(--app-surface-alt);
+}
+
+html:not([data-theme="gov_navy"]) main .border-slate-200,
+html:not([data-theme="gov_navy"]) main .border-slate-300 {
+  border-color: var(--app-border);
+}
+
+html:not([data-theme="gov_navy"]) main table thead tr {
+  background-color: var(--app-table-head-bg);
+  color: var(--app-table-head-text);
+}
+
+/* High-Contrast Dark Mode Pairing (prevents dark text on dark surfaces) */
+html.dark main .text-\[\#102A43\],
+html.dark main .text-slate-900,
+html.dark main .text-slate-800,
+html.dark main .text-slate-700 {
+  color: var(--app-text);
+}
+
+html.dark main .text-slate-600,
+html.dark main .text-slate-500 {
+  color: var(--app-text-muted);
+}
+
+html.dark main .text-\[\#164E83\] {
+  color: #7DD3FC;
+}
+
+html.dark main input,
+html.dark main select,
+html.dark main textarea {
+  background-color: #0F172A;
+  color: #F8FAFC;
+  border-color: #334155;
+}
+
+html.dark main table tbody tr:nth-child(odd) {
+  background-color: var(--app-table-row-bg);
+}
+
+html.dark main table tbody tr:nth-child(even) {
+  background-color: var(--app-table-row-alt);
+}
+
+html.dark main table tbody tr:hover {
+  background-color: var(--app-table-row-hover);
+}
+
+/* Preserve readable light badges/buttons inside dark mode */
+html.dark main .bg-amber-50,
+html.dark main .bg-emerald-50,
+html.dark main .bg-blue-50,
+html.dark main .bg-red-50,
+html.dark main .bg-orange-50 {
+  color: #0F172A;
+}
+
+/* Global Smart Auto-Fit & Compact Arabic/English Table Typography System Scaled by --font-scale */
 table {
   border-collapse: separate;
   border-spacing: 0;
@@ -72,25 +359,25 @@ table {
 }
 
 table thead th {
-  font-size: 11px !important;
-  line-height: 1.25 !important;
+  font-size: calc(11px * var(--font-scale, 1)) !important;
+  line-height: 1.28 !important;
   font-weight: 800 !important;
-  padding: 5px 7px !important;
+  padding: var(--ui-row-pad-y, 5px) var(--ui-row-pad-x, 7px) !important;
   vertical-align: middle;
 }
 
 table thead tr.table-group-header th {
-  font-size: 11px !important;
-  line-height: 1.2 !important;
+  font-size: calc(11px * var(--font-scale, 1)) !important;
+  line-height: 1.22 !important;
   font-weight: 800 !important;
-  padding: 4px 7px !important;
+  padding: var(--ui-row-pad-y, 4px) var(--ui-row-pad-x, 7px) !important;
 }
 
 table tbody td {
-  font-size: 10.5px !important;
-  line-height: 1.32 !important;
+  font-size: calc(10.5px * var(--font-scale, 1)) !important;
+  line-height: 1.35 !important;
   font-weight: 700 !important;
-  padding: 4px 7px !important;
+  padding: var(--ui-row-pad-y, 4px) var(--ui-row-pad-x, 7px) !important;
   vertical-align: middle;
 }
 
@@ -98,9 +385,9 @@ table tbody td {
 .num-cell,
 table td.num-cell,
 table th.num-cell {
-  font-size: 11px !important;
+  font-size: calc(11px * var(--font-scale, 1)) !important;
   font-weight: 700 !important;
-  line-height: 1.25 !important;
+  line-height: 1.28 !important;
   white-space: nowrap !important;
   font-variant-numeric: tabular-nums !important;
   font-feature-settings: "tnum" 1 !important;
@@ -113,18 +400,22 @@ table th.num-cell {
   white-space: normal !important;
   word-break: break-word;
   overflow-wrap: anywhere;
-  line-height: 1.32 !important;
+  line-height: 1.35 !important;
 }
 
 .autofit-header-cell {
   white-space: normal !important;
   word-break: break-word;
-  line-height: 1.25 !important;
+  line-height: 1.28 !important;
 }
 
-/* Pinned Column Shadow Divider for RTL Sticky Columns */
+/* Pinned Column Shadow Divider for RTL & LTR Sticky Columns */
 .pinned-col-edge {
   box-shadow: -4px 0 8px -4px rgba(16, 42, 67, 0.24);
+}
+
+html[dir="ltr"] .pinned-col-edge {
+  box-shadow: 4px 0 8px -4px rgba(16, 42, 67, 0.24);
 }
 
 /* Smooth compact table scrollbars */

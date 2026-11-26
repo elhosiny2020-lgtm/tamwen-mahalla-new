@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
     ],
   },
   output: 'standalone',
-  transpilePackages: ['motion', 'lucide-react'],
+  transpilePackages: ['motion'],
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },

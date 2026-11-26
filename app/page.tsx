@@ -16,8 +16,10 @@ import {
   setSelectedBranchSession,
 } from '@/lib/mock-db';
 import { Branch, User } from '@/types';
+import { useSystemPreferences } from '@/lib/user-preferences-store';
 
 export default function Home() {
+  const { setActiveUserId, t } = useSystemPreferences();
   const [hydrated, setHydrated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -26,17 +28,20 @@ export default function Home() {
 
   useEffect(() => {
     const hydrateSession = () => {
-      setCurrentUser(getCurrentSessionUser());
+      const sessionUser = getCurrentSessionUser();
+      setCurrentUser(sessionUser);
+      setActiveUserId(sessionUser?.id || 'guest');
       setSelectedBranchId(getSelectedBranchSession());
       setBranches(getStoredBranches());
       setHydrated(true);
     };
     const frameId = requestAnimationFrame(hydrateSession);
     return () => cancelAnimationFrame(frameId);
-  }, []);
+  }, [setActiveUserId]);
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
+    setActiveUserId(user.id);
     setBranches(getStoredBranches());
     if (user.branchIds.length === 1 && user.role !== 'super_admin' && user.role !== 'admin') {
       setSelectedBranchId(user.primaryBranchId);
@@ -62,6 +67,7 @@ export default function Home() {
     setSelectedBranchSession(null);
     setCurrentUser(null);
     setSelectedBranchId(null);
+    setActiveUserId('guest');
   };
 
   if (!hydrated) {
@@ -69,14 +75,14 @@ export default function Home() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A192F] font-sans text-white">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full border-4 border-[#C6A15B]/30 border-t-[#C6A15B] animate-spin" />
-          <p className="text-sm font-bold text-[#C6A15B]">جاري تحميل المنظومة التموينية الموحدة...</p>
+          <p className="text-sm font-bold text-[#C6A15B]">{t('loadingSystem')}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F7FB] font-sans text-[#243447] selection:bg-[#102A43] selection:text-white">
+    <div className="app-shell min-h-screen flex flex-col bg-[#F4F7FB] font-sans text-[#243447] selection:bg-[#102A43] selection:text-white">
       {currentUser ? (
         <>
           <Header
