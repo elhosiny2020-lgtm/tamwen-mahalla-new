@@ -49,7 +49,28 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       setRequests(getStoredRegistrationRequests());
       setAuditLogs(getStoredAuditLogs());
     });
-    return () => cancelAnimationFrame(frameId);
+
+    let cancelled = false;
+    fetch('/api/audit-logs?limit=200', { method: 'GET', cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.ok && Array.isArray(data.logs)) {
+          const serverLogs = data.logs as AuditLog[];
+          const localLogs = getStoredAuditLogs();
+          const seen = new Set(serverLogs.map((l) => l.id));
+          const merged = [
+            ...serverLogs,
+            ...localLogs.filter((l) => !seen.has(l.id)),
+          ];
+          setAuditLogs(merged);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
   }, []);
 
   const showNotice = (msg: string) => {

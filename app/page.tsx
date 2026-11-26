@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import LoginForm from '@/components/LoginForm';
 import RegisterWizard from '@/components/RegisterWizard';
 import BranchSelection from '@/components/BranchSelection';
 import UserPortal from '@/components/UserPortal';
+import SessionExpiryBanner from '@/components/SessionExpiryBanner';
 import {
   INITIAL_BRANCHES,
   getCurrentSessionUser,
@@ -17,6 +18,10 @@ import {
 } from '@/lib/mock-db';
 import { Branch, User } from '@/types';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
+import {
+  useSessionExpiryMonitor,
+  clearClientSessionExpiryTimestamp,
+} from '@/hooks/useSessionExpiryMonitor';
 
 export default function Home() {
   const { setActiveUserId, t } = useSystemPreferences();
@@ -39,6 +44,22 @@ export default function Home() {
     return () => cancelAnimationFrame(frameId);
   }, [setActiveUserId]);
 
+  const handleLogout = useCallback(() => {
+    void fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    clearClientSessionExpiryTimestamp();
+    setCurrentSessionUser(null);
+    setSelectedBranchSession(null);
+    setCurrentUser(null);
+    setSelectedBranchId(null);
+    setActiveUserId('guest');
+  }, [setActiveUserId]);
+
+  const sessionExpiry = useSessionExpiryMonitor({
+    enabled: Boolean(currentUser),
+    warningThresholdSeconds: 300,
+    onExpire: handleLogout,
+  });
+
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     setActiveUserId(user.id);
@@ -60,15 +81,6 @@ export default function Home() {
       setCurrentUser(updated);
       setCurrentSessionUser(updated);
     }
-  };
-
-  const handleLogout = () => {
-    void fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    setCurrentSessionUser(null);
-    setSelectedBranchSession(null);
-    setCurrentUser(null);
-    setSelectedBranchId(null);
-    setActiveUserId('guest');
   };
 
   if (!hydrated) {
@@ -103,6 +115,12 @@ export default function Home() {
               <UserPortal currentUser={currentUser} activeBranchId={selectedBranchId} />
             )}
           </main>
+          <SessionExpiryBanner
+            remainingSeconds={sessionExpiry.remainingSeconds}
+            isNearExpiration={sessionExpiry.isNearExpiration}
+            onDismiss={sessionExpiry.dismissWarning}
+            onLogoutNow={handleLogout}
+          />
           <Footer />
         </>
       ) : (

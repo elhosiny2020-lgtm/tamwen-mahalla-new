@@ -1,25 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * In-memory sliding window rate limiter keyed by IP + route (+ optional userId).
- * Note: For multi-instance horizontal scaling, replace backing store with Redis/Upstash.
- */
+// In-memory sliding window. Per-instance only: replace with Redis/Supabase if running multiple instances.
+const buckets = new Map<string, number[]>();
 
-interface RateBucket {
-  timestamps: number[];
+export function rateLimit(key: string, limit: number, windowMs: number): { ok: boolean; retryAfter: number } {
+  const now = Date.now();
+  const hits = (buckets.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (hits.length >= limit) {
+    buckets.set(key, hits);
+    return { ok: false, retryAfter: Math.max(1, Math.ceil((windowMs - (now - hits[0])) / 1000)) };
+  }
+  hits.push(now);
+  buckets.set(key, hits);
+  if (buckets.size > 10_000) {
+    for (const [k, v] of buckets) if (!v.some((t) => now - t < windowMs)) buckets.delete(k);
+  }
+  return { ok: true, retryAfter: 0 };
 }
 
-const rateBuckets = new Map<string, RateBucket>();
-const MAX_BUCKETS = 5000;
+/** On Cloud Run the LAST x-forwarded-for entry is the one appended by Google's frontend; earlier entries can be spoofed. */
+export function clientIp(request: Request): string {
+  const parts = (request.headers.get('x-forwarded-for') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return parts[parts.length - 1] ?? 'unknown';
+}
 
-export function getClientIp(req: NextRequest): string {
-  const xff = req.headers.get('x-forwarded-for');
-  if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = req.headers.get('x-real-ip')?.trim();
-  return realIp || 'unknown';
+export function getClientIp(req: NextRequest | Request): string {
+  return clientIp(req);
+}
+
+export function tooManyRequests(retryAfter: number): NextResponse {
+  return NextResponse.json(
+    { ok: false, error: 'عدد المحاولات كبير جداً. حاول مرة أخرى لاحقاً.' },
+    { status: 429, headers: { 'Retry-After': String(retryAfter), 'Cache-Control': 'no-store' } }
+  );
 }
 
 export interface RateLimitResult {
@@ -33,40 +46,11 @@ export function checkSlidingWindowRateLimit(params: {
   limit: number;
   windowMs: number;
 }): RateLimitResult {
-  const now = Date.now();
-  const cutoff = now - params.windowMs;
-
-  if (rateBuckets.size > MAX_BUCKETS) {
-    for (const [k, bucket] of rateBuckets.entries()) {
-      const active = bucket.timestamps.filter((t) => t > cutoff);
-      if (active.length === 0) {
-        rateBuckets.delete(k);
-      } else {
-        bucket.timestamps = active;
-      }
-    }
-  }
-
-  const bucket = rateBuckets.get(params.key) ?? { timestamps: [] };
-  bucket.timestamps = bucket.timestamps.filter((t) => t > cutoff);
-
-  if (bucket.timestamps.length >= params.limit) {
-    const oldestInWindow = bucket.timestamps[0] ?? now;
-    const retryAfterSeconds = Math.max(1, Math.ceil((oldestInWindow + params.windowMs - now) / 1000));
-    rateBuckets.set(params.key, bucket);
-    return {
-      allowed: false,
-      remaining: 0,
-      retryAfterSeconds,
-    };
-  }
-
-  bucket.timestamps.push(now);
-  rateBuckets.set(params.key, bucket);
+  const res = rateLimit(params.key, params.limit, params.windowMs);
   return {
-    allowed: true,
-    remaining: Math.max(0, params.limit - bucket.timestamps.length),
-    retryAfterSeconds: 0,
+    allowed: res.ok,
+    remaining: res.ok ? 1 : 0,
+    retryAfterSeconds: res.retryAfter,
   };
 }
 

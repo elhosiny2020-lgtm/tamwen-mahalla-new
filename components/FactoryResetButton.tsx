@@ -26,6 +26,7 @@ import {
 } from '@/lib/factory-reset-engine';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
 import { toArabicNumerals } from '@/lib/utils';
+import { RoleGuard } from './RoleGuard';
 
 interface FactoryResetButtonProps {
   sectionName: string;
@@ -225,7 +226,7 @@ export default function FactoryResetButton({
   };
 
   return (
-    <>
+    <RoleGuard user={effectiveUser} requireAdmin>
       <button
         type="button"
         onClick={openModal}
@@ -506,6 +507,6 @@ export default function FactoryResetButton({
           </div>
         </div>
       )}
-    </>
+    </RoleGuard>
   );
 }

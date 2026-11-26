@@ -1,48 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiSession } from '@/lib/server/auth-guard';
+import { requireSession } from '@/lib/server/auth-guard';
 import { getValidatedSupabaseAdminConfig } from '@/lib/server/supabase-admin';
 
 const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
-const PreferencesPayloadSchema = z.object({
-  userId: z.string().regex(USER_ID_REGEX),
-  fontScale: z.number().int().min(80).max(150),
-  language: z.enum(['ar', 'en']),
-  themeId: z.enum([
-    'gov_navy',
-    'soft_white',
-    'calm_gray',
-    'calm_blue',
-    'calm_green',
-    'warm_beige',
-    'dark_mode',
-    'eye_comfort',
-    'custom',
-  ]),
-  customColors: z.object({
-    background: z.string().regex(HEX_COLOR_REGEX),
-    primary: z.string().regex(HEX_COLOR_REGEX),
-    accent: z.string().regex(HEX_COLOR_REGEX),
-  }),
-  displayMode: z.enum(['auto', 'manual']),
-  density: z.enum(['compact', 'comfortable', 'spacious']),
-  updatedAt: z.string().max(64).optional(),
-});
+const PreferencesPayloadSchema = z
+  .object({
+    userId: z.string().regex(USER_ID_REGEX),
+    fontScale: z.number().int().min(80).max(150),
+    language: z.enum(['ar', 'en']),
+    themeId: z.enum([
+      'gov_navy',
+      'soft_white',
+      'calm_gray',
+      'calm_blue',
+      'calm_green',
+      'warm_beige',
+      'dark_mode',
+      'eye_comfort',
+      'custom',
+    ]),
+    customColors: z
+      .object({
+        background: z.string().regex(HEX_COLOR_REGEX),
+        primary: z.string().regex(HEX_COLOR_REGEX),
+        accent: z.string().regex(HEX_COLOR_REGEX),
+      })
+      .strict(),
+    displayMode: z.enum(['auto', 'manual']),
+    density: z.enum(['compact', 'comfortable', 'spacious']),
+    updatedAt: z.string().max(64).optional(),
+  })
+  .strict();
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   // Always verify session directly in route handler before touching Supabase
-  const auth = await requireApiSession(req);
-  if (auth.errorResponse) return auth.errorResponse;
+  const g = await requireSession(request);
+  if (!g.ok) return g.response;
 
-  const userId = req.nextUrl.searchParams.get('userId')?.trim() || '';
+  const userId = request.nextUrl.searchParams.get('userId')?.trim() || '';
   if (!USER_ID_REGEX.test(userId) || userId === 'guest') {
     return NextResponse.json({ synced: false, source: 'local', preferences: null });
   }
 
   // Enforce strict per-user isolation: callers may only read their own preferences
-  if (auth.session.userId !== userId) {
+  if (g.session.sub !== userId) {
     return NextResponse.json(
       { ok: false, error: 'غير مسموح بقراءة تفضيلات مستخدم آخر.' },
       { status: 403 }
@@ -99,14 +103,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   // Always verify session directly in route handler before touching Supabase
-  const auth = await requireApiSession(req);
-  if (auth.errorResponse) return auth.errorResponse;
+  const g = await requireSession(request);
+  if (!g.ok) return g.response;
 
   let body: unknown;
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ ok: false, error: 'صيغة JSON غير صالحة.' }, { status: 400 });
   }
@@ -117,7 +121,7 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  if (auth.session.userId !== data.userId) {
+  if (g.session.sub !== data.userId) {
     return NextResponse.json(
       { ok: false, error: 'غير مسموح بتعديل تفضيلات مستخدم آخر.' },
       { status: 403 }

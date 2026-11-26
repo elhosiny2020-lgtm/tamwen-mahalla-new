@@ -753,6 +753,20 @@ export function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>) {
     timestamp: new Date().toISOString()
   };
   localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([newLog, ...logs].slice(0, 500)));
+
+  // Mirror sensitive user actions to server-side audit store (best-effort when authenticated)
+  void fetch('/api/audit-logs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: log.action,
+      module: log.module,
+      details: log.details,
+      branchId: log.branchId,
+      fullName: log.fullName,
+      status: log.status,
+    }),
+  }).catch(() => {});
 }
 
 export function getStoredRegistrationRequests(): RegistrationRequest[] {

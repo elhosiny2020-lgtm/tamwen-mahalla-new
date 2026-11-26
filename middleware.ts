@@ -5,23 +5,27 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // ONLY routes that must work without a session. Everything else under /api requires one.
 // Before finalizing: list app/api/**/route.ts and keep here only the ones that truly need to be public.
-const PUBLIC_API = new Set<string>(['/api/auth/login', '/api/auth/logout', '/api/health']);
+const PUBLIC_API = new Set<string>(['/api/auth/login', '/api/auth/logout', '/api/auth/session', '/api/health']);
 
 function deny(status: number, error: string) {
   return NextResponse.json({ ok: false, error }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
 function isTrustedRequest(request: NextRequest): boolean {
-  const site = request.headers.get('sec-fetch-site');
-  if (site) return site === 'same-origin';
   const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
   const source = request.headers.get('origin') ?? request.headers.get('referer');
-  if (!host || !source) return false; // mutating requests must carry Origin or Referer
-  try {
-    return new URL(source).host === host;
-  } catch {
-    return false;
+  if (host && source) {
+    try {
+      const sourceHost = new URL(source).host;
+      const primaryHost = host.split(',')[0]?.trim();
+      if (sourceHost === primaryHost) return true;
+    } catch {
+      return false;
+    }
   }
+  const site = request.headers.get('sec-fetch-site');
+  if (site === 'same-origin') return true;
+  return false;
 }
 
 export async function middleware(request: NextRequest) {

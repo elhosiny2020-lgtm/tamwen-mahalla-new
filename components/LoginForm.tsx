@@ -7,6 +7,16 @@ import { INITIAL_BRANCHES, getStoredUsers, getStoredBranches, setCurrentSessionU
 import { Branch, User as UserType } from '@/types';
 import { getRoleArabicLabel } from '@/lib/utils';
 
+import {
+  loginFormSchema,
+  forgotPasswordStep1Schema,
+  forgotPasswordStep2Schema,
+  forgotPasswordStep3Schema,
+} from '@/lib/zod-schemas';
+import {
+  setClientSessionExpiryTimestamp,
+} from '@/hooks/useSessionExpiryMonitor';
+
 interface LoginFormProps {
   onLoginSuccess: (user: UserType) => void;
   onOpenRegister: () => void;
@@ -48,11 +58,25 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+
+    const validated = loginFormSchema.safeParse({
+      username,
+      password,
+      branchId: selectedBranchId,
+    });
+
+    if (!validated.success) {
+      setErrorMsg(
+        validated.error.issues[0]?.message || 'يرجى التحقق من صحة اسم المستخدم وكلمة المرور.'
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
       const users = getStoredUsers();
-      const trimmedUser = username.trim().toLowerCase();
+      const trimmedUser = validated.data.username.toLowerCase();
 
       let found = users.find((u) => u.username.toLowerCase() === trimmedUser);
 
@@ -65,7 +89,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         setErrorMsg('اسم المستخدم غير مسجل في المنظومة. يرجى التأكد من البيانات أو تقديم طلب إنشاء حساب جديد.');
         addAuditLog({
           userId: 'anonymous',
-          username: username || 'unknown',
+          username: validated.data.username || 'unknown',
           fullName: 'مستخدم غير مسجل',
           action: 'محاولة دخول فاشلة',
           module: 'بوابة المصادقة الموحدة',
@@ -89,7 +113,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: found.username,
-          password,
+          password: validated.data.password,
           branchId: activeBranchId,
         }),
       });
@@ -113,6 +137,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
       setSuccessMsg('تم التحقق من الهوية والصلاحيات بنجاح، جاري فتح المنظومة الرقمية...');
       setCurrentSessionUser(updatedUser);
       setSelectedBranchSession(null);
+      setClientSessionExpiryTimestamp();
 
       addAuditLog({
         userId: updatedUser.id,
@@ -140,26 +165,40 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     e.preventDefault();
     setFpError('');
     if (fpStep === 1) {
-      if (!fpIdentifier.trim()) {
-        setFpError('يرجى إدخال اسم المستخدم أو الرقم القومي');
+      const res = forgotPasswordStep1Schema.safeParse({ identifier: fpIdentifier });
+      if (!res.success) {
+        setFpError(res.error.issues[0]?.message || 'يرجى إدخال اسم المستخدم أو الرقم القومي');
         return;
       }
+      setFpIdentifier(res.data.identifier);
       setFpStep(2);
     } else if (fpStep === 2) {
-      if (fpOtp.trim().length < 4) {
-        setFpError('يرجى إدخال رمز التحقق المرسل');
+      const res = forgotPasswordStep2Schema.safeParse({ otp: fpOtp });
+      if (!res.success) {
+        setFpError(res.error.issues[0]?.message || 'يرجى إدخال رمز التحقق المرسل');
         return;
       }
       setFpStep(3);
     } else if (fpStep === 3) {
-      if (fpNewPassword.length < 6) {
-        setFpError('كلمة المرور الجديدة يجب أن تكون ٦ أحرف على الأقل');
+      const res = forgotPasswordStep3Schema.safeParse({
+        newPassword: fpNewPassword,
+        confirmNewPassword: fpConfirmNewPassword,
+      });
+      if (!res.success) {
+        setFpError(res.error.issues[0]?.message || 'يرجى التحقق من كلمة المرور الجديدة');
         return;
       }
-      if (fpNewPassword !== fpConfirmNewPassword) {
-        setFpError('كلمة المرور الجديدة وتأكيدها غير متطابقين');
-        return;
-      }
+      addAuditLog({
+        userId: fpIdentifier,
+        username: fpIdentifier,
+        fullName: fpIdentifier,
+        action: 'إعادة تعيين كلمة المرور',
+        module: 'بوابة المصادقة الموحدة',
+        details: 'تم تحديث كلمة المرور بنجاح عبر رمز التحقق المؤقت',
+        ipAddress: '10.20.30.50',
+        deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
+        status: 'success',
+      });
       setFpSuccess(true);
       setTimeout(() => {
         setShowForgotPassword(false);

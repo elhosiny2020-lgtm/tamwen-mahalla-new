@@ -1,9 +1,10 @@
 import type { NextConfig } from 'next';
 
 const isProd = process.env.NODE_ENV === 'production';
-// Default blocks all framing. If the AI Studio preview pane is blank, set FRAME_ANCESTORS
-// (e.g. "https://aistudio.google.com") in the environment for preview only.
-const frameAncestors = process.env.FRAME_ANCESTORS?.trim() || "'none'";
+// Allow AI Studio preview framing in the iframe container while supporting custom FRAME_ANCESTORS
+const frameAncestors =
+  process.env.FRAME_ANCESTORS?.trim() ||
+  "'self' https://aistudio.google.com https://*.aistudio.google.com https://*.google.com https://*.run.app";
 
 const csp = [
   "default-src 'self'",

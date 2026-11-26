@@ -1,41 +1,30 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiSession } from '@/lib/server/auth-guard';
-import {
-  checkSlidingWindowRateLimit,
-  rateLimitExceededResponse,
-} from '@/lib/server/rate-limit';
+import { requireSession } from '@/lib/server/auth-guard';
+import { rateLimit, tooManyRequests } from '@/lib/server/rate-limit';
 
-const AiRequestSchema = z.object({
-  prompt: z
-    .string()
-    .trim()
-    .min(1, 'النص المطلوب فارغ.')
-    .max(8000, 'الحد الأقصى لطول النص هو ٨٠٠٠ حرف.'),
-  systemInstruction: z.string().trim().max(2000).optional(),
-});
+const AiRequestSchema = z
+  .object({
+    prompt: z
+      .string()
+      .trim()
+      .min(1, 'النص المطلوب فارغ.')
+      .max(8000, 'الحد الأقصى لطول النص هو ٨٠٠٠ حرف.'),
+    systemInstruction: z.string().trim().max(2000).optional(),
+  })
+  .strict();
 
-export async function POST(req: NextRequest) {
-  // Always verify session directly in route handler
-  const auth = await requireApiSession(req);
-  if (auth.errorResponse) return auth.errorResponse;
+export async function POST(request: NextRequest) {
+  const g = await requireSession(request);
+  if (!g.ok) return g.response;
 
-  const rl = checkSlidingWindowRateLimit({
-    key: `api:ai:${auth.session.userId}`,
-    limit: 20,
-    windowMs: 10 * 60 * 1000,
-  });
-  if (!rl.allowed) {
-    return rateLimitExceededResponse(
-      'تم تجاوز الحد المسموح لطلبات المساعد الذكي (٢٠ طلباً كل ١٠ دقائق). يرجى المحاولة لاحقاً.',
-      rl.retryAfterSeconds
-    );
-  }
+  const rl = rateLimit('ai:' + g.session.sub, 20, 10 * 60_000);
+  if (!rl.ok) return tooManyRequests(rl.retryAfter);
 
   let body: unknown;
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ ok: false, error: 'صيغة الطلب غير صالحة.' }, { status: 400 });
   }

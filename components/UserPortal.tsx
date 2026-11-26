@@ -107,6 +107,7 @@ import {
 import { loadMasterDocExpiries, subscribeDropdownLists } from '@/lib/dropdown-lists-store';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
 import { getLocalizedDepartmentDesc, getLocalizedDepartmentName } from '@/lib/i18n';
+import { RoleGuard, hasRequiredRole } from './RoleGuard';
 
 interface UserPortalProps {
   currentUser: User;
@@ -240,15 +241,21 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     (b) => b.id === (activeBranchId || currentUser.primaryBranchId)
   );
 
+  const ADMIN_ONLY_DEPT_CODES = useMemo(() => new Set(['USERS', 'ROLES', 'AUDIT', 'BACK', 'SETT']), []);
+
   const allowedDepartments = useMemo(
     () =>
-      allDepartments.filter(
-        (d) =>
+      allDepartments.filter((d) => {
+        if (ADMIN_ONLY_DEPT_CODES.has(d.code) && !hasRequiredRole(currentUser.role, undefined, true)) {
+          return false;
+        }
+        return (
           currentUser.departmentIds.includes(d.id) ||
           currentUser.role === 'super_admin' ||
           currentUser.role === 'admin'
-      ),
-    [allDepartments, currentUser]
+        );
+      }),
+    [allDepartments, currentUser, ADMIN_ONLY_DEPT_CODES]
   );
 
   const [complaintsList, setComplaintsList] = useState([
@@ -974,7 +981,20 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
             )}
 
             {(activeDept?.code === 'ROLES' || activeDept?.code === 'USERS' || activeDept?.code === 'AUDIT') && (
-              <AdminDashboard userId={currentUser.id} />
+              <RoleGuard
+                user={currentUser}
+                requireAdmin
+                fallback={
+                  <div className="bg-white p-6 rounded-2xl border border-red-200 text-center space-y-2">
+                    <h3 className="text-sm font-black text-red-800">غير مصرح بالوصول إلى لوحة الإدارة السيادية</h3>
+                    <p className="text-xs font-bold text-slate-600">
+                      هذا القسم مقصور على مدير النظام والمسؤولين الإداريين المصرح لهم فقط.
+                    </p>
+                  </div>
+                }
+              >
+                <AdminDashboard userId={currentUser.id} />
+              </RoleGuard>
             )}
 
             {activeDept?.code === 'COMP' && (
