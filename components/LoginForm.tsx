@@ -333,7 +333,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
 
           {/* Footer Signature */}
           <div className="mt-8 pt-4 border-t border-slate-200/60 flex items-center justify-center text-[11px] text-slate-600 font-bold">
-            <span className="text-[#C6A15B] font-black">تصميم وتطوير المهندس أحمد الحسيني — هاتف ٠١٠٠٤٤١٤٠٣٨</span>
+            <span className="text-[#C6A15B] font-black" dir="ltr">Designed &amp; Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038</span>
           </div>
         </div>
 

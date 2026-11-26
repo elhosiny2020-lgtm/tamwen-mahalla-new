@@ -59,9 +59,9 @@ export default function Header({
 
   return (
     <header className="bg-[#102A43] text-white shadow-md border-b border-[#164E83] sticky top-0 z-40 print:hidden font-sans">
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Zone 1: Brand & Official Sovereignty Identity with Official Emblem */}
-        <div className="flex items-center gap-3 shrink-0">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 min-h-16 flex flex-wrap items-center justify-between gap-3">
+        {/* Zone 1: Brand & Official Sovereignty Identity + Digital Clock & Today's Date */}
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-sm border border-[#C6A15B]/60 bg-white shrink-0">
             <Image
               src="/assets/aistudio/logo_4234585c.jpg"
@@ -75,7 +75,7 @@ export default function Header({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[13px] sm:text-[15px] font-black tracking-tight text-white whitespace-nowrap">
+              <h1 className="text-[13px] sm:text-[15px] font-black tracking-tight text-white">
                 وزارة التموين والتجارة الداخلية — محافظة الغربية
               </h1>
             </div>
@@ -83,11 +83,12 @@ export default function Header({
               مديرية التموين بالغربية · {currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'}
             </p>
           </div>
+          {/* الساعة الرقمية وتاريخ واسم اليوم بجانب الترويسة مباشرة */}
+          <ClientClock />
         </div>
 
         {/* Zone 2: Live Enterprise Telemetry */}
-        <div className="hidden xl:flex items-center gap-3 text-[11px] text-slate-200 font-extrabold">
-          <ClientClock />
+        <div className="hidden 2xl:flex items-center gap-2.5 text-[11px] text-slate-200 font-extrabold">
           <div className="flex items-center gap-1.5 bg-[#164E83]/50 px-2.5 py-1 rounded-xl border border-white/10">
             <Database className="w-3.5 h-3.5 text-emerald-400" />
             <span>قاعدة البيانات متصلة</span>

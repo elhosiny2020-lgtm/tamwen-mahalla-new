@@ -63,7 +63,7 @@ export default function SmartAutoFitTable<T>({
   selectedIds = [],
   onToggleSelect,
   onClearSelection,
-  pinnedKeys = [],
+  pinnedKeys,
   onPinAll,
   onUnpinAll,
   onTogglePinColumn,
@@ -77,7 +77,34 @@ export default function SmartAutoFitTable<T>({
 }: SmartAutoFitTableProps<T>) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
+  const [internalPinnedKeys, setInternalPinnedKeys] = useState<string[]>(() =>
+    pinnedKeys && pinnedKeys.length > 0
+      ? pinnedKeys
+      : columns.filter((c) => c.pinned).map((c) => c.key)
+  );
   const storageKey = `${HIDDEN_COLS_STORAGE_PREFIX}${userId}_${tableId}`;
+
+  const effectivePinnedKeys = onTogglePinColumn && pinnedKeys ? pinnedKeys : internalPinnedKeys;
+
+  const handleEffectiveUnpinAll = () => {
+    setInternalPinnedKeys([]);
+    onUnpinAll?.();
+    onNotify?.('تم إلغاء تثبيت جميع الأعمدة في الجدول.');
+  };
+
+  const handleEffectivePinAll = () => {
+    const firstTwo = columns.slice(0, 2).map((c) => c.key);
+    setInternalPinnedKeys(firstTwo);
+    onPinAll?.();
+    onNotify?.('تم تثبيت الأعمدة التعريفية الأولى للجدول.');
+  };
+
+  const handleEffectiveTogglePin = (key: string) => {
+    setInternalPinnedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+    onTogglePinColumn?.(key);
+  };
 
   // Hydrate saved hidden columns post-mount cleanly (hydration-safe)
   useEffect(() => {
@@ -111,14 +138,14 @@ export default function SmartAutoFitTable<T>({
         label: col.headerText,
         type: col.type,
         defaultWidth: col.defaultWidth,
-        pinned: pinnedKeys.includes(col.key),
+        pinned: effectivePinnedKeys.includes(col.key),
         sampleValues: rows.slice(0, 60).map((r) => {
           if (col.measureValue) return col.measureValue(r);
           const raw = (r as Record<string, unknown>)[col.key];
           return raw !== undefined && raw !== null ? toArabicNumerals(String(raw)) : '';
         }),
       })),
-    [visibleColumns, rows, pinnedKeys]
+    [visibleColumns, rows, effectivePinnedKeys]
   );
 
   const {
@@ -186,14 +213,14 @@ export default function SmartAutoFitTable<T>({
     let currentRight = selectable ? 34 : 0;
     let lastKey: string | null = null;
     visibleColumns.forEach((col) => {
-      if (pinnedKeys.includes(col.key)) {
+      if (effectivePinnedKeys.includes(col.key)) {
         offsets[col.key] = currentRight;
         currentRight += widthsMap[col.key] || col.defaultWidth || 100;
         lastKey = col.key;
       }
     });
     return { pinnedOffsetsMap: offsets, lastPinnedKey: lastKey };
-  }, [visibleColumns, pinnedKeys, widthsMap, selectable]);
+  }, [visibleColumns, effectivePinnedKeys, widthsMap, selectable]);
 
   const manageableColumns: PinnableColumnItem[] = useMemo(
     () =>
@@ -202,10 +229,10 @@ export default function SmartAutoFitTable<T>({
         .map((c) => ({
           key: c.key,
           label: c.headerText,
-          pinned: pinnedKeys.includes(c.key),
+          pinned: effectivePinnedKeys.includes(c.key),
           visible: !hiddenKeys.includes(c.key),
         })),
-    [columns, pinnedKeys, hiddenKeys]
+    [columns, effectivePinnedKeys, hiddenKeys]
   );
 
   return (
@@ -218,11 +245,12 @@ export default function SmartAutoFitTable<T>({
         totalColumns={columns.length}
         visibleColumns={visibleColumns.length}
         columns={manageableColumns}
-        onPinAll={onPinAll}
-        onUnpinAll={onUnpinAll}
-        onTogglePinColumn={onTogglePinColumn}
+        onPinAll={handleEffectivePinAll}
+        onUnpinAll={handleEffectiveUnpinAll}
+        onTogglePinColumn={handleEffectiveTogglePin}
         onToggleVisibleColumn={handleToggleVisibleColumn}
         onResetPinDefaults={() => {
+          setInternalPinnedKeys(columns.slice(0, 1).map((c) => c.key));
           onResetPinDefaults?.();
           setHiddenKeys([]);
         }}
@@ -246,7 +274,7 @@ export default function SmartAutoFitTable<T>({
                 <th className={`w-[34px] min-w-[34px] max-w-[34px] text-center sticky right-0 z-40 ${theadClassName}`}>تحديد</th>
               )}
               {visibleColumns.map((col) => {
-                const isPinned = pinnedKeys.includes(col.key) && pinnedOffsetsMap[col.key] !== undefined;
+                const isPinned = effectivePinnedKeys.includes(col.key) && pinnedOffsetsMap[col.key] !== undefined;
                 const isLastPinned = lastPinnedKey === col.key;
                 const style: React.CSSProperties = {
                   ...getColStyle(col.key),
@@ -311,7 +339,7 @@ export default function SmartAutoFitTable<T>({
                       </td>
                     )}
                     {visibleColumns.map((col) => {
-                      const isPinned = pinnedKeys.includes(col.key) && pinnedOffsetsMap[col.key] !== undefined;
+                      const isPinned = effectivePinnedKeys.includes(col.key) && pinnedOffsetsMap[col.key] !== undefined;
                       const isLastPinned = lastPinnedKey === col.key;
                       const isNum = col.type === 'numeric' || col.type === 'currency' || col.type === 'date';
                       const extraCls =

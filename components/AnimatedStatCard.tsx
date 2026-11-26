@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { formatArabicDecimal, formatArabicNumber, formatArabicPercent } from '@/lib/utils';
 
-export type StatColorTheme = 'navy' | 'green' | 'gold' | 'red' | 'teal' | 'purple';
+export type StatColorTheme = 'navy' | 'green' | 'gold' | 'red' | 'teal' | 'purple' | 'blue';
 
 interface AnimatedStatCardProps {
   title: string;
@@ -80,6 +80,14 @@ const THEME_STYLES: Record<
     indicatorBg: 'text-indigo-900 bg-indigo-100/80',
     topBar: 'bg-indigo-700',
   },
+  blue: {
+    cardBg: 'bg-gradient-to-bl from-[#164E83]/[0.08] via-white to-white',
+    border: 'border-[#164E83]/25 hover:border-[#164E83]/60',
+    iconBox: 'bg-[#164E83] text-white',
+    valueColor: 'text-[#164E83]',
+    indicatorBg: 'text-[#164E83] bg-[#164E83]/10',
+    topBar: 'bg-[#164E83]',
+  },
 };
 
 export default function AnimatedStatCard({
@@ -151,30 +159,47 @@ export default function AnimatedStatCard({
       } ${onClick ? 'cursor-pointer' : ''}`}
     >
       <div className={`absolute top-0 right-0 left-0 h-1 ${styles.topBar}`} />
-      <div className="flex items-start justify-between gap-2.5">
-        <div className="min-w-0 flex-1">
-          <span className={`${compact ? 'text-[11px]' : 'text-[12px]'} font-black text-slate-700 block truncate`} title={title}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 space-y-1">
+          <span
+            className={`${
+              compact ? 'text-[10.5px] leading-snug' : 'text-[11.5px] leading-snug'
+            } font-black text-slate-700 block break-words whitespace-normal`}
+            title={title}
+          >
             {title}
           </span>
           <div
-            className={`num-cell ${compact ? 'text-lg' : 'text-[22px]'} font-black whitespace-nowrap my-0.5 ${styles.valueColor}`}
+            className={`num-cell ${
+              compact ? 'text-base sm:text-lg' : 'text-lg sm:text-[20px]'
+            } font-black break-words leading-tight my-0.5 ${styles.valueColor}`}
           >
             {formattedNumber}
           </div>
-          <div className="flex items-center flex-wrap gap-1.5">
-            {unit && <span className="text-[10.5px] font-extrabold text-slate-600">{unit}</span>}
-            {subtitle && !unit && <span className="text-[10.5px] font-extrabold text-slate-600 truncate">{subtitle}</span>}
+          <div className="flex items-center flex-wrap gap-1">
+            {unit && (
+              <span className="text-[10px] font-extrabold text-slate-600 break-words whitespace-normal leading-tight">
+                {unit}
+              </span>
+            )}
+            {subtitle && !unit && (
+              <span className="text-[10px] font-extrabold text-slate-600 break-words whitespace-normal leading-tight">
+                {subtitle}
+              </span>
+            )}
             {indicator && (
-              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${styles.indicatorBg}`}>
+              <span
+                className={`text-[9.5px] font-black px-1.5 py-0.5 rounded break-words whitespace-normal leading-tight ${styles.indicatorBg}`}
+              >
                 {indicator}
               </span>
             )}
           </div>
         </div>
         <div
-          className={`${compact ? 'w-9 h-9 rounded-xl' : 'w-11 h-11 rounded-xl'} flex items-center justify-center shrink-0 shadow-xs ${styles.iconBox}`}
+          className={`${compact ? 'w-8 h-8 rounded-xl' : 'w-10 h-10 rounded-xl'} flex items-center justify-center shrink-0 shadow-xs ${styles.iconBox}`}
         >
-          <Icon className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
+          <Icon className={compact ? 'w-4 h-4' : 'w-4.5 h-4.5'} />
         </div>
       </div>
     </motion.div>

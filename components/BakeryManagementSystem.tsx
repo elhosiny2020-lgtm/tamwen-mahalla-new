@@ -106,6 +106,7 @@ import BakeryDebtsModule from './BakeryDebtsModule';
 import AnimatedStatCard from './AnimatedStatCard';
 import TableStats from './TableStats';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
+import FactoryResetButton from './FactoryResetButton';
 
 export type { BakerySubTab };
 
@@ -1443,6 +1444,23 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
             <PlusCircle className="w-4 h-4" />
             <span>إضافة مخبز جديد</span>
           </button>
+          <FactoryResetButton
+            sectionName="منظومة إدارة المخابز"
+            compact
+            onConfirmReset={() => {
+              setBakeries([]);
+              saveStoredBakeries([]);
+              setInspections([]);
+              saveStoredInspections([]);
+              setDebtTransactions([]);
+              saveStoredDebtTransactions([]);
+              setAlertActions([]);
+              saveStoredAlertActions([]);
+              setAuditChanges([]);
+              setSelectedBakeryIds([]);
+              showToast('تم تنفيذ إعادة ضبط المصنع ومسح جميع بيانات المخابز والتراخيص والحملات والمديونيات بنجاح.');
+            }}
+          />
         </div>
       </div>
 

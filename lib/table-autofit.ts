@@ -8,7 +8,10 @@ export type AutoFitColumnType =
   | 'longText'
   | 'badge'
   | 'text'
-  | 'actions';
+  | 'actions'
+  | 'code'
+  | 'status'
+  | 'percentage';
 
 export type AutoFitMode = 'auto' | 'headers' | 'data' | 'equal' | 'default' | 'saved';
 
@@ -43,6 +46,9 @@ const TYPE_BOUNDS: Record<
   badge: { min: 74, max: 145, defaultW: 94, wrap: false, padding: 20 },
   text: { min: 72, max: 150, defaultW: 102, wrap: true, padding: 16 },
   actions: { min: 98, max: 155, defaultW: 118, wrap: false, padding: 16 },
+  code: { min: 76, max: 160, defaultW: 110, wrap: false, padding: 18 },
+  status: { min: 78, max: 155, defaultW: 105, wrap: false, padding: 18 },
+  percentage: { min: 64, max: 135, defaultW: 90, wrap: false, padding: 18 },
 };
 
 let cachedCanvasContext: CanvasRenderingContext2D | null = null;

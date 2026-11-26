@@ -68,6 +68,8 @@ import DebtsAlertsAndLateTab from './debts/DebtsAlertsAndLateTab';
 import BakeryFinancialProfileModal from './debts/BakeryFinancialProfileModal';
 import ViolationsCalculatorTab from './debts/ViolationsCalculatorTab';
 import DebtsReportsAndSettingsTab from './debts/DebtsReportsAndSettingsTab';
+import MajorDebtsFollowupTab from './debts/MajorDebtsFollowupTab';
+import FactoryResetButton from './FactoryResetButton';
 
 interface BakeryDebtsModuleProps {
   userId?: string;
@@ -84,6 +86,7 @@ interface BakeryDebtsModuleProps {
 
 type ModuleTabId =
   | 'dashboard'
+  | 'major_debts'
   | 'registry'
   | 'calculator'
   | 'payments'
@@ -1017,16 +1020,17 @@ export default function BakeryDebtsModule({
   // ← ٨. السداد والمدفوعات ← ٩. التقارير والإحصائيات (٣٦) ← ١٠. سجل التدقيق ← ١١. إعدادات القسم
   const navItems: { id: ModuleTabId; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: 'dashboard', label: '١. لوحة التحكم', icon: LayoutDashboard },
-    { id: 'registry', label: '٢. سجل المديونيات وأرقام POS', icon: Table2, badge: openDebtsCount },
-    { id: 'calculator', label: '٣. حاسبة نقص الوزن والمخالفات (١٧٥/٢٠٢٤)', icon: Calculator, badge: store.violations.length },
-    { id: 'scheduling', label: '٤. الجدولة والأقساط', icon: CalendarClock },
-    { id: 'alerts', label: '٥. التنبيهات والتجديد المالي', icon: BellRing, badge: unreadAlertsCount },
-    { id: 'followups', label: '٦. المتابعة والإنذارات الرسمية', icon: PhoneCall },
-    { id: 'late', label: '٧. المخابز المتأخرة والمخاطر', icon: AlertTriangle, badge: lateBakeriesCount },
-    { id: 'payments', label: '٨. السداد والمدفوعات والإيصالات', icon: CreditCard },
-    { id: 'reports', label: '٩. التقارير والإحصائيات (٣٦)', icon: FileSpreadsheet },
-    { id: 'audit', label: '١٠. سجل التدقيق المالي', icon: History },
-    { id: 'settings', label: '١١. إعدادات القسم', icon: Settings2 },
+    { id: 'major_debts', label: '٢. المديونيات الكبرى والمتابعة المالية', icon: Wallet, badge: openDebtsCount },
+    { id: 'registry', label: '٣. سجل المديونيات وأرقام POS', icon: Table2, badge: openDebtsCount },
+    { id: 'calculator', label: '٤. حاسبة نقص الوزن والمخالفات (١٧٥/٢٠٢٤)', icon: Calculator, badge: store.violations.length },
+    { id: 'scheduling', label: '٥. الجدولة والأقساط', icon: CalendarClock },
+    { id: 'alerts', label: '٦. التنبيهات والتجديد المالي', icon: BellRing, badge: unreadAlertsCount },
+    { id: 'followups', label: '٧. المتابعة والإنذارات الرسمية', icon: PhoneCall },
+    { id: 'late', label: '٨. المخابز المتأخرة والمخاطر', icon: AlertTriangle, badge: lateBakeriesCount },
+    { id: 'payments', label: '٩. السداد والمدفوعات والإيصالات', icon: CreditCard },
+    { id: 'reports', label: '١٠. التقارير والإحصائيات (٣٦)', icon: FileSpreadsheet },
+    { id: 'audit', label: '١١. سجل التدقيق المالي', icon: History },
+    { id: 'settings', label: '١٢. إعدادات القسم', icon: Settings2 },
   ];
 
   // المجموعات الست المتطابقة بصرياً وهيكليةً مع BakeryNavigationGrid في منظومة إدارة المخابز
@@ -1057,13 +1061,8 @@ export default function BakeryDebtsModule({
       iconAccent: 'text-[#102A43]',
       items: [
         { id: 'g1-dash', label: 'لوحة التحكم', tab: 'dashboard', icon: LayoutDashboard },
-        { id: 'g1-reg', label: 'سجل المديونيات', tab: 'registry', icon: Table2, badgeCount: openDebtsCount },
-        {
-          id: 'g1-owners',
-          label: 'أصحاب المخابز وPOS',
-          action: () => setProfileBakeryId(bakeries[0]?.id || null),
-          icon: Users,
-        },
+        { id: 'g1-major', label: 'المديونيات الكبرى', tab: 'major_debts', icon: Wallet, badgeCount: openDebtsCount },
+        { id: 'g1-reg', label: 'سجل المديونيات وPOS', tab: 'registry', icon: Table2, badgeCount: openDebtsCount },
       ],
     },
     {
@@ -1278,6 +1277,26 @@ export default function BakeryDebtsModule({
               <CreditCard className="w-3.5 h-3.5" />
               <span>تسجيل سداد</span>
             </button>
+            <FactoryResetButton
+              sectionName="منظومة مديونيات أصحاب المخابز"
+              compact
+              onConfirmReset={() => {
+                updateStore((prev) => ({
+                  ...prev,
+                  debts: [],
+                  payments: [],
+                  schedules: [],
+                  installments: [],
+                  settlements: [],
+                  violations: [],
+                  appeals: [],
+                  followups: [],
+                  auditLogs: [],
+                  majorDebtFollowups: [],
+                }));
+                notify('تم تنفيذ إعادة ضبط المصنع ومسح جميع المديونيات والسدادات والأقساط والمخالفات بنجاح.');
+              }}
+            />
           </div>
         </div>
 
@@ -1373,6 +1392,23 @@ export default function BakeryDebtsModule({
           todayRef={todayRef}
           onOpenBakeryProfile={(id) => setProfileBakeryId(id)}
           onNavigateTab={(t) => setActiveTab(t as ModuleTabId)}
+        />
+      )}
+
+      {activeTab === 'major_debts' && (
+        <MajorDebtsFollowupTab
+          userId={userId}
+          currentUserName={currentUserName}
+          bakeries={bakeries}
+          debts={recomputedDebts}
+          payments={enrichedPayments}
+          schedules={store.schedules}
+          installments={recomputedInstallments}
+          settings={store.settings}
+          todayRef={todayRef}
+          onCreateSchedulePlan={handleCreateSchedulePlan}
+          onRegisterPayment={handleRegisterPayment}
+          onOpenBakeryProfile={(id) => setProfileBakeryId(id)}
         />
       )}
 

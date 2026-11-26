@@ -40,6 +40,9 @@ import {
   PinOff,
   Menu,
   X,
+  ListChecks,
+  ChevronDown,
+  ChevronLeft,
 } from 'lucide-react';
 import {
   AuditLog,
@@ -86,6 +89,22 @@ import BakeryDebtsModule from './BakeryDebtsModule';
 import DepartmentWorkspace from './DepartmentWorkspace';
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
+import DailyTasksAndInternalChatModule from './DailyTasksAndInternalChatModule';
+import InternalTradeModule from './InternalTradeModule';
+import RationCommoditiesModule from './ration/RationCommoditiesModule';
+import DropdownListsManagerModule from './DropdownListsManagerModule';
+import FactoryResetButton from './FactoryResetButton';
+import { TableActionButtons } from './trade/TradeSharedCrudUi';
+import {
+  loadButaneWarehouses,
+  loadCommercialEstablishments,
+  loadFuelStations,
+} from '@/lib/internal-trade-store';
+import {
+  loadRationCommodities,
+  loadRationMerchants,
+} from '@/lib/ration-commodities-store';
+import { loadMasterDocExpiries } from '@/lib/dropdown-lists-store';
 
 interface UserPortalProps {
   currentUser: User;
@@ -117,6 +136,7 @@ function renderDeptIcon(iconName: string, className: string) {
     case 'ShieldCheck': return <ShieldCheck className={className} />;
     case 'History': return <History className={className} />;
     case 'Database': return <Database className={className} />;
+    case 'ListChecks': return <ListChecks className={className} />;
     default: return <LayoutDashboard className={className} />;
   }
 }
@@ -139,7 +159,21 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [sidebarSearch, setSidebarSearch] = useState<string>('');
-  const [pinnedDeptIds, setPinnedDeptIds] = useState<string[]>(['d-01', 'd-02', 'd-03', 'd-15', 'd-16', 'd-22']);
+  const [pinnedDeptIds, setPinnedDeptIds] = useState<string[]>(['d-01', 'd-02', 'd-03', 'd-04', 'd-07', 'd-26', 'd-25']);
+  const [openSidebarGroups, setOpenSidebarGroups] = useState<Record<string, boolean>>({
+    grp_cmd: true,
+    grp_bakery: true,
+    grp_trade: true,
+    grp_ration: true,
+    grp_citizens: true,
+    grp_admin: true,
+  });
+  const [liveExtraCounts, setLiveExtraCounts] = useState({
+    tradeMerchants: 5,
+    gasEntities: 6,
+    rationItemsAndMerchants: 10,
+    managedDocs: 4,
+  });
 
   // Complaints table state
   const [compSearch, setCompSearch] = useState('');
@@ -162,6 +196,12 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       setInspections(getStoredInspections());
       setDebtTransactions(getStoredDebtTransactions());
       setTodayRef(new Date().toISOString().slice(0, 10));
+      setLiveExtraCounts({
+        tradeMerchants: loadCommercialEstablishments().length,
+        gasEntities: loadButaneWarehouses().length + loadFuelStations().length,
+        rationItemsAndMerchants: loadRationCommodities().length + loadRationMerchants().length,
+        managedDocs: loadMasterDocExpiries().length,
+      });
 
       try {
         const savedTab = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
@@ -198,7 +238,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     [allDepartments, currentUser]
   );
 
-  const [complaintsList] = useState([
+  const [complaintsList, setComplaintsList] = useState([
     { id: 'comp-1', citizen: 'أحمد محمود الششتاوي', phone: '01011112222', issue: 'مراجعة أوزان رغيف الخبز بقرية الهياتم', status: 'جاري الفحص والتفتيش', date: '2026-11-24' },
     { id: 'comp-2', citizen: 'فاطمة علي أبو النجا', phone: '01233334444', issue: 'تحديث بيانات بطاقة تموينية بمركز المحلة', status: 'تم الحل وإعادة التفعيل', date: '2026-11-23' },
     { id: 'comp-3', citizen: 'سعيد عبد الرحمن الدسوقي', phone: '01122334455', issue: 'متابعة مواعيد تشغيل مخبز بقرية صفط تراب', status: 'تمت المعاينة والمطابقة', date: '2026-11-22' },
@@ -265,6 +305,42 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         </span>
       ),
     },
+    {
+      key: 'actions',
+      label: 'الإجراءات',
+      headerText: 'الإجراءات',
+      type: 'actions',
+      align: 'center',
+      defaultWidth: 230,
+      render: (c) => (
+        <TableActionButtons
+          recordLabel={c.citizen}
+          onView={() => setCompNotice(`معاينة شكوى المواطن: ${c.citizen} — ${c.issue}`)}
+          onAdd={() => {
+            const newComp = {
+              id: `comp-${Date.now()}`,
+              citizen: 'مواطن جديد — مركز المحلة',
+              phone: '01000000000',
+              issue: 'بلاغ تمويني جديد قيد الفحص الميداني',
+              status: 'جاري الفحص والتفتيش',
+              date: todayRef,
+            };
+            setComplaintsList((prev) => [newComp, ...prev]);
+            setCompNotice('تمت إضافة بلاغ جديد إلى سجل الشكاوى.');
+          }}
+          onEdit={() => {
+            setComplaintsList((prev) =>
+              prev.map((x) => (x.id === c.id ? { ...x, status: 'تم الحل وإعادة التفعيل' } : x))
+            );
+            setCompNotice(`تم تحديث حالة شكوى (${c.citizen}) إلى تم الحل.`);
+          }}
+          onDelete={() => {
+            setComplaintsList((prev) => prev.filter((x) => x.id !== c.id));
+            setCompNotice(`تم حذف شكوى (${c.citizen}) من الجدول.`);
+          }}
+        />
+      ),
+    },
   ];
 
   const activeDept = allDepartments.find((d) => d.id === activeDeptId) || allowedDepartments[0];
@@ -315,6 +391,60 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       pendingReviews: pendingReqs + activeBaks.filter((b) => b.activityStatus !== 'نشط').length,
     };
   }, [bakeries, allUsers, branches, regRequests, auditLogs, inspections, debtTransactions, todayRef]);
+
+  // عدادات حية رقمية بجانب كل قسم في القائمة الجانبية
+  const deptLiveCounts = useMemo<Record<string, number>>(
+    () => ({
+      DASH: ultraMetrics.totalAlerts,
+      BAK: ultraMetrics.totalBakeries,
+      DEBTS: bakeries.filter((b) => !b.isArchived && (b.remainingDebtEgp || 0) > 0).length || debtTransactions.length,
+      TRADE: liveExtraCounts.tradeMerchants,
+      GAS: liveExtraCounts.gasEntities,
+      COMM: liveExtraCounts.rationItemsAndMerchants,
+      CTRL: ultraMetrics.totalAlerts + ultraMetrics.totalViolations,
+      INSP: inspections.length,
+      VIOL: ultraMetrics.totalViolations,
+      COMP: complaintsList.length,
+      LISTS: liveExtraCounts.managedDocs,
+      USERS: allUsers.length,
+      ROLES: branches.length,
+      AUDIT: auditLogs.length,
+      TASKS: ultraMetrics.pendingReviews,
+    }),
+    [ultraMetrics, bakeries, debtTransactions.length, liveExtraCounts, inspections.length, complaintsList.length, allUsers.length, branches.length, auditLogs.length]
+  );
+
+  // تنظيم القائمة الجانبية اليمنى في مجموعات منطقية مترابطة
+  const sidebarGroupedSections = useMemo(() => {
+    const groupsDef: { id: string; title: string; codes: string[] }[] = [
+      { id: 'grp_cmd', title: 'القيادة والمركز الرقابي', codes: ['DASH', 'CTRL'] },
+      { id: 'grp_bakery', title: 'منظومة المخابز والمديونيات', codes: ['BAK', 'DEBTS'] },
+      { id: 'grp_trade', title: 'التجارة الداخلية والوقود والتفتيش', codes: ['TRADE', 'GAS', 'INSP', 'VIOL'] },
+      { id: 'grp_ration', title: 'السلع التموينية والحبوب والمطاحن', codes: ['COMM', 'GRAIN', 'SILOS', 'MILLS', 'COLD'] },
+      { id: 'grp_citizens', title: 'الشكاوى والمهام والمتابعة', codes: ['COMP', 'TASKS'] },
+      {
+        id: 'grp_admin',
+        title: 'القوائم المنسدلة والأرشيف والحفظ والإدارة',
+        codes: ['LISTS', 'REP', 'DOCS', 'BACK', 'SETT', 'USERS', 'ROLES', 'AUDIT', 'HR', 'FIN', 'STORE'],
+      },
+    ];
+    const usedIds = new Set<string>();
+    const sections = groupsDef
+      .map((g) => {
+        const items = g.codes
+          .map((code) => filteredSidebarDepts.find((d) => d.code === code))
+          .filter((d): d is Department => Boolean(d));
+        items.forEach((d) => usedIds.add(d.id));
+        return { id: g.id, title: g.title, items };
+      })
+      .filter((s) => s.items.length > 0);
+
+    const remaining = filteredSidebarDepts.filter((d) => !usedIds.has(d.id));
+    if (remaining.length > 0) {
+      sections.push({ id: 'grp_other', title: 'أقسام أخرى', items: remaining });
+    }
+    return sections;
+  }, [filteredSidebarDepts]);
 
   const handleStandaloneAddInspection = (record: Omit<InspectionRecord, 'id'>) => {
     const updated = [{ ...record, id: `ins-${Date.now()}` }, ...inspections];
@@ -419,83 +549,127 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         </div>
       )}
 
-      {/* Separated Independent Animated Tabs */}
+      {/* القائمة الجانبية المنظمة حسب التخصص مع عدادات رقمية حية بجانب كل قسم */}
       <nav
         aria-label="تبويبات الأقسام الرئيسية"
-        className="space-y-1.5 max-h-[calc(100vh-14.5rem)] overflow-y-auto compact-table-scroll pl-0.5"
+        className="space-y-2.5 max-h-[calc(100vh-14.5rem)] overflow-y-auto compact-table-scroll pl-0.5"
       >
-        {filteredSidebarDepts.map((dept) => {
-          const isActive = activeDeptId === dept.id;
-          const isPinned = pinnedDeptIds.includes(dept.id);
-
+        {sidebarGroupedSections.map((section) => {
+          const isGroupOpen = openSidebarGroups[section.id] ?? true;
           return (
-            <motion.button
-              key={dept.id}
-              type="button"
-              onClick={() => handleSelectDept(dept.id)}
-              whileHover={{ x: -3 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[11px] font-black transition-colors cursor-pointer text-right border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A15B] ${
-                isActive
-                  ? 'text-[#102A43] border-[#C6A15B] shadow-md'
-                  : 'bg-[#164E83]/25 border-white/10 text-slate-100 hover:bg-[#164E83]/60 hover:border-white/25'
-              }`}
-              title={dept.arabicName}
-            >
-              {/* Animated Active Tab Background & Indicator */}
-              {isActive && (
-                <motion.span
-                  layoutId={isMobile ? 'mobileActiveTabBg' : 'desktopActiveTabBg'}
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className="absolute inset-0 rounded-xl bg-gradient-to-l from-[#C6A15B] via-[#d8b878] to-[#C6A15B] z-0"
-                />
-              )}
-              {isActive && (
-                <motion.span
-                  layoutId={isMobile ? 'mobileActiveTabBar' : 'desktopActiveTabBar'}
-                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                  className="absolute right-0 top-1.5 bottom-1.5 w-1 rounded-l-full bg-[#102A43] z-10"
-                />
-              )}
-
-              <div className="relative z-10 flex items-center gap-2.5 truncate">
-                <span
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                    isActive ? 'bg-[#102A43] text-[#C6A15B]' : 'bg-[#0B1F33]/60 text-[#C6A15B]'
-                  }`}
-                >
-                  {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5')}
-                </span>
-                {(!sidebarCollapsed || isMobile) && (
-                  <span className="truncate leading-tight">{dept.arabicName}</span>
-                )}
-              </div>
-
+            <div key={section.id} className="space-y-1">
               {(!sidebarCollapsed || isMobile) && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => togglePinDept(e, dept.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      togglePinDept(e as unknown as React.MouseEvent, dept.id);
-                    }
-                  }}
-                  className={`relative z-10 p-1 rounded hover:bg-black/10 shrink-0 ${
-                    isPinned
-                      ? isActive
-                        ? 'text-[#102A43]'
-                        : 'text-[#C6A15B]'
-                      : 'text-slate-400 opacity-45 hover:opacity-100'
-                  }`}
-                  title={isPinned ? 'إلغاء التثبيت بالمفضلة' : 'تثبيت بالمفضلة'}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenSidebarGroups((prev) => ({ ...prev, [section.id]: !isGroupOpen }))
+                  }
+                  className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-black text-[#C6A15B] hover:text-white cursor-pointer border-b border-white/10"
                 >
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                </span>
+                  <span className="truncate">{section.title}</span>
+                  {isGroupOpen ? (
+                    <ChevronDown className="w-3 h-3 shrink-0" />
+                  ) : (
+                    <ChevronLeft className="w-3 h-3 shrink-0" />
+                  )}
+                </button>
               )}
-            </motion.button>
+
+              {(isGroupOpen || (sidebarCollapsed && !isMobile)) &&
+                section.items.map((dept) => {
+                  const isActive = activeDeptId === dept.id;
+                  const isPinned = pinnedDeptIds.includes(dept.id);
+                  const liveCount = deptLiveCounts[dept.code];
+                  const isSubNested = dept.code === 'GAS' || dept.code === 'INSP' || dept.code === 'VIOL';
+
+                  return (
+                    <motion.button
+                      key={dept.id}
+                      type="button"
+                      onClick={() => handleSelectDept(dept.id)}
+                      whileHover={{ x: -3 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                      className={`relative w-full flex items-center justify-between gap-1.5 py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer text-right border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A15B] ${
+                        isSubNested && (!sidebarCollapsed || isMobile) ? 'pr-4 pl-2.5' : 'px-2.5'
+                      } ${
+                        isActive
+                          ? 'text-[#102A43] border-[#C6A15B] shadow-md'
+                          : 'bg-[#164E83]/25 border-white/10 text-slate-100 hover:bg-[#164E83]/60 hover:border-white/25'
+                      }`}
+                      title={dept.arabicName}
+                    >
+                      {isActive && (
+                        <motion.span
+                          layoutId={isMobile ? 'mobileActiveTabBg' : 'desktopActiveTabBg'}
+                          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                          className="absolute inset-0 rounded-xl bg-gradient-to-l from-[#C6A15B] via-[#d8b878] to-[#C6A15B] z-0"
+                        />
+                      )}
+                      {isActive && (
+                        <motion.span
+                          layoutId={isMobile ? 'mobileActiveTabBar' : 'desktopActiveTabBar'}
+                          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                          className="absolute right-0 top-1.5 bottom-1.5 w-1 rounded-l-full bg-[#102A43] z-10"
+                        />
+                      )}
+
+                      <div className="relative z-10 flex items-center gap-2 min-w-0 flex-1">
+                        <span
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                            isActive ? 'bg-[#102A43] text-[#C6A15B]' : 'bg-[#0B1F33]/60 text-[#C6A15B]'
+                          }`}
+                        >
+                          {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5')}
+                        </span>
+                        {(!sidebarCollapsed || isMobile) && (
+                          <span className="leading-snug break-words whitespace-normal text-right">
+                            {dept.arabicName}
+                          </span>
+                        )}
+                      </div>
+
+                      {(!sidebarCollapsed || isMobile) && (
+                        <div className="relative z-10 flex items-center gap-1 shrink-0">
+                          {typeof liveCount === 'number' && (
+                            <span
+                              className={`num-cell px-1.5 py-0.5 rounded-md text-[9.5px] font-black ${
+                                isActive
+                                  ? 'bg-[#102A43] text-[#C6A15B]'
+                                  : 'bg-[#0B1F33]/80 text-[#C6A15B] border border-[#C6A15B]/35'
+                              }`}
+                              title="العدد المسجل حالياً في هذا القسم"
+                            >
+                              {toArabicNumerals(liveCount)}
+                            </span>
+                          )}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => togglePinDept(e, dept.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                togglePinDept(e as unknown as React.MouseEvent, dept.id);
+                              }
+                            }}
+                            className={`p-0.5 rounded hover:bg-black/10 shrink-0 ${
+                              isPinned
+                                ? isActive
+                                  ? 'text-[#102A43]'
+                                  : 'text-[#C6A15B]'
+                                : 'text-slate-400 opacity-45 hover:opacity-100'
+                            }`}
+                            title={isPinned ? 'إلغاء التثبيت بالمفضلة' : 'تثبيت بالمفضلة'}
+                          >
+                            <Star className="w-3 h-3 fill-current" />
+                          </span>
+                        </div>
+                      )}
+                    </motion.button>
+                  );
+                })}
+            </div>
           );
         })}
       </nav>
@@ -806,14 +980,25 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-[13px] font-black text-[#102A43]">شكاوى وبلاغات المواطنين الواردة</h3>
-                    <div className="relative min-w-[230px]">
-                      <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
-                      <input
-                        type="text"
-                        value={compSearch}
-                        onChange={(e) => setCompSearch(e.target.value)}
-                        placeholder="بحث باسم المواطن أو رقم الهاتف..."
-                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative min-w-[230px]">
+                        <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                        <input
+                          type="text"
+                          value={compSearch}
+                          onChange={(e) => setCompSearch(e.target.value)}
+                          placeholder="بحث باسم المواطن أو رقم الهاتف..."
+                          className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold"
+                        />
+                      </div>
+                      <FactoryResetButton
+                        sectionName="الشكاوى وخدمة المواطنين"
+                        compact
+                        onConfirmReset={() => {
+                          setComplaintsList([]);
+                          setSelectedCompIds([]);
+                          setCompNotice('تم تنفيذ إعادة ضبط المصنع ومسح جميع الشكاوى المدخلة.');
+                        }}
                       />
                     </div>
                   </div>
@@ -852,10 +1037,45 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               </div>
             )}
 
+            {activeDept?.code === 'TASKS' && (
+              <DailyTasksAndInternalChatModule
+                currentUser={currentUser}
+                allUsers={allUsers}
+                departments={allDepartments}
+                bakeries={bakeries.filter((b) => !b.isArchived)}
+                inspections={inspections}
+                todayRef={todayRef}
+                onNavigateToDepartment={(deptId) => handleSelectDept(deptId)}
+                onSelectBakeryDetails={(b) => setPortalSelectedBakery(b)}
+              />
+            )}
+
+            {(activeDept?.code === 'TRADE' || activeDept?.code === 'GAS') && (
+              <InternalTradeModule
+                key={activeDept.code}
+                currentUser={currentUser}
+                todayRef={todayRef}
+                initialScreen={activeDept.code === 'GAS' ? 'butane_management' : 'dashboard'}
+              />
+            )}
+
+            {activeDept?.code === 'COMM' && (
+              <RationCommoditiesModule currentUserName={currentUser.fullName} />
+            )}
+
+            {activeDept?.code === 'LISTS' && (
+              <DropdownListsManagerModule currentUserName={currentUser.fullName} />
+            )}
+
             {activeDept &&
               activeDept.code !== 'DASH' &&
               activeDept.code !== 'BAK' &&
               activeDept.code !== 'DEBTS' &&
+              activeDept.code !== 'TRADE' &&
+              activeDept.code !== 'GAS' &&
+              activeDept.code !== 'COMM' &&
+              activeDept.code !== 'LISTS' &&
+              activeDept.code !== 'TASKS' &&
               activeDept.code !== 'INSP' &&
               activeDept.code !== 'VIOL' &&
               activeDept.code !== 'COMP' &&

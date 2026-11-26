@@ -32,10 +32,10 @@ export const INITIAL_DEPARTMENTS: Department[] = [
   { id: 'd-01', code: 'DASH', name: 'لوحة التحكم الرئيسية', arabicName: 'لوحة التحكم الرئيسية الموحدة', description: 'المؤشرات الاستراتيجية وغرفة المتابعة المركزية', iconName: 'LayoutDashboard', isCore: true },
   { id: 'd-02', code: 'BAK', name: 'إدارة المخابز', arabicName: 'منظومة الرقابة على المخابز', description: 'إدارة المخابز، المعادلات السبع، التراخيص، العقود، التنبيهات، والطباعة', iconName: 'Flame', isCore: true },
   { id: 'd-03', code: 'DEBTS', name: 'مديونيات أصحاب المخابز', arabicName: 'مديونيات أصحاب المخابز', description: 'إدارة التحصيلات والمديونيات والغرامات التموينية', iconName: 'CreditCard', isCore: true },
-  { id: 'd-04', code: 'TRADE', name: 'التجارة الداخلية', arabicName: 'التجارة الداخلية والأسواق', description: 'مراقبة الأسواق والأسعار والسجلات التجارية', iconName: 'ShoppingBag', isCore: true },
+  { id: 'd-04', code: 'TRADE', name: 'قسم التجارة الداخلية', arabicName: 'قسم التجارة الداخلية', description: 'إدارة ومتابعة المنشآت التجارية والأسواق والسلع والأنشطة التموينية والمواد البترولية', iconName: 'ShoppingBag', isCore: true },
   { id: 'd-05', code: 'CTRL', name: 'المركز الرقابي الموحد', arabicName: 'المركز الرقابي الموحد', description: 'غرفة العمليات والبلاغات والشكاوى العاجلة', iconName: 'ShieldAlert', isCore: true },
   { id: 'd-06', code: 'GAS', name: 'تداول البوتاجاز والمواد البترولية', arabicName: 'تداول البوتاجاز والمواد البترولية', description: 'مستودعات البوتاجاز ومحطات الوقود', iconName: 'Fuel', isCore: true },
-  { id: 'd-07', code: 'COMM', name: 'السلع التموينية', arabicName: 'السلع التموينية والبدالين', description: 'صرف السلع التموينية ومنافذ جمعيتي', iconName: 'Package', isCore: true },
+  { id: 'd-07', code: 'COMM', name: 'قسم السلع التموينية', arabicName: 'قسم السلع التموينية', description: 'إدارة السلع التموينية والتجار والحصص والمخازن والبطاقات والمستفيدين والتقارير', iconName: 'Package', isCore: true },
   { id: 'd-08', code: 'GRAIN', name: 'صيانة الحبوب', arabicName: 'صيانة الحبوب والأقماح', description: 'متابعة الأقماح المحلية والمستوردة', iconName: 'Wheat', isCore: true },
   { id: 'd-09', code: 'SILOS', name: 'الشون والصوامع', arabicName: 'الشون والصوامع الهندسية', description: 'السعات التخزينية وتوريد الأقماح', iconName: 'Warehouse', isCore: true },
   { id: 'd-10', code: 'MILLS', name: 'المطاحن', arabicName: 'المطاحن التموينية', description: 'متابعة طحن الدقيق التمويني استخراج ٨٧٫٥٪', iconName: 'Factory', isCore: true },
@@ -52,18 +52,20 @@ export const INITIAL_DEPARTMENTS: Department[] = [
   { id: 'd-21', code: 'USERS', name: 'إدارة المستخدمين', arabicName: 'إدارة المستخدمين والحسابات', description: 'إنشاء ومتابعة حسابات العاملين', iconName: 'UserCog', isCore: true },
   { id: 'd-22', code: 'ROLES', name: 'إدارة الصلاحيات والأقسام', arabicName: 'إدارة الصلاحيات والفروع الإدارية', description: 'تخصيص أدوار وصلاحيات العاملين حسب الإدارات والأقسام', iconName: 'ShieldCheck', isCore: true },
   { id: 'd-23', code: 'AUDIT', name: 'سجل العمليات والمراجعة', arabicName: 'سجل العمليات والمراجعة الأمنية', description: 'رصد ومراقبة كافة العمليات والتعديلات', iconName: 'History', isCore: true },
-  { id: 'd-24', code: 'BACK', name: 'النسخ الاحتياطي والاستعادة', arabicName: 'النسخ الاحتياطي وقواعد البيانات', description: 'إدارة النسخ الاحتياطي وحماية البيانات', iconName: 'Database', isCore: true }
+  { id: 'd-24', code: 'BACK', name: 'النسخ الاحتياطي والاستعادة', arabicName: 'النسخ الاحتياطي وقواعد البيانات', description: 'إدارة النسخ الاحتياطي وحماية البيانات', iconName: 'Database', isCore: true },
+  { id: 'd-25', code: 'TASKS', name: 'إدارة المهام اليومية والمتابعة', arabicName: 'إدارة المهام اليومية والمتابعة', description: 'متابعة المهام اليومية والتكليفات والمتابعة الشاملة للأقسام والمحادثات الداخلية بين الموظفين', iconName: 'SearchCheck', isCore: true },
+  { id: 'd-26', code: 'LISTS', name: 'إدارة القوائم المنسدلة', arabicName: 'إدارة القوائم المنسدلة', description: 'تعديل رؤوس أعمدة الجداول وإدارة القرى والوحدات المحلية والبطاقات والتراخيص وتواريخ الانتهاء بالكالندر', iconName: 'ListChecks', isCore: true }
 ];
 
 export const INITIAL_USERS: User[] = [
   {
     id: 'usr-001',
-    fullName: 'المهندس / أحمد الحسيني - مدير النظام الرئيسي',
+    fullName: 'Eng. Ahmed El-Hosseiny — Designed & Developed by Eng. Ahmed El-Hosseiny (Tel: 01004414038)',
     nationalId: '28510121601234',
     phone: '01004414038',
     email: 'admin.gharbia@supply.gov.eg',
     username: 'admin',
-    jobTitle: 'مدير نظم المعلومات والتحول الرقمي',
+    jobTitle: 'Designed & Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038',
     jobGrade: 'درجة أولى أ',
     workplace: 'إدارة تموين مركز المحلة الكبرى - ديوان المديرية',
     branchIds: ['b-01', 'b-02', 'b-03', 'b-04', 'b-05', 'b-06', 'b-07', 'b-08', 'b-09', 'b-10', 'b-11'],
@@ -87,7 +89,7 @@ export const INITIAL_USERS: User[] = [
     workplace: 'إدارة تموين مركز المحلة الكبرى',
     branchIds: ['b-03', 'b-04'],
     primaryBranchId: 'b-03',
-    departmentIds: ['d-01', 'd-02', 'd-03', 'd-05', 'd-07', 'd-15', 'd-16', 'd-17', 'd-18'],
+    departmentIds: ['d-01', 'd-02', 'd-03', 'd-04', 'd-05', 'd-06', 'd-07', 'd-15', 'd-16', 'd-17', 'd-18', 'd-25', 'd-26'],
     role: 'supply_admin_manager',
     status: 'active',
     employeeNumber: '44102',
@@ -469,7 +471,7 @@ export const INITIAL_BAKERY_AUDIT_CHANGES: BakeryAuditChange[] = [
     oldValue: 'مراجعة دورية',
     newValue: 'تم اعتماد الحصة التأمينية 35.000 والأرغفة اليومية 23100',
     reason: 'مطابقة المعادلات المعتمدة لإدارة تموين مركز المحلة الكبرى',
-    performedBy: 'المهندس / أحمد الحسيني',
+    performedBy: 'Eng. Ahmed El-Hosseiny — Tel: 01004414038',
     timestamp: '2026-11-25T07:00:00.000Z',
   }
 ];
@@ -480,7 +482,7 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     timestamp: '2026-11-25T09:00:00.000Z',
     userId: 'usr-001',
     username: 'admin',
-    fullName: 'المهندس / أحمد الحسيني - مدير النظام الرئيسي',
+    fullName: 'Designed & Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038',
     action: 'تفعيل منظومة المخابز المركزية',
     module: 'إدارة المخابز - مركز المحلة الكبرى',
     branchId: 'b-03',
@@ -713,7 +715,20 @@ export function getStoredDepartments(): Department[] {
   if (typeof window === 'undefined') return INITIAL_DEPARTMENTS;
   try {
     const data = localStorage.getItem(STORAGE_KEYS.DEPARTMENTS);
-    return data ? JSON.parse(data) : INITIAL_DEPARTMENTS;
+    if (!data) return INITIAL_DEPARTMENTS;
+    const parsed: Department[] = JSON.parse(data).map((d: Department) =>
+      d.id === 'd-04'
+        ? {
+            ...d,
+            name: 'قسم التجارة الداخلية',
+            arabicName: 'قسم التجارة الداخلية',
+            description: 'إدارة ومتابعة المنشآت التجارية والأسواق والسلع والأنشطة التموينية والمواد البترولية',
+          }
+        : d
+    );
+    const existingIds = new Set(parsed.map((d) => d.id));
+    const missing = INITIAL_DEPARTMENTS.filter((d) => !existingIds.has(d.id));
+    return missing.length > 0 ? [...parsed, ...missing] : parsed;
   } catch {
     return INITIAL_DEPARTMENTS;
   }

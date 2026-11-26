@@ -17,8 +17,8 @@ export default function Footer() {
             <span>النظام مؤمن ومشفر بالكامل</span>
           </span>
           <span className="text-slate-600 hidden sm:inline">|</span>
-          <span className="text-[#C6A15B] font-black">
-            تصميم وتطوير المهندس أحمد الحسيني — هاتف ٠١٠٠٤٤١٤٠٣٨
+          <span className="text-[#C6A15B] font-black" dir="ltr">
+            Designed &amp; Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038
           </span>
         </div>
       </div>

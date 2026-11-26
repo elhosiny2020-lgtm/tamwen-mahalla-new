@@ -720,4 +720,254 @@ export interface DebtModuleSettings {
   noticeTemplates: Record<string, string>;
 }
 
+// ============================================================================
+// ١. إعدادات وسجل المديونيات الكبرى (Major Debts & Threshold Settings)
+// ============================================================================
+export type MajorDebtScopeType = 'all' | 'branch' | 'village' | 'bakery';
+export type MajorDebtComparisonRule = 'gte' | 'gt'; // عند المساواة بالحد (>=) أو عند تجاوزه (>)
+
+export interface DebtThresholdHistoryRecord {
+  id: string;
+  thresholdAmountEgp: number;
+  warningApproachPercent: number;
+  scopeType: MajorDebtScopeType;
+  scopeTargetValue: string;
+  comparisonRule: MajorDebtComparisonRule;
+  changedBy: string;
+  changedAt: string;
+  notes?: string;
+}
+
+export interface DebtThresholdSetting {
+  thresholdAmountEgp: number;
+  warningApproachPercent: number;
+  scopeType: MajorDebtScopeType;
+  scopeTargetValue: string;
+  comparisonRule: MajorDebtComparisonRule;
+  updatedBy: string;
+  updatedAt: string;
+  history: DebtThresholdHistoryRecord[];
+}
+
+// ============================================================================
+// ٢. محاضر المخالفات متعددة البنود والجهات المحررة (Multi-Item Violation Reports)
+// ============================================================================
+export interface ViolationIssuingAuthorityConfig {
+  id: string;
+  name: string;
+  category: string;
+  isActive: boolean;
+}
+
+export interface ViolationCatalogItem {
+  id: string;
+  code: string;
+  groupCode: 'أ' | 'ب' | 'ج' | 'د' | 'هـ' | 'و' | 'ز' | 'ح';
+  groupTitle: string;
+  title: string;
+  legalBasisDecree: string;
+  legalArticle: string;
+  competentAuthority: string;
+  approvedActionAndPenalty: string;
+  defaultUnit: string;
+  hasFinancialFineByDefault: boolean;
+  defaultBaseFineEgp: number;
+  isActive: boolean;
+}
+
+export interface ViolationReportLineItem {
+  id: string;
+  catalogItemId: string;
+  groupTitle: string;
+  violationTypeTitle: string;
+  detailedDescription: string;
+  quantity: number;
+  unit: string;
+  decreeOrArticleRef: string;
+  competentAuthority: string;
+  approvedMeasure: string;
+  fineAmountEgp: number;
+  dueDate: string;
+  notes: string;
+}
+
+export interface OfficialViolationReportRecord {
+  id: string;
+  reportNumber: string;
+  caseNumber?: string;
+  bakeryId: string;
+  bakeryNumber: string;
+  bakeryName: string;
+  ownerName: string;
+  posNumber: string;
+  village: string;
+  localUnit: string;
+  phone: string;
+  issuingAuthoritySnapshot: string; // يحفظ اسم الجهة وقت التحرير ولا يتغير بتعديل الإعدادات لاحقاً
+  subDepartmentName: string;
+  inspectorName: string;
+  reportDate: string;
+  reportLocation: string;
+  reportStatus: 'مسودة' | 'قيد المراجعة' | 'معتمد' | 'محال للجهة المختصة' | 'مغلق';
+  paymentStatus: 'غير مستحق' | 'غير مسدد' | 'مسدد جزئياً' | 'مسدد بالكامل';
+  items: ViolationReportLineItem[];
+  totalFineAmountEgp: number;
+  attachmentsList: string[];
+  notes: string;
+  linkedDebtId?: string;
+  linkedDebtNumber?: string;
+  transferredToDebtsAt?: string;
+  transferredBy?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+// ============================================================================
+// ٣. إدارة المهام اليومية والمتابعة والشات الداخلي (Daily Tasks, Follow-ups & Internal Chat)
+// ============================================================================
+export type DailyTaskType =
+  | 'مهمة يومية'
+  | 'مهمة أسبوعية'
+  | 'مهمة شهرية'
+  | 'مهمة عاجلة'
+  | 'تكليف إداري'
+  | 'متابعة مخالفة'
+  | 'متابعة مديونية'
+  | 'مراجعة مستندات'
+  | 'فحص أو تفتيش'
+  | 'صيانة أو إصلاح'
+  | 'متابعة شكوى'
+  | 'إعداد تقرير'
+  | 'متابعة توريد أو صرف'
+  | 'متابعة تراخيص'
+  | 'مهمة أخرى';
+
+export type DailyTaskPriority = 'عادية' | 'متوسطة' | 'مهمة' | 'عاجلة جداً';
+
+export type DailyTaskStatus =
+  | 'جديدة'
+  | 'تم الإسناد'
+  | 'تم الاطلاع'
+  | 'جارٍ التنفيذ'
+  | 'متوقفة مؤقتاً'
+  | 'تنتظر مستندات'
+  | 'تنتظر اعتماد'
+  | 'مكتملة'
+  | 'مرفوضة'
+  | 'متأخرة'
+  | 'ملغاة بسبب موثق';
+
+export type TaskConfidentialityLevel = 'عام للإدارة' | 'مقيد للمكلفين' | 'سري للإدارة العليا';
+
+export interface DailyTaskComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+  attachmentName?: string;
+}
+
+export interface DailyTaskActionLog {
+  id: string;
+  actorName: string;
+  actionTitle: string;
+  details: string;
+  timestamp: string;
+}
+
+export interface DailyTaskRecord {
+  id: string;
+  taskNumber: string;
+  title: string;
+  description: string;
+  departmentId: string;
+  departmentName: string;
+  primaryAssigneeId: string;
+  primaryAssigneeName: string;
+  participantIds: string[];
+  participantNames: string[];
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  startDate: string;
+  dueDate: string;
+  priority: DailyTaskPriority;
+  taskType: DailyTaskType;
+  confidentiality: TaskConfidentialityLevel;
+  status: DailyTaskStatus;
+  progressPercent: number;
+  completionReportText?: string;
+  requiredInstructions: string;
+  notes: string;
+  attachments: string[];
+  linkedRecordType?: 'bakery' | 'debt' | 'violation' | 'license' | 'complaint' | 'inspection';
+  linkedRecordId?: string;
+  linkedRecordLabel?: string;
+  linkedDeptCode?: string;
+  comments: DailyTaskComment[];
+  actionLogs: DailyTaskActionLog[];
+  updatedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  cancellationOrRejectionReason?: string;
+}
+
+export type EmployeePresenceStatus = 'متصل' | 'غير متصل' | 'غير متاح';
+
+export interface InternalChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRoleLabel: string;
+  text: string;
+  sentAt: string;
+  readByUserIds: string[];
+  replyToMessageId?: string;
+  replyToPreview?: string;
+  attachmentName?: string;
+  attachmentType?: 'مستند إداري' | 'صورة محضر' | 'ملف PDF' | 'كشف حساب';
+  isDeletedFromUi?: boolean;
+  deletedBy?: string;
+  deletedAt?: string;
+}
+
+export interface InternalChatConversation {
+  id: string;
+  title: string;
+  type: 'direct' | 'department_group' | 'cross_department_group' | 'task_chat';
+  departmentId?: string;
+  linkedTaskId?: string;
+  linkedTaskNumber?: string;
+  participantIds: string[];
+  participantNames: string[];
+  isPinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UnifiedSystemNotification {
+  id: string;
+  recipientUserId: string; // 'ALL' أو معرف الموظف
+  category:
+    | 'إسناد مهمة'
+    | 'تعديل مهمة'
+    | 'موعد نهائي'
+    | 'تأخر مهمة'
+    | 'تعليق أو مرفق'
+    | 'طلب اعتماد'
+    | 'مخالفة جديدة'
+    | 'تحديث مديونية'
+    | 'رسالة شات داخلي';
+  title: string;
+  message: string;
+  severity: 'info' | 'warning' | 'urgent' | 'success';
+  isRead: boolean;
+  createdAt: string;
+  targetDeptId?: string;
+  targetRecordId?: string;
+}
+
+
 

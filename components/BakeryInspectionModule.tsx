@@ -26,6 +26,7 @@ import { buildInitialDebtItems, computeDebtFinancials } from '@/lib/debts-engine
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import ViolationCalculator, { WeightShortageCalculationOutput } from './ViolationCalculator';
+import OfficialViolationReportBuilder from './OfficialViolationReportBuilder';
 
 interface BakeryInspectionModuleProps {
   bakeries: BakeryRecord[];
@@ -606,6 +607,16 @@ export default function BakeryInspectionModule({
           onRecordAndLinkDebt={handleRecordFromCalculator}
         />
       )}
+
+      {/* منظومة تحرير محاضر مخالفات المخابز متعددة البنود والدليل الشامل (أ-ح) والربط بالمديونيات */}
+      <OfficialViolationReportBuilder
+        userId={currentUser.id}
+        currentUserName={currentUser.fullName}
+        bakeries={bakeries}
+        todayRef={todayRef}
+        onSelectBakeryDetails={onSelectBakeryDetails}
+        onNotify={notify}
+      />
 
       {/* Header & Filter Card */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">

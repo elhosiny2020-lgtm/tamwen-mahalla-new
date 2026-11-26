@@ -188,7 +188,7 @@ export function AlertSeverityBadge({ alert }: { alert: ComputedDebtAlert }) {
 }
 
 interface OfficialPrintModalProps {
-  open: boolean;
+  open?: boolean;
   onClose: () => void;
   title: string;
   subtitle?: string;
@@ -199,7 +199,7 @@ interface OfficialPrintModalProps {
 }
 
 export function OfficialPrintModal({
-  open,
+  open = true,
   onClose,
   title,
   subtitle,
@@ -288,7 +288,7 @@ export function OfficialPrintModal({
             </div>
           </div>
           <p className="text-center text-[9.5px] font-bold text-slate-500 pt-2">
-            تصميم وتطوير المهندس أحمد الحسيني — هاتف ٠١٠٠٤٤١٤٠٣٨ · مديرية التموين والتجارة الداخلية بالغربية
+            <span dir="ltr">Designed &amp; Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038</span> · مديرية التموين والتجارة الداخلية بالغربية
           </p>
         </div>
       </div>

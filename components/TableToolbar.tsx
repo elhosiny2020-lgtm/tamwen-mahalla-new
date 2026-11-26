@@ -31,6 +31,11 @@ export interface TableColumnItem {
 }
 
 export interface TableToolbarProps {
+  tableName?: string;
+  totalRows?: number;
+  pinnedCount?: number;
+  onClearPins?: () => void;
+  onManualPin?: () => void;
   columns?: TableColumnItem[];
   onPinAll?: () => void;
   onUnpinAll?: () => void;
@@ -59,6 +64,11 @@ export interface TableToolbarProps {
  * توزيع بالتساوي، استعادة الافتراضي، حفظ التخطيط، وتثبيت وإظهار/إخفاء الأعمدة.
  */
 export default function TableToolbar({
+  tableName,
+  totalRows,
+  pinnedCount,
+  onClearPins,
+  onManualPin,
   columns,
   onPinAll,
   onUnpinAll,
@@ -80,6 +90,8 @@ export default function TableToolbar({
 }: TableToolbarProps) {
   const [showColumnManager, setShowColumnManager] = useState(false);
 
+  const effectiveUnpinAll = onUnpinAll || onClearPins;
+
   const hasAutoFitControls = Boolean(
     onAutoFitAll ||
       onAutoFitHeaders ||
@@ -91,13 +103,14 @@ export default function TableToolbar({
 
   const hasColumnActions = Boolean(
     onPinAll ||
-      onUnpinAll ||
+      effectiveUnpinAll ||
+      onManualPin ||
       (columns && (onTogglePinColumn || onToggleVisibleColumn)) ||
       onOpenHeaderCustomizer ||
       extraControls
   );
 
-  if (!hasAutoFitControls && !hasColumnActions) return null;
+  if (!hasAutoFitControls && !hasColumnActions && !tableName) return null;
 
   const visibleColCount = columns ? columns.filter((c) => c.visible !== false).length : 0;
 
@@ -105,6 +118,17 @@ export default function TableToolbar({
     <div className={compact ? 'space-y-1.5' : 'space-y-1.5 pt-1.5 border-t border-slate-100'}>
       {/* شريط التحكم الموحد في الأعمدة والتخطيط */}
       <div className="flex flex-wrap items-center justify-between gap-1.5">
+        {tableName && (
+          <div className="flex items-center gap-2 text-xs font-black text-[#102A43]">
+            <Columns3 className="w-3.5 h-3.5 text-[#C6A15B] shrink-0" />
+            <span>{tableName}</span>
+            {typeof totalRows === 'number' && (
+              <span className="px-2 py-0.5 rounded-full bg-[#F4F7FB] border border-slate-200 text-[10.5px] font-black text-[#164E83]">
+                {toArabicNumerals(totalRows)} سجل
+              </span>
+            )}
+          </div>
+        )}
         {hasAutoFitControls && (
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-[11px] font-black text-[#164E83] flex items-center gap-1 ml-1">
@@ -212,42 +236,54 @@ export default function TableToolbar({
 
         {hasColumnActions && (
           <div className="flex flex-wrap items-center gap-1">
-            {onPinAll && (
+            {effectiveUnpinAll && (
               <button
                 type="button"
-                onClick={onPinAll}
-                className="px-2 py-0.5 bg-[#102A43] hover:bg-[#164E83] text-white rounded-md text-[10.5px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors"
-                title="تثبيت الأعمدة مع الحفاظ على التمرير الأفقي داخل الجدول"
+                onClick={effectiveUnpinAll}
+                className={`px-2.5 py-0.5 border rounded-md text-[10.5px] font-black flex items-center gap-1 cursor-pointer transition-colors ${
+                  pinnedCount === 0
+                    ? 'bg-red-700 text-white border-red-700'
+                    : 'bg-red-50 hover:bg-red-100 text-red-800 border-red-300'
+                }`}
+                title="الخيار الأول: إلغاء تثبيت جميع الأعمدة والعودة للعرض الطبيعي"
               >
-                <Pin className="w-3 h-3 text-[#C6A15B]" />
-                <span>تثبيت الكل</span>
-              </button>
-            )}
-
-            {onUnpinAll && (
-              <button
-                type="button"
-                onClick={onUnpinAll}
-                className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-md text-[10.5px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors"
-                title="إلغاء تثبيت جميع الأعمدة والعودة للعرض الطبيعي"
-              >
-                <PinOff className="w-3 h-3" />
+                <PinOff className={`w-3 h-3 ${pinnedCount === 0 ? 'text-white' : 'text-red-700'}`} />
                 <span>إلغاء التثبيت</span>
               </button>
             )}
 
-            {columns && (onTogglePinColumn || onToggleVisibleColumn) && (
+            {((columns && (onTogglePinColumn || onToggleVisibleColumn)) || onManualPin) && (
               <button
                 type="button"
-                onClick={() => setShowColumnManager((v) => !v)}
-                className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold flex items-center gap-1 cursor-pointer border transition-colors ${
-                  showColumnManager
+                onClick={() => {
+                  if (columns && (onTogglePinColumn || onToggleVisibleColumn)) {
+                    setShowColumnManager((v) => !v);
+                  }
+                  if (onManualPin) {
+                    onManualPin();
+                  }
+                }}
+                className={`px-2.5 py-0.5 rounded-md text-[10.5px] font-black flex items-center gap-1 cursor-pointer border transition-colors ${
+                  showColumnManager || (typeof pinnedCount === 'number' && pinnedCount > 0)
                     ? 'bg-[#C6A15B] text-[#102A43] border-[#C6A15B]'
-                    : 'bg-[#F4F7FB] hover:bg-slate-200 text-[#102A43] border-slate-300'
+                    : 'bg-[#102A43] hover:bg-[#164E83] text-white border-[#102A43]'
                 }`}
+                title="الخيار الثاني: اختيار وتثبيت الأعمدة يدوياً عموداً بعمود"
               >
-                <Columns3 className="w-3 h-3" />
-                <span>إدارة الأعمدة والتخطيط</span>
+                <Pin className={`w-3 h-3 ${showColumnManager || (typeof pinnedCount === 'number' && pinnedCount > 0) ? 'text-[#102A43]' : 'text-[#C6A15B]'}`} />
+                <span>إكمال التثبيت يدوياً</span>
+              </button>
+            )}
+
+            {onPinAll && (
+              <button
+                type="button"
+                onClick={onPinAll}
+                className="px-2 py-0.5 bg-[#F4F7FB] hover:bg-slate-200 text-[#102A43] border border-slate-300 rounded-md text-[10.5px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors"
+                title="تثبيت الأعمدة التعريفية تلقائياً مع الحفاظ على التمرير الأفقي"
+              >
+                <Columns3 className="w-3 h-3 text-[#164E83]" />
+                <span>تثبيت تلقائي</span>
               </button>
             )}
 
