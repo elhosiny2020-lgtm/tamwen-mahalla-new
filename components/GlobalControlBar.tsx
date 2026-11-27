@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import {
   Check,
   Globe,
+  Images,
   Layers,
   LayoutGrid,
   Minus,
@@ -12,7 +14,6 @@ import {
   Plus,
   RotateCcw,
   SlidersHorizontal,
-  Sparkles,
   Type,
   X,
 } from 'lucide-react';
@@ -27,7 +28,9 @@ import {
 import { toArabicNumerals } from '@/lib/utils';
 
 type OpenPopover = 'font' | 'language' | 'theme' | 'display' | null;
-type StudioTab = 'layouts' | 'colors' | 'custom';
+type StudioTab = 'gallery' | 'layouts' | 'colors' | 'custom';
+type GalleryFilter = 'all' | 'glass_3d' | 'light' | 'dark' | 'featured';
+type ColorFilter = 'all' | 'light' | 'dark' | 'glass_3d';
 
 function LayoutWireframePreview({
   type,
@@ -160,6 +163,84 @@ function LayoutWireframePreview({
     );
   }
 
+  if (type === 'floating_top_glass') {
+    return (
+      <div className="w-full h-12 rounded-lg bg-gradient-to-br from-[#DCE9F8] via-[#EBF4FF] to-[#D4E6FA] border border-white p-1.5 flex flex-col gap-1 overflow-hidden">
+        <div className="h-2.5 w-full rounded-full bg-white/85 border border-sky-200/80 shadow-2xs flex items-center justify-between px-1.5">
+          <div className="flex items-center gap-0.5">
+            <span className="w-3 h-1 rounded-full bg-[#1976F3]" />
+            <span className="w-2.5 h-1 rounded-full bg-slate-300" />
+            <span className="w-2.5 h-1 rounded-full bg-slate-300" />
+          </div>
+          <span className="w-2 h-1 rounded-full bg-[#143A6B]" />
+        </div>
+        <div className="flex-1 grid grid-cols-3 gap-1">
+          <div className="rounded-md bg-white/80 border border-white shadow-2xs" />
+          <div className="rounded-md bg-white/80 border border-white shadow-2xs" />
+          <div className="rounded-md bg-[#1976F3]/15 border border-sky-300/60" />
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'tactile_clay_3d') {
+    return (
+      <div className="w-full h-12 rounded-lg bg-gradient-to-br from-[#C4D3DF] to-[#9EB0BC] border border-white/80 p-1 flex gap-1 overflow-hidden">
+        <div className="w-5 h-full rounded-md bg-[#2B4257] shadow-[0_3px_6px_rgba(16,32,48,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] shrink-0 p-0.5 flex flex-col gap-0.5">
+          <span className="w-full h-1.5 rounded-sm bg-[#4893A0]" />
+          <span className="w-full h-1 rounded-sm bg-white/35" />
+          <span className="w-full h-1 rounded-sm bg-white/20" />
+        </div>
+        <div className="flex-1 grid grid-cols-3 gap-1">
+          <div className="rounded-md bg-[#EEF4F8] shadow-[0_3px_6px_rgba(30,51,70,0.22),inset_0_1px_0_#ffffff]" />
+          <div className="rounded-md bg-[#EEF4F8] shadow-[0_3px_6px_rgba(30,51,70,0.22),inset_0_1px_0_#ffffff]" />
+          <div className="rounded-md bg-[#4893A0]/30 border border-white/70 shadow-[0_3px_6px_rgba(30,51,70,0.18)]" />
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'clean_light_sidebar') {
+    return (
+      <div className="w-full h-12 rounded-lg bg-[#F4F6FA] border border-slate-200 p-1 flex gap-1 overflow-hidden">
+        <div className="w-5 h-full rounded-md bg-white border border-slate-200 shrink-0 p-0.5 flex flex-col gap-0.5">
+          <span className="w-full h-1.5 rounded-sm bg-[#E8522E]" />
+          <span className="w-full h-1 rounded-sm bg-slate-300" />
+          <span className="w-full h-1 rounded-sm bg-slate-200" />
+        </div>
+        <div className="flex-1 flex flex-col gap-1">
+          <div className="h-2.5 rounded-sm bg-white border border-slate-200 flex items-center px-1 gap-1">
+            <span className="w-4 h-1 rounded-full bg-slate-800" />
+            <span className="w-2.5 h-1 rounded-full bg-[#E8522E]/70" />
+          </div>
+          <div className="flex-1 grid grid-cols-3 gap-1">
+            <div className="rounded-sm bg-white border border-slate-200" />
+            <div className="rounded-sm bg-white border border-slate-200" />
+            <div className="rounded-sm bg-white border border-slate-200" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'cyber_hud_cockpit') {
+    return (
+      <div className="w-full h-12 rounded-lg bg-gradient-to-br from-[#061428] via-[#0B2340] to-[#05101F] border border-cyan-400/50 p-1 flex gap-1 overflow-hidden">
+        <div className="w-3 h-full rounded-sm bg-[#091E36] border border-cyan-400/40 flex flex-col items-center py-1 gap-0.5 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_6px_#22D3EE]" />
+          <span className="w-1.5 h-1 rounded-full bg-cyan-400/45" />
+          <span className="w-1.5 h-1 rounded-full bg-cyan-400/25" />
+        </div>
+        <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-1">
+          <div className="col-span-2 rounded-xs bg-cyan-400/15 border border-cyan-300/45" />
+          <div className="row-span-2 rounded-xs bg-sky-500/15 border border-cyan-400/35" />
+          <div className="rounded-xs bg-slate-900/80 border border-cyan-400/25" />
+          <div className="rounded-xs bg-slate-900/80 border border-cyan-400/25" />
+        </div>
+      </div>
+    );
+  }
+
   // Default: sidebar_glass
   return (
     <div className="w-full h-12 rounded-lg bg-[#CEDAE3] border border-white p-1 flex gap-1 overflow-hidden">
@@ -185,7 +266,7 @@ function LayoutWireframePreview({
  * شريط التحكم العام الثابت بجوار الساعة والتاريخ:
  * ١. حجم الخط (80% - 150%)
  * ٢. اللغة (العربية RTL / English LTR)
- * ٣. استوديو الواجهات والألوان UX/UI (٦ تصاميم واجهات مختلفة + ١٤ لوحة ألوان + تخصيص حر)
+ * ٣. استوديو الواجهات والألوان UX/UI (معرض الواجهات البصري + ١٢ تخطيط هيكلي + ٣٤ لوحة ألوان + تخصيص حر)
  * ٤. إعدادات العرض الذكي (تلقائي حسب الشاشة / يدوي)
  */
 export default function GlobalControlBar() {
@@ -210,7 +291,9 @@ export default function GlobalControlBar() {
   } = useSystemPreferences();
 
   const [openMenu, setOpenMenu] = useState<OpenPopover>(null);
-  const [studioTab, setStudioTab] = useState<StudioTab>('layouts');
+  const [studioTab, setStudioTab] = useState<StudioTab>('gallery');
+  const [galleryFilter, setGalleryFilter] = useState<GalleryFilter>('all');
+  const [colorFilter, setColorFilter] = useState<ColorFilter>('all');
   const [pairLayoutWithColors, setPairLayoutWithColors] = useState<boolean>(true);
   const [draftCustomBg, setDraftCustomBg] = useState(prefs.customColors.background);
   const [draftCustomPrimary, setDraftCustomPrimary] = useState(prefs.customColors.primary);
@@ -242,6 +325,18 @@ export default function GlobalControlBar() {
     : 'left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:right-0';
 
   const activeLayoutMeta = UI_LAYOUT_PRESETS.find((l) => l.id === prefs.uiLayout);
+
+  const filteredBundles = useMemo(() => {
+    if (galleryFilter === 'all') return UX_BUNDLE_PRESETS;
+    return UX_BUNDLE_PRESETS.filter((b) => b.category === galleryFilter);
+  }, [galleryFilter]);
+
+  const filteredColors = useMemo(() => {
+    if (colorFilter === 'all') return THEME_PRESETS;
+    if (colorFilter === 'dark') return THEME_PRESETS.filter((p) => p.isDark);
+    if (colorFilter === 'glass_3d') return THEME_PRESETS.filter((p) => p.isGlass || p.isClay);
+    return THEME_PRESETS.filter((p) => !p.isDark);
+  }, [colorFilter]);
 
   return (
     <div ref={barRef} className="flex flex-wrap items-center gap-1.5 relative">
@@ -441,28 +536,47 @@ export default function GlobalControlBar() {
 
         {openMenu === 'theme' && (
           <div
-            className={`app-popover absolute ${popoverAlign} mt-2 w-[340px] sm:w-[460px] bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3 max-h-[84vh] overflow-y-auto`}
+            className={`app-popover absolute ${popoverAlign} mt-2 w-[350px] sm:w-[560px] bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3 max-h-[85vh] overflow-y-auto`}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2 font-black text-xs text-[#102A43]">
-                <Layers className="w-4 h-4 text-[#164E83]" />
-                <span>{t('uxStudioTitle')}</span>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 font-black text-xs text-[#102A43]">
+                  <Layers className="w-4 h-4 text-[#164E83] shrink-0" />
+                  <span className="truncate">{t('uxStudioTitle')}</span>
+                </div>
+                <p className="text-[10px] font-bold text-slate-500 mt-0.5 truncate">
+                  {activeLayoutMeta ? t(activeLayoutMeta.labelKey) : ''} ·{' '}
+                  {fmtNum(UX_BUNDLE_PRESETS.length)} {isRtl ? 'واجهة جاهزة' : 'skins'} ·{' '}
+                  {fmtNum(THEME_PRESETS.length)} {isRtl ? 'لون' : 'palettes'}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setOpenMenu(null)}
-                className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer shrink-0"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {/* 3 Tabs: UX/UI Layouts | Color Palettes | Custom Colors */}
-            <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+            {/* 4 Tabs: Visual Gallery | UX/UI Layouts | Color Palettes | Custom Colors */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setStudioTab('gallery')}
+                className={`py-1.5 px-2 rounded-lg text-[10.5px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                  studioTab === 'gallery'
+                    ? 'bg-[#102A43] text-[#C6A15B] shadow-xs'
+                    : 'text-slate-700 hover:text-[#102A43]'
+                }`}
+              >
+                <Images className="w-3.5 h-3.5 shrink-0" />
+                <span>{t('uxTabGallery')}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setStudioTab('layouts')}
-                className={`py-1.5 px-2 rounded-lg text-[10.5px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap ${
+                className={`py-1.5 px-2 rounded-lg text-[10.5px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
                   studioTab === 'layouts'
                     ? 'bg-[#102A43] text-[#C6A15B] shadow-xs'
                     : 'text-slate-700 hover:text-[#102A43]'
@@ -474,7 +588,7 @@ export default function GlobalControlBar() {
               <button
                 type="button"
                 onClick={() => setStudioTab('colors')}
-                className={`py-1.5 px-2 rounded-lg text-[10.5px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap ${
+                className={`py-1.5 px-2 rounded-lg text-[10.5px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
                   studioTab === 'colors'
                     ? 'bg-[#102A43] text-[#C6A15B] shadow-xs'
                     : 'text-slate-700 hover:text-[#102A43]'
@@ -486,7 +600,7 @@ export default function GlobalControlBar() {
               <button
                 type="button"
                 onClick={() => setStudioTab('custom')}
-                className={`py-1.5 px-2 rounded-lg text-[10.5px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap ${
+                className={`py-1.5 px-2 rounded-lg text-[10.5px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
                   studioTab === 'custom'
                     ? 'bg-[#102A43] text-[#C6A15B] shadow-xs'
                     : 'text-slate-700 hover:text-[#102A43]'
@@ -497,7 +611,137 @@ export default function GlobalControlBar() {
               </button>
             </div>
 
-            {/* Tab 1: UX/UI Interface Layouts + Instant Complete Bundles */}
+            {/* Tab 1: Visual Interface Gallery (All 18 Uploaded Reference Dashboards + Core Skins) */}
+            {studioTab === 'gallery' && (
+              <div className="space-y-3">
+                {/* Category Filter Bar */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                  {(
+                    [
+                      { id: 'all' as GalleryFilter, ar: 'الكل', en: 'All' },
+                      { id: 'glass_3d' as GalleryFilter, ar: 'زجاجي و 3D', en: 'Glass & 3D' },
+                      { id: 'light' as GalleryFilter, ar: 'فاتحة', en: 'Light' },
+                      { id: 'featured' as GalleryFilter, ar: 'مميزة', en: 'Featured' },
+                      { id: 'dark' as GalleryFilter, ar: 'داكنة', en: 'Dark' },
+                    ] as const
+                  ).map((cat) => {
+                    const count =
+                      cat.id === 'all'
+                        ? UX_BUNDLE_PRESETS.length
+                        : UX_BUNDLE_PRESETS.filter((b) => b.category === cat.id).length;
+                    const active = galleryFilter === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setGalleryFilter(cat.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                          active
+                            ? 'bg-[#102A43] text-[#C6A15B] border-[#102A43]'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {isRtl ? cat.ar : cat.en} ({fmtNum(count)})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 2-Column Visual Interface Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {filteredBundles.map((bundle) => {
+                    const isBundleActive =
+                      prefs.uiLayout === bundle.layoutId && prefs.themeId === bundle.themeId;
+                    const themeMeta = THEME_PRESETS.find((th) => th.id === bundle.themeId);
+                    const layoutMeta = UI_LAYOUT_PRESETS.find((l) => l.id === bundle.layoutId);
+                    return (
+                      <button
+                        key={bundle.id}
+                        type="button"
+                        onClick={() => applyUiSkinBundle(bundle.layoutId, bundle.themeId)}
+                        className={`group rounded-xl border overflow-hidden text-${isRtl ? 'right' : 'left'} flex flex-col cursor-pointer transition-all ${
+                          isBundleActive
+                            ? 'border-[#102A43] ring-2 ring-[#C6A15B] bg-slate-50 shadow-sm'
+                            : 'border-slate-200 hover:border-slate-400 bg-white'
+                        }`}
+                      >
+                        {/* Visual Thumbnail Preview */}
+                        <div
+                          className="relative aspect-[16/10] w-full overflow-hidden border-b border-slate-200/80"
+                          style={{ backgroundColor: themeMeta?.previewBg || '#F4F7FB' }}
+                        >
+                          {bundle.previewImage ? (
+                            <Image
+                              src={bundle.previewImage}
+                              alt={isRtl ? bundle.titleAr : bundle.titleEn}
+                              fill
+                              sizes="(max-width: 640px) 320px, 250px"
+                              className="object-cover object-top transition-transform duration-300 group-hover:scale-[1.03]"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-full h-full p-3 flex items-center justify-center">
+                              <div className="w-full">
+                                <LayoutWireframePreview
+                                  type={layoutMeta?.wireframeType || 'sidebar_glass'}
+                                  active={isBundleActive}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {isBundleActive && (
+                            <span
+                              className={`absolute top-2 ${isRtl ? 'left-2' : 'right-2'} w-5 h-5 rounded-full bg-emerald-600 text-white shadow-md flex items-center justify-center`}
+                            >
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Clean Metadata Footer */}
+                        <div className="p-2.5 space-y-1 w-full">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-black text-[#102A43] truncate">
+                              {isRtl ? bundle.titleAr : bundle.titleEn}
+                            </span>
+                            {themeMeta && (
+                              <span className="flex items-center gap-0.5 shrink-0">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-black/15"
+                                  style={{ backgroundColor: themeMeta.previewBg }}
+                                />
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-black/15"
+                                  style={{ backgroundColor: themeMeta.previewPrimary }}
+                                />
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-black/15"
+                                  style={{ backgroundColor: themeMeta.previewAccent }}
+                                />
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-600 line-clamp-1">
+                            {isRtl ? bundle.subtitleAr : bundle.subtitleEn}
+                          </p>
+                          <p className="text-[9.5px] font-bold text-slate-500 truncate">
+                            {layoutMeta
+                              ? isRtl
+                                ? layoutMeta.navPositionAr
+                                : layoutMeta.navPositionEn
+                              : ''}{' '}
+                            · {themeMeta ? t(themeMeta.labelKey) : ''}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: 12 Structural UX/UI Layouts */}
             {studioTab === 'layouts' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
@@ -533,13 +777,20 @@ export default function GlobalControlBar() {
                         <LayoutWireframePreview type={layout.wireframeType} active={isActive} />
                         <div className="flex items-start justify-between gap-1.5">
                           <div className="min-w-0">
-                            <span className="text-[11px] font-black text-[#102A43] flex items-center gap-1 flex-wrap leading-snug">
-                              <span>{t(layout.labelKey)}</span>
-                              {layout.isGlass && (
-                                <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-300 text-[8.5px] font-black">
-                                  {isRtl ? 'زجاجي' : 'Glass'}
-                                </span>
-                              )}
+                            <span className="text-[11px] font-black text-[#102A43] block leading-snug">
+                              {t(layout.labelKey)}
+                            </span>
+                            <span className="text-[9.5px] font-bold text-[#164E83] block mt-0.5">
+                              {isRtl ? layout.navPositionAr : layout.navPositionEn}
+                              {layout.isGlass
+                                ? isRtl
+                                  ? ' · زجاجي شفاف'
+                                  : ' · Frosted Glass'
+                                : layout.isClay
+                                ? isRtl
+                                  ? ' · مجسم 3D'
+                                  : ' · 3D Clay'
+                                : ''}
                             </span>
                             <span className="text-[10px] font-bold text-slate-600 block mt-0.5 leading-snug">
                               {isRtl ? layout.descAr : layout.descEn}
@@ -551,59 +802,41 @@ export default function GlobalControlBar() {
                     );
                   })}
                 </div>
-
-                {/* One-Click UX + Color Complete Skins */}
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <div className="flex items-center gap-1.5 text-[10.5px] font-black text-[#164E83]">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{t('uxQuickBundlesTitle')}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {UX_BUNDLE_PRESETS.map((bundle) => {
-                      const isBundleActive =
-                        prefs.uiLayout === bundle.layoutId && prefs.themeId === bundle.themeId;
-                      const themeMeta = THEME_PRESETS.find((th) => th.id === bundle.themeId);
-                      return (
-                        <button
-                          key={bundle.id}
-                          type="button"
-                          onClick={() => applyUiSkinBundle(bundle.layoutId, bundle.themeId)}
-                          className={`p-2 rounded-xl border text-${isRtl ? 'right' : 'left'} flex items-center gap-2 cursor-pointer transition-all ${
-                            isBundleActive
-                              ? 'border-[#102A43] bg-blue-50/70'
-                              : 'border-slate-200 hover:bg-slate-50 bg-white'
-                          }`}
-                        >
-                          <span
-                            className="w-6 h-6 rounded-lg border border-slate-300 shrink-0 flex items-center justify-center"
-                            style={{ backgroundColor: themeMeta?.previewBg || '#F4F7FB' }}
-                          >
-                            <span
-                              className="w-3 h-3 rounded-sm"
-                              style={{ backgroundColor: themeMeta?.previewPrimary || '#102A43' }}
-                            />
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10.5px] font-black text-[#102A43] block truncate">
-                              {isRtl ? bundle.titleAr : bundle.titleEn}
-                            </span>
-                            <span className="text-[9.5px] font-bold text-slate-500 block truncate">
-                              {isRtl ? bundle.subtitleAr : bundle.subtitleEn}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
             )}
 
-            {/* Tab 2: 14 Curated Color Palettes */}
+            {/* Tab 3: 34 Curated Color Palettes */}
             {studioTab === 'colors' && (
               <div className="space-y-2.5">
-                <div className="grid grid-cols-2 gap-2">
-                  {THEME_PRESETS.map((preset) => {
+                <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                  {(
+                    [
+                      { id: 'all' as ColorFilter, ar: 'الكل', en: 'All' },
+                      { id: 'light' as ColorFilter, ar: 'فاتحة', en: 'Light' },
+                      { id: 'glass_3d' as ColorFilter, ar: 'زجاجي و 3D', en: 'Glass & 3D' },
+                      { id: 'dark' as ColorFilter, ar: 'داكنة', en: 'Dark' },
+                    ] as const
+                  ).map((cat) => {
+                    const active = colorFilter === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setColorFilter(cat.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                          active
+                            ? 'bg-[#102A43] text-[#C6A15B] border-[#102A43]'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {isRtl ? cat.ar : cat.en}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {filteredColors.map((preset) => {
                     const active = prefs.themeId === preset.id;
                     return (
                       <button
@@ -634,9 +867,19 @@ export default function GlobalControlBar() {
                             <span className="text-[10.5px] font-black text-[#102A43] block truncate">
                               {t(preset.labelKey)}
                             </span>
-                            {preset.isGlass && (
-                              <span className="text-[8.5px] font-black text-sky-700 block">
-                                {isRtl ? 'تأثير زجاجي شفاف' : 'Frosted Glass'}
+                            {(preset.isGlass || preset.isClay || preset.isDark) && (
+                              <span className="text-[9px] font-bold text-slate-500 block">
+                                {preset.isClay
+                                  ? isRtl
+                                    ? 'تأثير مجسم 3D'
+                                    : '3D Tactile Clay'
+                                  : preset.isGlass
+                                  ? isRtl
+                                    ? 'تأثير زجاجي شفاف'
+                                    : 'Frosted Glass'
+                                  : isRtl
+                                  ? 'وضع ليلي داكن'
+                                  : 'Dark Mode'}
                               </span>
                             )}
                           </div>
@@ -649,7 +892,7 @@ export default function GlobalControlBar() {
               </div>
             )}
 
-            {/* Tab 3: Custom Color Picker */}
+            {/* Tab 4: Custom Color Picker */}
             {studioTab === 'custom' && (
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">

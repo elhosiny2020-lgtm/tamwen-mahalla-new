@@ -473,6 +473,315 @@ html[data-theme="copper_editorial"] {
   --app-table-row-hover: #EFE2D6;
 }
 
+/* 7i. ShareFlow Coral & Slate */
+html[data-theme="coral_shareflow"] {
+  --app-canvas-bg: #D5DCE8;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F3F5FA;
+  --app-text: #1E2433;
+  --app-text-muted: #5A647A;
+  --app-border: #DCE2EE;
+  --app-header-bg: #1E2433;
+  --app-header-border: #2F374C;
+  --app-header-text: #FFFFFF;
+  --app-accent: #E8532A;
+  --app-primary: #1E2433;
+  --app-primary-soft: #E8532A;
+  --app-table-head-bg: #1E2433;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F7F8FC;
+  --app-table-row-hover: #FFF0EB;
+}
+
+/* 7j. Learnthru Soft Periwinkle & Rose */
+html[data-theme="periwinkle_learn"] {
+  --app-canvas-bg: #E2E8F2;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F2F5FC;
+  --app-text: #1E2B4A;
+  --app-text-muted: #566589;
+  --app-border: #D4DEF0;
+  --app-header-bg: #435B9E;
+  --app-header-border: #5670B8;
+  --app-header-text: #FFFFFF;
+  --app-accent: #EE8A95;
+  --app-primary: #435B9E;
+  --app-primary-soft: #5D76C2;
+  --app-table-head-bg: #435B9E;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F4F7FD;
+  --app-table-row-hover: #E9EFFB;
+}
+
+/* 7k. Pastel Violet Cloud */
+html[data-theme="pastel_violet_cloud"] {
+  --app-canvas-bg: #ECE7FA;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F5F2FD;
+  --app-text: #232248;
+  --app-text-muted: #5D5B87;
+  --app-border: #DCD5F5;
+  --app-header-bg: #4B4DB8;
+  --app-header-border: #6063D4;
+  --app-header-text: #FFFFFF;
+  --app-accent: #F39CB2;
+  --app-primary: #4B4DB8;
+  --app-primary-soft: #6B6EF9;
+  --app-table-head-bg: #4B4DB8;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F7F5FE;
+  --app-table-row-hover: #ECE8FC;
+}
+
+/* 7l. Cyber Ocean 3D Dark HUD */
+html[data-theme="cyber_ocean_dark"] {
+  --app-canvas-bg: #041422;
+  --app-glass-mesh: radial-gradient(circle at 14% 16%, rgba(0, 212, 255, 0.24), transparent 42%),
+    radial-gradient(circle at 86% 20%, rgba(16, 185, 129, 0.18), transparent 40%),
+    radial-gradient(circle at 50% 88%, rgba(255, 122, 56, 0.16), transparent 44%),
+    linear-gradient(145deg, #03101C 0%, #072035 50%, #031321 100%);
+  --app-surface-bg: rgba(9, 34, 54, 0.72);
+  --app-surface-alt: rgba(12, 46, 72, 0.62);
+  --app-text: #EBF8FF;
+  --app-text-muted: #9CC7DF;
+  --app-border: rgba(0, 212, 255, 0.28);
+  --app-header-bg: rgba(5, 22, 38, 0.86);
+  --app-header-border: rgba(0, 212, 255, 0.34);
+  --app-header-text: #F0FAFF;
+  --app-accent: #00D4FF;
+  --app-primary: #0A2C46;
+  --app-primary-soft: #0EA5E9;
+  --app-table-head-bg: rgba(7, 30, 50, 0.92);
+  --app-table-head-text: #EBF8FF;
+  --app-table-row-bg: rgba(9, 34, 54, 0.64);
+  --app-table-row-alt: rgba(13, 44, 68, 0.58);
+  --app-table-row-hover: rgba(0, 212, 255, 0.18);
+  --app-glass-shadow: 0 18px 42px -12px rgba(0, 8, 18, 0.72), 0 0 0 1px rgba(0, 212, 255, 0.22), inset 0 1px 0 rgba(125, 232, 255, 0.18);
+}
+
+/* 7m. Plum & Sunflower Gold */
+html[data-theme="plum_sunflower"] {
+  --app-canvas-bg: #F3E9EC;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #FAF4F6;
+  --app-text: #2D2638;
+  --app-text-muted: #655973;
+  --app-border: #E5D6DC;
+  --app-header-bg: #4B425B;
+  --app-header-border: #625676;
+  --app-header-text: #FFFFFF;
+  --app-accent: #F5C74C;
+  --app-primary: #4B425B;
+  --app-primary-soft: #E56F76;
+  --app-table-head-bg: #4B425B;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #FBF7F8;
+  --app-table-row-hover: #FFF7DF;
+}
+
+/* 7n. Royal Indigo & Honey */
+html[data-theme="royal_indigo_honey"] {
+  --app-canvas-bg: #F3F4FA;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #EEF0FA;
+  --app-text: #1E1A4D;
+  --app-text-muted: #575485;
+  --app-border: #D9DCF0;
+  --app-header-bg: #2D2572;
+  --app-header-border: #403694;
+  --app-header-text: #FFFFFF;
+  --app-accent: #F8B85A;
+  --app-primary: #2D2572;
+  --app-primary-soft: #4F46E5;
+  --app-table-head-bg: #2D2572;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F6F7FC;
+  --app-table-row-hover: #FFF5E4;
+}
+
+/* 7o. 3D Tactile Clay Slate */
+html[data-theme="clay_slate_3d"] {
+  --app-canvas-bg: #A3B5C1;
+  --app-surface-bg: #C5D3DC;
+  --app-surface-alt: #B5C6D1;
+  --app-text: #192C3B;
+  --app-text-muted: #3D5668;
+  --app-border: rgba(255, 255, 255, 0.58);
+  --app-header-bg: #2B4257;
+  --app-header-border: #3B5973;
+  --app-header-text: #F2F7FA;
+  --app-accent: #55A6B4;
+  --app-primary: #2B4257;
+  --app-primary-soft: #438A96;
+  --app-table-head-bg: #2B4257;
+  --app-table-head-text: #F2F7FA;
+  --app-table-row-bg: #D5E0E8;
+  --app-table-row-alt: #C7D5DF;
+  --app-table-row-hover: #B9CBD7;
+}
+
+/* 7p. Twilight Indigo & Peach */
+html[data-theme="twilight_peach"] {
+  --app-canvas-bg: #F8EEE8;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #FCF6F2;
+  --app-text: #242754;
+  --app-text-muted: #5C608A;
+  --app-border: #EADAD0;
+  --app-header-bg: #3B3E79;
+  --app-header-border: #505499;
+  --app-header-text: #FFFFFF;
+  --app-accent: #F89668;
+  --app-primary: #3B3E79;
+  --app-primary-soft: #F89668;
+  --app-table-head-bg: #3B3E79;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #FDF8F5;
+  --app-table-row-hover: #FDECE3;
+}
+
+/* 7q. Deep Ocean & Flame Orange */
+html[data-theme="deep_ocean_flame"] {
+  --app-canvas-bg: #062038;
+  --app-surface-bg: #0B2D4C;
+  --app-surface-alt: #103A61;
+  --app-text: #F0F7FF;
+  --app-text-muted: #A3C4E0;
+  --app-border: #1C4E7A;
+  --app-header-bg: #04182B;
+  --app-header-border: #143D63;
+  --app-header-text: #FFFFFF;
+  --app-accent: #FF5D1F;
+  --app-primary: #0B3357;
+  --app-primary-soft: #1E88E5;
+  --app-table-head-bg: #051B30;
+  --app-table-head-text: #F0F7FF;
+  --app-table-row-bg: #0B2D4C;
+  --app-table-row-alt: #0E3559;
+  --app-table-row-hover: #154572;
+}
+
+/* 7r. Monochrome Editorial Studio */
+html[data-theme="monochrome_studio"] {
+  --app-canvas-bg: #DFE2EC;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F4F5F8;
+  --app-text: #14161B;
+  --app-text-muted: #565B68;
+  --app-border: #DCDFE8;
+  --app-header-bg: #14161B;
+  --app-header-border: #2A2E38;
+  --app-header-text: #FFFFFF;
+  --app-accent: #F472B6;
+  --app-primary: #14161B;
+  --app-primary-soft: #333845;
+  --app-table-head-bg: #14161B;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F7F8FA;
+  --app-table-row-hover: #ECEEF4;
+}
+
+/* 7s. Studio Navy & Tangerine Pro */
+html[data-theme="navy_tangerine_pro"] {
+  --app-canvas-bg: #E5EFF8;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F1F6FB;
+  --app-text: #142030;
+  --app-text-muted: #4E6078;
+  --app-border: #CFDCEB;
+  --app-header-bg: #182436;
+  --app-header-border: #2B3B54;
+  --app-header-text: #FFFFFF;
+  --app-accent: #F26430;
+  --app-primary: #182436;
+  --app-primary-soft: #F26430;
+  --app-table-head-bg: #182436;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F5F8FC;
+  --app-table-row-hover: #FFF1EB;
+}
+
+/* 7t. Aqua Frosted Glass Prism */
+html[data-theme="aqua_glass_prism"] {
+  --app-canvas-bg: #D5ECF1;
+  --app-glass-mesh: radial-gradient(circle at 12% 16%, rgba(14, 165, 233, 0.28), transparent 44%),
+    radial-gradient(circle at 84% 18%, rgba(167, 139, 250, 0.24), transparent 42%),
+    radial-gradient(circle at 52% 88%, rgba(16, 185, 129, 0.24), transparent 46%),
+    linear-gradient(135deg, #D5ECF2 0%, #EEF6FA 50%, #E5E4F4 100%);
+  --app-surface-bg: rgba(255, 255, 255, 0.72);
+  --app-surface-alt: rgba(235, 248, 250, 0.64);
+  --app-text: #0A2F3D;
+  --app-text-muted: #3A6473;
+  --app-border: rgba(255, 255, 255, 0.82);
+  --app-header-bg: rgba(12, 76, 96, 0.88);
+  --app-header-border: rgba(165, 243, 252, 0.36);
+  --app-header-text: #FFFFFF;
+  --app-accent: #10B981;
+  --app-primary: #0C4C60;
+  --app-primary-soft: #0EA5E9;
+  --app-table-head-bg: rgba(12, 76, 96, 0.92);
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: rgba(255, 255, 255, 0.7);
+  --app-table-row-alt: rgba(232, 247, 250, 0.58);
+  --app-table-row-hover: rgba(165, 243, 252, 0.42);
+  --app-glass-shadow: 0 14px 36px -10px rgba(12, 76, 96, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* 7u. Humandeck Royal Navy & Vivid Violet */
+html[data-theme="humandeck_violet"] {
+  --app-canvas-bg: #EFF2F8;
+  --app-surface-bg: #FFFFFF;
+  --app-surface-alt: #F4F5FB;
+  --app-text: #14163C;
+  --app-text-muted: #565B82;
+  --app-border: #DCE0EE;
+  --app-header-bg: #13144A;
+  --app-header-border: #262870;
+  --app-header-text: #FFFFFF;
+  --app-accent: #6B52D6;
+  --app-primary: #13144A;
+  --app-primary-soft: #6B52D6;
+  --app-table-head-bg: #13144A;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #F6F7FC;
+  --app-table-row-hover: #EFEBFB;
+}
+
+/* 7v. Crextio Sky Frosted Glass */
+html[data-theme="crextio_sky_glass"] {
+  --app-canvas-bg: #DCE9F8;
+  --app-glass-mesh: radial-gradient(circle at 18% 14%, rgba(59, 130, 246, 0.22), transparent 44%),
+    radial-gradient(circle at 82% 20%, rgba(147, 197, 253, 0.34), transparent 46%),
+    radial-gradient(circle at 50% 90%, rgba(219, 234, 254, 0.5), transparent 50%),
+    linear-gradient(145deg, #D9E8F9 0%, #EEF5FD 50%, #DDEAFB 100%);
+  --app-surface-bg: rgba(255, 255, 255, 0.78);
+  --app-surface-alt: rgba(240, 247, 255, 0.7);
+  --app-text: #102A4C;
+  --app-text-muted: #466387;
+  --app-border: rgba(255, 255, 255, 0.88);
+  --app-header-bg: rgba(20, 58, 107, 0.9);
+  --app-header-border: rgba(191, 219, 254, 0.42);
+  --app-header-text: #FFFFFF;
+  --app-accent: #1976F3;
+  --app-primary: #143A6B;
+  --app-primary-soft: #1976F3;
+  --app-table-head-bg: rgba(20, 58, 107, 0.92);
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: rgba(255, 255, 255, 0.76);
+  --app-table-row-alt: rgba(238, 246, 255, 0.62);
+  --app-table-row-hover: rgba(191, 219, 254, 0.44);
+  --app-glass-shadow: 0 16px 38px -12px rgba(20, 58, 107, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
 /* 8. Custom User Theme */
 html[data-theme="custom"] {
   --app-canvas-bg: var(--custom-bg, #BDC9D4);
@@ -675,12 +984,51 @@ html[data-glass-ui="true"] .fixed .bg-white {
 }
 
 html[data-ui-layout="liquid_glass"] main .bg-white,
-html[data-ui-layout="glass_split"] main .bg-white {
-  border-radius: 1.25rem;
+html[data-ui-layout="glass_split"] main .bg-white,
+html[data-ui-layout="floating_top_glass"] main .bg-white,
+html[data-ui-layout="cyber_hud_cockpit"] main .bg-white {
+  border-radius: 1.35rem;
 }
 
-html[data-ui-layout="liquid_glass"] aside.app-sidebar {
+html[data-ui-layout="liquid_glass"] aside.app-sidebar,
+html[data-ui-layout="cyber_hud_cockpit"] aside.app-sidebar {
   border-radius: 1.5rem;
+}
+
+/* Tactile 3D Claymorphism Surface Material (Clay 3D Layout & Theme) */
+html[data-clay-ui="true"] .app-shell {
+  background: linear-gradient(145deg, #9BB0BD 0%, #B2C3CE 50%, #94A8B6 100%);
+}
+
+html[data-clay-ui="true"] main .bg-white,
+html[data-clay-ui="true"] main .app-workspace-frame {
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow:
+    10px 12px 24px rgba(32, 54, 72, 0.22),
+    -6px -6px 16px rgba(255, 255, 255, 0.45),
+    inset 0 2px 2px rgba(255, 255, 255, 0.65);
+}
+
+html[data-clay-ui="true"] aside.app-sidebar {
+  border-radius: 1.75rem;
+  box-shadow:
+    12px 16px 32px rgba(18, 34, 48, 0.36),
+    inset 0 2px 3px rgba(255, 255, 255, 0.2);
+}
+
+/* Clean Pure-White Light Minimal Sidebar Layout */
+html[data-light-sidebar="true"] aside.app-sidebar {
+  background: #FFFFFF;
+  color: var(--app-text, #1E293B);
+  border-color: var(--app-border, #DCE2EE);
+  box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.12);
+}
+
+/* Cyber HUD Cockpit Luminous Rim */
+html[data-ui-layout="cyber_hud_cockpit"] main .bg-white,
+html[data-ui-layout="cyber_hud_cockpit"] aside.app-sidebar {
+  border-color: rgba(0, 212, 255, 0.32);
 }
 
 /* High-Contrast Dark Mode Pairing (prevents dark text on dark surfaces across main, popovers & modals) */

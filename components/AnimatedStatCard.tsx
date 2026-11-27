@@ -163,12 +163,30 @@ export default function AnimatedStatCard({
   })();
 
   const styles = THEME_STYLES[theme];
-  const isDarkTheme = prefs.themeId === 'dark_mode' || prefs.themeId === 'midnight_aurora';
+  const isDarkTheme =
+    prefs.themeId === 'dark_mode' ||
+    prefs.themeId === 'midnight_aurora' ||
+    prefs.themeId === 'obsidian_glass' ||
+    prefs.themeId === 'aurora_glass' ||
+    prefs.themeId === 'cyber_ocean_dark' ||
+    prefs.themeId === 'deep_ocean_flame';
   const layout = prefs.uiLayout;
 
   const containerStyleClass = (() => {
+    if (layout === 'cyber_hud_cockpit' || prefs.themeId === 'cyber_ocean_dark') {
+      return 'rounded-2xl bg-[#092236]/85 border border-cyan-400/35 shadow-[0_14px_32px_-12px_rgba(0,12,24,0.75)]';
+    }
     if (isDarkTheme) {
       return `rounded-2xl bg-[#131E31]/95 ${styles.darkAccentBorder} shadow-lg`;
+    }
+    if (layout === 'tactile_clay_3d' || prefs.themeId === 'clay_slate_3d') {
+      return 'rounded-[26px] bg-[#C8D6DF] border border-white/65 shadow-[10px_12px_22px_rgba(32,54,72,0.22),-6px_-6px_14px_rgba(255,255,255,0.5),inset_0_2px_2px_rgba(255,255,255,0.72)]';
+    }
+    if (layout === 'floating_top_glass') {
+      return 'rounded-[24px] bg-white/80 backdrop-blur-xl border border-white/90 shadow-[0_14px_30px_-14px_rgba(20,58,107,0.16)]';
+    }
+    if (layout === 'clean_light_sidebar') {
+      return 'rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 shadow-[0_6px_18px_-10px_rgba(15,23,42,0.1)]';
     }
     if (layout === 'ultra_minimal') {
       return 'rounded-xl bg-white border border-slate-200 hover:border-slate-400 shadow-none';

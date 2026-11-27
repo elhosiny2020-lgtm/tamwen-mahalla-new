@@ -184,13 +184,19 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     prefs.themeId === 'dark_mode' ||
     prefs.themeId === 'midnight_aurora' ||
     prefs.themeId === 'obsidian_glass' ||
-    prefs.themeId === 'aurora_glass';
+    prefs.themeId === 'aurora_glass' ||
+    prefs.themeId === 'cyber_ocean_dark' ||
+    prefs.themeId === 'deep_ocean_flame';
   const uiLayout = prefs.uiLayout;
-  const isTopRibbonLayout = uiLayout === 'executive_command' || uiLayout === 'glass_split';
-  const isCompactRailLayout = uiLayout === 'bento_mosaic';
+  const isTopRibbonLayout =
+    uiLayout === 'executive_command' ||
+    uiLayout === 'glass_split' ||
+    uiLayout === 'floating_top_glass';
+  const isCompactRailLayout = uiLayout === 'bento_mosaic' || uiLayout === 'cyber_hud_cockpit';
   const isMinimalLayout = uiLayout === 'ultra_minimal';
   const isRoyalLayout = uiLayout === 'royal_heritage';
-  const isCockpitLayout = uiLayout === 'operations_cockpit';
+  const isCockpitLayout = uiLayout === 'operations_cockpit' || uiLayout === 'cyber_hud_cockpit';
+  const isLightSidebarLayout = uiLayout === 'clean_light_sidebar' && !isDarkTheme;
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
   const [allDepartments, setAllDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
   const [bakeries, setBakeries] = useState<BakeryRecord[]>(INITIAL_BAKERIES);
@@ -786,10 +792,18 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   const renderSidebarTabs = (isMobile = false) => (
     <div className="flex flex-col h-full">
       {/* Top User Avatar & Greeting + Collapse Controls */}
-      <div className="flex flex-col items-center text-center pb-4 mb-3 border-b border-white/12 relative">
+      <div
+        className={`flex flex-col items-center text-center pb-4 mb-3 border-b relative ${
+          isLightSidebarLayout ? 'border-slate-200' : 'border-white/12'
+        }`}
+      >
         <div className="w-full flex items-center justify-between mb-2">
           {(!sidebarCollapsed || isMobile) && (
-            <span className="text-[10px] font-black text-[#94C9CE] truncate">
+            <span
+              className={`text-[10px] font-black truncate ${
+                isLightSidebarLayout ? 'text-slate-500' : 'text-[#94C9CE]'
+              }`}
+            >
               {currentBranch?.arabicName || 'تموين الغربية'}
             </span>
           )}
@@ -798,7 +812,9 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 bg-[#314D66] text-white rounded-full cursor-pointer"
+                className={`p-1.5 rounded-full cursor-pointer ${
+                  isLightSidebarLayout ? 'bg-slate-100 text-slate-700' : 'bg-[#314D66] text-white'
+                }`}
                 title="إغلاق القائمة"
               >
                 <X className="w-4 h-4" />
@@ -810,7 +826,13 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                     type="button"
                     onClick={() => setIsSidebarPinned(!isSidebarPinned)}
                     className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                      isSidebarPinned ? 'bg-[#DCECEF] text-[#1E3346]' : 'bg-[#314D66] text-slate-300 hover:text-white'
+                      isLightSidebarLayout
+                        ? isSidebarPinned
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        : isSidebarPinned
+                        ? 'bg-[#DCECEF] text-[#1E3346]'
+                        : 'bg-[#314D66] text-slate-300 hover:text-white'
                     }`}
                     title={isSidebarPinned ? 'إلغاء تثبيت القائمة' : 'تثبيت القائمة مفتوحة'}
                   >
@@ -823,7 +845,11 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                     setSidebarCollapsed(!sidebarCollapsed);
                     if (!sidebarCollapsed) setIsSidebarPinned(false);
                   }}
-                  className="p-1.5 bg-[#314D66] hover:bg-[#3B717E] text-[#94C9CE] rounded-full transition-colors cursor-pointer"
+                  className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                    isLightSidebarLayout
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      : 'bg-[#314D66] hover:bg-[#3B717E] text-[#94C9CE]'
+                  }`}
                   title={sidebarCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
                 >
                   {sidebarCollapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
@@ -833,15 +859,34 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
           </div>
         </div>
 
-        <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-[#94C9CE] via-[#4B8592] to-[#253B4F] border-2 border-white/65 shadow-lg flex items-center justify-center text-white font-black text-xl">
+        <div
+          className="relative w-14 h-14 rounded-full border-2 border-white/65 shadow-lg flex items-center justify-center text-white font-black text-xl"
+          style={{
+            background: isLightSidebarLayout
+              ? 'linear-gradient(135deg, var(--app-primary, #1E2433), var(--app-accent, #E8532A))'
+              : 'linear-gradient(135deg, #94C9CE, #4B8592, #253B4F)',
+          }}
+        >
           {currentUser.fullName.charAt(0)}
-          <span className="absolute -bottom-0.5 -left-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-[#253B4F]" />
+          <span className="absolute -bottom-0.5 -left-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white" />
         </div>
 
         {(!sidebarCollapsed || isMobile) && (
           <div className="mt-2 min-w-0 w-full">
-            <h3 className="text-sm font-black text-white truncate">أهلاً، {firstName}!</h3>
-            <p className="text-[10.5px] font-bold text-[#94C9CE] truncate">{currentUser.jobTitle}</p>
+            <h3
+              className={`text-sm font-black truncate ${
+                isLightSidebarLayout ? 'text-slate-900' : 'text-white'
+              }`}
+            >
+              أهلاً، {firstName}!
+            </h3>
+            <p
+              className={`text-[10.5px] font-bold truncate ${
+                isLightSidebarLayout ? 'text-slate-500' : 'text-[#94C9CE]'
+              }`}
+            >
+              {currentUser.jobTitle}
+            </p>
           </div>
         )}
       </div>
@@ -849,13 +894,21 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       {/* Quick Search Inside Sidebar */}
       {(!sidebarCollapsed || isMobile) && (
         <div className="relative mb-3">
-          <Search className={`w-3.5 h-3.5 text-slate-300 absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5`} />
+          <Search
+            className={`w-3.5 h-3.5 absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5 ${
+              isLightSidebarLayout ? 'text-slate-400' : 'text-slate-300'
+            }`}
+          />
           <input
             type="text"
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
             placeholder={t('searchDepartments')}
-            className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 bg-[#182938]/75 border border-white/12 rounded-full text-[11px] text-white font-bold placeholder:text-slate-300 focus:outline-none focus:border-[#94C9CE]`}
+            className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 rounded-full text-[11px] font-bold focus:outline-none border ${
+              isLightSidebarLayout
+                ? 'bg-slate-100 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-slate-400'
+                : 'bg-[#182938]/75 border-white/12 text-white placeholder:text-slate-300 focus:border-[#94C9CE]'
+            }`}
           />
         </div>
       )}
@@ -875,7 +928,11 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                   onClick={() =>
                     setOpenSidebarGroups((prev) => ({ ...prev, [section.id]: !isGroupOpen }))
                   }
-                  className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-black text-[#94C9CE] hover:text-white cursor-pointer border-b border-white/10"
+                  className={`w-full flex items-center justify-between px-2 py-1 text-[10px] font-black cursor-pointer border-b ${
+                    isLightSidebarLayout
+                      ? 'text-slate-500 hover:text-slate-900 border-slate-200'
+                      : 'text-[#94C9CE] hover:text-white border-white/10'
+                  }`}
                 >
                   <span className="truncate">{section.title}</span>
                   {isGroupOpen ? (
@@ -909,7 +966,11 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                             : 'pl-4 pr-2.5'
                           : 'px-2.5'
                       } ${
-                        isActive
+                        isLightSidebarLayout
+                          ? isActive
+                            ? 'text-white border-transparent shadow-md'
+                            : 'bg-transparent border-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                          : isActive
                           ? 'text-[#1E3346] border-white/80 shadow-[0_6px_16px_rgba(12,24,36,0.28)]'
                           : 'bg-white/[0.04] border-transparent text-slate-100 hover:bg-white/[0.11] hover:border-white/15'
                       }`}
@@ -919,14 +980,27 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                         <motion.span
                           layoutId={isMobile ? 'mobileActiveTabBg' : 'desktopActiveTabBg'}
                           transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#E5F1F3] to-[#C2DCE0] z-0"
+                          className={`absolute inset-0 rounded-2xl z-0 ${
+                            isLightSidebarLayout ? '' : 'bg-gradient-to-b from-[#E5F1F3] to-[#C2DCE0]'
+                          }`}
+                          style={
+                            isLightSidebarLayout
+                              ? { backgroundColor: 'var(--app-primary, #1E2433)' }
+                              : undefined
+                          }
                         />
                       )}
 
                       <div className="relative z-10 flex items-center gap-2.5 min-w-0 flex-1">
                         <span
                           className={`relative w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                            isActive ? 'bg-[#253B4F] text-[#94C9CE]' : 'bg-[#182938]/75 text-[#94C9CE]'
+                            isLightSidebarLayout
+                              ? isActive
+                                ? 'bg-white/20 text-white'
+                                : 'bg-slate-100 text-slate-700'
+                              : isActive
+                              ? 'bg-[#253B4F] text-[#94C9CE]'
+                              : 'bg-[#182938]/75 text-[#94C9CE]'
                           }`}
                         >
                           {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5')}
@@ -948,7 +1022,11 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                           {typeof liveCount === 'number' && (
                             <span
                               className={`num-cell tabular-nums min-w-[26px] h-[20px] px-1.5 rounded-lg text-[10px] font-black inline-flex items-center justify-center leading-none shadow-2xs transition-colors ${
-                                isActive
+                                isLightSidebarLayout
+                                  ? isActive
+                                    ? 'bg-white/20 text-white border border-white/25'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                  : isActive
                                   ? 'bg-[#1E3346] text-[#94C9CE] border border-[#1E3346]/20'
                                   : 'bg-[#142331]/90 text-[#94C9CE] border border-[#94C9CE]/25'
                               }`}
@@ -968,7 +1046,15 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                               }
                             }}
                             className={`p-0.5 rounded hover:bg-black/10 shrink-0 ${
-                              isPinned
+                              isLightSidebarLayout
+                                ? isPinned
+                                  ? isActive
+                                    ? 'text-amber-300'
+                                    : 'text-amber-500'
+                                  : isActive
+                                  ? 'text-white/60 hover:text-white'
+                                  : 'text-slate-400 opacity-60 hover:opacity-100'
+                                : isPinned
                                 ? isActive
                                   ? 'text-[#253B4F]'
                                   : 'text-[#94C9CE]'
@@ -990,13 +1076,31 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
 
       {/* Bottom Spotlight Card inside Sidebar */}
       {(!sidebarCollapsed || isMobile) && (
-        <div className="mt-3 rounded-[20px] bg-gradient-to-b from-[#1E3142] to-[#172635] border border-white/10 p-3.5 text-center space-y-2 shadow-inner">
-          <div className="w-9 h-9 mx-auto rounded-full bg-white/12 border border-white/20 flex items-center justify-center text-[#E5F1F3]">
+        <div
+          className={`mt-3 rounded-[20px] p-3.5 text-center space-y-2 ${
+            isLightSidebarLayout
+              ? 'bg-slate-50 border border-slate-200 shadow-xs'
+              : 'bg-gradient-to-b from-[#1E3142] to-[#172635] border border-white/10 shadow-inner'
+          }`}
+        >
+          <div
+            className={`w-9 h-9 mx-auto rounded-full flex items-center justify-center ${
+              isLightSidebarLayout
+                ? 'bg-slate-200/80 border border-slate-300 text-slate-800'
+                : 'bg-white/12 border border-white/20 text-[#E5F1F3]'
+            }`}
+          >
             <Crown className="w-4.5 h-4.5" />
           </div>
           <div>
-            <p className="text-xs font-black text-white">المهام والمحادثات</p>
-            <p className="text-[10px] font-bold text-slate-300 leading-snug mt-0.5">
+            <p className={`text-xs font-black ${isLightSidebarLayout ? 'text-slate-900' : 'text-white'}`}>
+              المهام والمحادثات
+            </p>
+            <p
+              className={`text-[10px] font-bold leading-snug mt-0.5 ${
+                isLightSidebarLayout ? 'text-slate-600' : 'text-slate-300'
+              }`}
+            >
               متابعة فورية بين الموظفين وتصدير التقارير
             </p>
           </div>
@@ -1006,7 +1110,14 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               setTasksInitialSubTab('internal_chat');
               handleSelectDept('d-25');
             }}
-            className="w-full py-2 px-3 rounded-full bg-gradient-to-b from-[#4E8997] to-[#376A77] hover:brightness-110 text-white text-[11px] font-black shadow-md cursor-pointer transition-all"
+            className={`w-full py-2 px-3 rounded-full hover:brightness-110 text-white text-[11px] font-black shadow-md cursor-pointer transition-all ${
+              isLightSidebarLayout ? '' : 'bg-gradient-to-b from-[#4E8997] to-[#376A77]'
+            }`}
+            style={
+              isLightSidebarLayout
+                ? { backgroundColor: 'var(--app-primary, #1E2433)' }
+                : undefined
+            }
           >
             فتح المحادثات الآن
           </button>
@@ -1018,6 +1129,12 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   const workspaceFrameClass = (() => {
     if (isDarkTheme) {
       return 'rounded-[24px] bg-[#0F172A]/80 border border-slate-700/70 shadow-2xl p-3 sm:p-4 lg:p-5';
+    }
+    if (uiLayout === 'tactile_clay_3d') {
+      return 'rounded-[28px] bg-[#D8E2E9]/90 border border-white/85 shadow-[0_24px_48px_-14px_rgba(30,51,70,0.28),inset_0_2px_0_rgba(255,255,255,0.95)] p-3 sm:p-4 lg:p-5';
+    }
+    if (isLightSidebarLayout) {
+      return 'rounded-[24px] bg-white/95 border border-slate-200/90 shadow-[0_14px_34px_-16px_rgba(15,23,42,0.12)] p-3 sm:p-4 lg:p-5';
     }
     if (isMinimalLayout) {
       return 'rounded-2xl bg-white/95 border border-slate-200 p-3 sm:p-5';
@@ -1033,8 +1150,10 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
 
   const cardSurfaceClass = isDarkTheme
     ? 'bg-[#131E31]/95 border border-slate-700/80 text-slate-100 shadow-lg'
-    : isMinimalLayout
-    ? 'bg-white border border-slate-200 text-[#1E3346]'
+    : uiLayout === 'tactile_clay_3d'
+    ? 'bg-[#EDF3F7] border border-white/90 text-[#1A2D3D] shadow-[0_14px_26px_-10px_rgba(30,51,70,0.22),inset_0_2px_0_rgba(255,255,255,0.95)]'
+    : isLightSidebarLayout || isMinimalLayout
+    ? 'bg-white border border-slate-200 text-[#1E3346] shadow-xs'
     : isRoyalLayout
     ? 'bg-white border border-[#C6A15B]/45 text-[#102A43] shadow-sm'
     : 'bg-gradient-to-br from-[#D7E2EB]/90 to-[#C8D6E2]/90 border border-white/75 text-[#1E3346] shadow-[0_12px_26px_-12px_rgba(30,51,70,0.24)]';
@@ -1166,9 +1285,13 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           onMouseEnter={() => (!isSidebarPinned || isCompactRailLayout) && setSidebarCollapsed(false)}
           onMouseLeave={() => (!isSidebarPinned || isCompactRailLayout) && setSidebarCollapsed(true)}
-          className={`app-sidebar hidden lg:flex flex-col bg-gradient-to-b from-[#253B4F] via-[#213649] to-[#1A2B3B] text-white ${
+          className={`app-sidebar hidden lg:flex flex-col ${
+            isLightSidebarLayout
+              ? 'bg-white text-slate-900 border-slate-200 shadow-[0_14px_34px_-12px_rgba(15,23,42,0.12)]'
+              : 'bg-gradient-to-b from-[#253B4F] via-[#213649] to-[#1A2B3B] text-white border-white/15 shadow-[0_18px_40px_-12px_rgba(16,28,40,0.45)]'
+          } ${
             isMinimalLayout || isRoyalLayout ? 'rounded-2xl' : 'rounded-[24px]'
-          } shadow-[0_18px_40px_-12px_rgba(16,28,40,0.45)] border border-white/15 shrink-0 print:hidden overflow-hidden p-3.5 self-start sticky top-20`}
+          } border shrink-0 print:hidden overflow-hidden p-3.5 self-start sticky top-20`}
         >
           {renderSidebarTabs(false)}
         </motion.aside>

@@ -67,11 +67,26 @@ export interface TranslationDictionary {
   theme_emerald_glass: string;
   theme_sapphire_executive: string;
   theme_copper_editorial: string;
+  theme_coral_shareflow: string;
+  theme_periwinkle_learn: string;
+  theme_pastel_violet_cloud: string;
+  theme_cyber_ocean_dark: string;
+  theme_plum_sunflower: string;
+  theme_royal_indigo_honey: string;
+  theme_clay_slate_3d: string;
+  theme_twilight_peach: string;
+  theme_deep_ocean_flame: string;
+  theme_monochrome_studio: string;
+  theme_navy_tangerine_pro: string;
+  theme_aqua_glass_prism: string;
+  theme_humandeck_violet: string;
+  theme_crextio_sky_glass: string;
   theme_custom: string;
 
   // UX/UI Studio & Layouts
   uxStudioBtn: string;
   uxStudioTitle: string;
+  uxTabGallery: string;
   uxTabLayouts: string;
   uxTabColors: string;
   uxTabCustom: string;
@@ -84,6 +99,10 @@ export interface TranslationDictionary {
   layout_operations_cockpit: string;
   layout_liquid_glass: string;
   layout_glass_split: string;
+  layout_floating_top_glass: string;
+  layout_tactile_clay_3d: string;
+  layout_clean_light_sidebar: string;
+  layout_cyber_hud_cockpit: string;
 
   // Sidebar & Navigation
   departments: string;
@@ -250,11 +269,26 @@ const AR: TranslationDictionary = {
   theme_emerald_glass: 'الزمرد الزجاجي الملكي (Glass)',
   theme_sapphire_executive: 'الياقوت التنفيذي الفاخر',
   theme_copper_editorial: 'النحاس الدافئ والتحريري',
+  theme_coral_shareflow: 'كورال شير فلو العصري',
+  theme_periwinkle_learn: 'الأزرق السماوي والوردي',
+  theme_pastel_violet_cloud: 'البنفسجي الباستيل السحابي',
+  theme_cyber_ocean_dark: 'العمليات السيبراني الداكن (3D)',
+  theme_plum_sunflower: 'البرقوقي والذهبي المشرق',
+  theme_royal_indigo_honey: 'النيلي الملكي والعسلي',
+  theme_clay_slate_3d: 'السلايت المجسم ثلاثي الأبعاد',
+  theme_twilight_peach: 'نيلي الغسق والخوخي',
+  theme_deep_ocean_flame: 'المحيط العميق والبرتقالي',
+  theme_monochrome_studio: 'استوديو أبيض وأسود كلاسيكي',
+  theme_navy_tangerine_pro: 'الكحلي واليوسفي الاحترافي',
+  theme_aqua_glass_prism: 'الأكوا الزجاجي الشفاف (Glass)',
+  theme_humandeck_violet: 'الكحلي الملكي والبنفسجي',
+  theme_crextio_sky_glass: 'السماوي الثلجي العائم (Glass)',
   theme_custom: 'لون مخصص',
 
   uxStudioBtn: 'الواجهات والألوان UX/UI',
   uxStudioTitle: 'استوديو تصميم الواجهات والألوان',
-  uxTabLayouts: 'أشكال الواجهات (UX/UI)',
+  uxTabGallery: 'معرض الواجهات',
+  uxTabLayouts: 'أشكال الواجهات',
   uxTabColors: 'لوحات الألوان',
   uxTabCustom: 'تخصيص حر',
   uxQuickBundlesTitle: 'تغييرات شاملة فورية (واجهة + ألوان)',
@@ -266,6 +300,10 @@ const AR: TranslationDictionary = {
   layout_operations_cockpit: 'غرفة العمليات الفورية (Cockpit)',
   layout_liquid_glass: 'الزجاج السائل الشفاف (Liquid Glass)',
   layout_glass_split: 'المنصة الزجاجية المقسمة (Glass Command)',
+  layout_floating_top_glass: 'الشريط العلوي السماوي العائم (Crextio)',
+  layout_tactile_clay_3d: 'الواجهة المجسمة ثلاثية الأبعاد (Clay 3D)',
+  layout_clean_light_sidebar: 'القائمة الجانبية البيضاء الأنيقة (Light Pro)',
+  layout_cyber_hud_cockpit: 'منصة العمليات السيبرانية (Cyber 3D HUD)',
 
   departments: 'الأقسام',
   searchDepartments: 'بحث في الأقسام...',
@@ -426,13 +464,28 @@ const EN: TranslationDictionary = {
   theme_emerald_glass: 'Royal Emerald Glass',
   theme_sapphire_executive: 'Sapphire Executive',
   theme_copper_editorial: 'Warm Copper Editorial',
+  theme_coral_shareflow: 'ShareFlow Coral & Slate',
+  theme_periwinkle_learn: 'Periwinkle & Soft Rose',
+  theme_pastel_violet_cloud: 'Pastel Violet Cloud',
+  theme_cyber_ocean_dark: 'Cyber Ocean 3D Dark',
+  theme_plum_sunflower: 'Plum & Sunflower Gold',
+  theme_royal_indigo_honey: 'Royal Indigo & Honey',
+  theme_clay_slate_3d: '3D Tactile Clay Slate',
+  theme_twilight_peach: 'Twilight Indigo & Peach',
+  theme_deep_ocean_flame: 'Deep Ocean & Flame Orange',
+  theme_monochrome_studio: 'Monochrome Studio Ink',
+  theme_navy_tangerine_pro: 'Studio Navy & Tangerine',
+  theme_aqua_glass_prism: 'Aqua Frosted Glass',
+  theme_humandeck_violet: 'Humandeck Royal Violet',
+  theme_crextio_sky_glass: 'Crextio Sky Glass',
   theme_custom: 'Custom Theme',
 
   uxStudioBtn: 'UX/UI & Colors',
   uxStudioTitle: 'UX/UI Interface & Color Studio',
-  uxTabLayouts: 'UI Layouts (UX/UI)',
+  uxTabGallery: 'UI Gallery',
+  uxTabLayouts: 'UI Layouts',
   uxTabColors: 'Color Palettes',
-  uxTabCustom: 'Custom Colors',
+  uxTabCustom: 'Custom',
   uxQuickBundlesTitle: 'One-Click UX/UI + Color Skins',
   layout_frosted_slate: 'Frosted Glass Dashboard',
   layout_executive_command: 'Executive Command (Top Ribbon)',
@@ -442,6 +495,10 @@ const EN: TranslationDictionary = {
   layout_operations_cockpit: 'Live Operations Cockpit',
   layout_liquid_glass: 'Liquid Crystal Glass',
   layout_glass_split: 'Glass Executive Command',
+  layout_floating_top_glass: 'Crextio Sky Floating Top Bar',
+  layout_tactile_clay_3d: '3D Tactile Claymorphism',
+  layout_clean_light_sidebar: 'Clean White Minimal Sidebar',
+  layout_cyber_hud_cockpit: 'Cyber 3D Telemetry HUD',
 
   departments: 'Departments',
   searchDepartments: 'Search departments...',

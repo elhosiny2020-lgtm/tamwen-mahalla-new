@@ -35,6 +35,20 @@ export type ThemePresetId =
   | 'emerald_glass'
   | 'sapphire_executive'
   | 'copper_editorial'
+  | 'coral_shareflow'
+  | 'periwinkle_learn'
+  | 'pastel_violet_cloud'
+  | 'cyber_ocean_dark'
+  | 'plum_sunflower'
+  | 'royal_indigo_honey'
+  | 'clay_slate_3d'
+  | 'twilight_peach'
+  | 'deep_ocean_flame'
+  | 'monochrome_studio'
+  | 'navy_tangerine_pro'
+  | 'aqua_glass_prism'
+  | 'humandeck_violet'
+  | 'crextio_sky_glass'
   | 'custom';
 
 export type UiLayoutId =
@@ -45,7 +59,11 @@ export type UiLayoutId =
   | 'ultra_minimal'
   | 'operations_cockpit'
   | 'liquid_glass'
-  | 'glass_split';
+  | 'glass_split'
+  | 'floating_top_glass'
+  | 'tactile_clay_3d'
+  | 'clean_light_sidebar'
+  | 'cyber_hud_cockpit';
 
 export type DisplayScalingMode = 'auto' | 'manual';
 export type UiDensity = 'compact' | 'comfortable' | 'spacious';
@@ -88,6 +106,7 @@ export interface ThemePresetMeta {
   previewText: string;
   isDark?: boolean;
   isGlass?: boolean;
+  isClay?: boolean;
 }
 
 export interface UiLayoutPresetMeta {
@@ -106,8 +125,13 @@ export interface UiLayoutPresetMeta {
     | 'minimal_flat'
     | 'cockpit_dense'
     | 'liquid_glass'
-    | 'glass_split';
+    | 'glass_split'
+    | 'floating_top_glass'
+    | 'tactile_clay_3d'
+    | 'clean_light_sidebar'
+    | 'cyber_hud_cockpit';
   isGlass?: boolean;
+  isClay?: boolean;
 }
 
 export interface UxSkinBundleMeta {
@@ -118,6 +142,8 @@ export interface UxSkinBundleMeta {
   subtitleEn: string;
   layoutId: UiLayoutId;
   themeId: ThemePresetId;
+  previewImage?: string;
+  category?: 'featured' | 'light' | 'dark' | 'glass_3d';
 }
 
 export const UI_LAYOUT_PRESETS: UiLayoutPresetMeta[] = [
@@ -201,6 +227,49 @@ export const UI_LAYOUT_PRESETS: UiLayoutPresetMeta[] = [
     navPositionEn: 'Glass Command Bar',
     recommendedTheme: 'obsidian_glass',
     wireframeType: 'glass_split',
+    isGlass: true,
+  },
+  {
+    id: 'floating_top_glass',
+    labelKey: 'layout_floating_top_glass',
+    descAr: 'شريط تنقل علوي سماوي عائم مع بطاقات زجاجية مستديرة ومساحات رحبة (Crextio)',
+    descEn: 'Airy sky-frost top navigation ribbon with generous rounded glass cards',
+    navPositionAr: 'شريط علوي عائم',
+    navPositionEn: 'Floating Sky Top Bar',
+    recommendedTheme: 'crextio_sky_glass',
+    wireframeType: 'floating_top_glass',
+    isGlass: true,
+  },
+  {
+    id: 'tactile_clay_3d',
+    labelKey: 'layout_tactile_clay_3d',
+    descAr: 'بطاقات وأزرار مجسمة ثلاثية الأبعاد بظلال ناعمة وإضاءة حواف علوية (Clay 3D)',
+    descEn: 'Sculpted 3D claymorphic cards and soft-embossed tactile slate panels',
+    navPositionAr: 'قائمة مجسمة 3D',
+    navPositionEn: '3D Tactile Sidebar',
+    recommendedTheme: 'clay_slate_3d',
+    wireframeType: 'tactile_clay_3d',
+    isClay: true,
+  },
+  {
+    id: 'clean_light_sidebar',
+    labelKey: 'layout_clean_light_sidebar',
+    descAr: 'قائمة جانبية بيضاء نقية بخطوط واضحة وتباين عالٍ وتبويبات ملونة ناعمة',
+    descEn: 'Crisp pure-white minimalist sidebar with dark ink & vibrant active accents',
+    navPositionAr: 'قائمة جانبية بيضاء',
+    navPositionEn: 'Clean White Sidebar',
+    recommendedTheme: 'coral_shareflow',
+    wireframeType: 'clean_light_sidebar',
+  },
+  {
+    id: 'cyber_hud_cockpit',
+    labelKey: 'layout_cyber_hud_cockpit',
+    descAr: 'منصة عمليات ليلية بإطارات سيبرانية مضيئة وشريط أيقونات مضغوط للرصد السريع',
+    descEn: 'Luminous cyan-rimmed dark glass telemetry deck with slim icon rail',
+    navPositionAr: 'شريط أيقونات سيبراني',
+    navPositionEn: 'Cyber HUD Icon Rail',
+    recommendedTheme: 'cyber_ocean_dark',
+    wireframeType: 'cyber_hud_cockpit',
     isGlass: true,
   },
 ];
@@ -374,9 +443,327 @@ export const THEME_PRESETS: ThemePresetMeta[] = [
     previewAccent: '#C87D4B',
     previewText: '#2F1811',
   },
+  {
+    id: 'coral_shareflow',
+    labelKey: 'theme_coral_shareflow',
+    previewBg: '#B8C1D4',
+    previewPrimary: '#1E2433',
+    previewAccent: '#E8532A',
+    previewText: '#1E2433',
+  },
+  {
+    id: 'periwinkle_learn',
+    labelKey: 'theme_periwinkle_learn',
+    previewBg: '#DFE5EE',
+    previewPrimary: '#4F67B0',
+    previewAccent: '#EE8A95',
+    previewText: '#1F2A44',
+  },
+  {
+    id: 'pastel_violet_cloud',
+    labelKey: 'theme_pastel_violet_cloud',
+    previewBg: '#ECE7FA',
+    previewPrimary: '#5D5FEF',
+    previewAccent: '#F39CB2',
+    previewText: '#232248',
+  },
+  {
+    id: 'cyber_ocean_dark',
+    labelKey: 'theme_cyber_ocean_dark',
+    previewBg: '#041422',
+    previewPrimary: '#0A2C46',
+    previewAccent: '#00D4FF',
+    previewText: '#E8F6FF',
+    isDark: true,
+    isGlass: true,
+  },
+  {
+    id: 'plum_sunflower',
+    labelKey: 'theme_plum_sunflower',
+    previewBg: '#F2E7EA',
+    previewPrimary: '#4B425B',
+    previewAccent: '#F5C74C',
+    previewText: '#2D2638',
+  },
+  {
+    id: 'royal_indigo_honey',
+    labelKey: 'theme_royal_indigo_honey',
+    previewBg: '#F4F5FB',
+    previewPrimary: '#2D2572',
+    previewAccent: '#F8B85A',
+    previewText: '#1E1A4D',
+  },
+  {
+    id: 'clay_slate_3d',
+    labelKey: 'theme_clay_slate_3d',
+    previewBg: '#9EB0BC',
+    previewPrimary: '#2B4257',
+    previewAccent: '#4893A0',
+    previewText: '#1A2D3D',
+    isClay: true,
+  },
+  {
+    id: 'twilight_peach',
+    labelKey: 'theme_twilight_peach',
+    previewBg: '#F8EEE8',
+    previewPrimary: '#3B3E79',
+    previewAccent: '#F89668',
+    previewText: '#242754',
+  },
+  {
+    id: 'deep_ocean_flame',
+    labelKey: 'theme_deep_ocean_flame',
+    previewBg: '#062038',
+    previewPrimary: '#0B3357',
+    previewAccent: '#FF5D1F',
+    previewText: '#F0F7FF',
+    isDark: true,
+  },
+  {
+    id: 'monochrome_studio',
+    labelKey: 'theme_monochrome_studio',
+    previewBg: '#DDE0EA',
+    previewPrimary: '#14161B',
+    previewAccent: '#F472B6',
+    previewText: '#14161B',
+  },
+  {
+    id: 'navy_tangerine_pro',
+    labelKey: 'theme_navy_tangerine_pro',
+    previewBg: '#E6F0F8',
+    previewPrimary: '#182436',
+    previewAccent: '#F26430',
+    previewText: '#121E2E',
+  },
+  {
+    id: 'aqua_glass_prism',
+    labelKey: 'theme_aqua_glass_prism',
+    previewBg: '#D8EEF3',
+    previewPrimary: '#0C4C60',
+    previewAccent: '#10B981',
+    previewText: '#0A2F3D',
+    isGlass: true,
+  },
+  {
+    id: 'humandeck_violet',
+    labelKey: 'theme_humandeck_violet',
+    previewBg: '#F1F3F9',
+    previewPrimary: '#13144A',
+    previewAccent: '#6B52D6',
+    previewText: '#14163C',
+  },
+  {
+    id: 'crextio_sky_glass',
+    labelKey: 'theme_crextio_sky_glass',
+    previewBg: '#DCE9F8',
+    previewPrimary: '#143A6B',
+    previewAccent: '#1976F3',
+    previewText: '#102A4C',
+    isGlass: true,
+  },
 ];
 
 export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
+  // === 18 Curated Gallery Interfaces Inspired Directly by User-Selected Dashboards ===
+  {
+    id: 'gallery_crextio_sky',
+    titleAr: 'واجهة السماوي العائم (Crextio)',
+    titleEn: 'Crextio Sky Floating Glass',
+    subtitleAr: 'شريط علوي عائم وبطاقات سماوية زجاجية رحبة',
+    subtitleEn: 'Floating top nav & airy sky glass cards',
+    layoutId: 'floating_top_glass',
+    themeId: 'crextio_sky_glass',
+    previewImage: '/assets/aistudio/fd4a64bb1e577223adf6adcfc2e8c4b7_91111878.jpg',
+    category: 'glass_3d',
+  },
+  {
+    id: 'gallery_cyber_hospital',
+    titleAr: 'العمليات السيبراني 3D (Cyber HUD)',
+    titleEn: 'Cyber 3D Operations HUD',
+    subtitleAr: 'زجاج ليلي مضيء بحدود سماوية وتفاصيل فورية',
+    subtitleEn: 'Dark luminous cyan glass telemetry deck',
+    layoutId: 'cyber_hud_cockpit',
+    themeId: 'cyber_ocean_dark',
+    previewImage: '/assets/aistudio/12a906f8400555f75b75755f91e7cb7b_7fa6fdac.jpg',
+    category: 'dark',
+  },
+  {
+    id: 'gallery_clay_3d',
+    titleAr: 'الواجهة المجسمة 3D (Tactile Clay)',
+    titleEn: '3D Tactile Clay Slate',
+    subtitleAr: 'بطاقات بارزة ثلاثية الأبعاد بظلال ناعمة وأزرق رمادي',
+    subtitleEn: 'Soft-embossed 3D clay cards & slate rail',
+    layoutId: 'tactile_clay_3d',
+    themeId: 'clay_slate_3d',
+    previewImage: '/assets/aistudio/d3432e6545503a17380d2e77f419066f_386d0038.jpg',
+    category: 'glass_3d',
+  },
+  {
+    id: 'gallery_aqua_glass',
+    titleAr: 'أكوا الزجاجي الشفاف (Aqua Glass)',
+    titleEn: 'Aqua Frosted Glass Academy',
+    subtitleAr: 'شريط بترولي غامق وبطاقات زجاجية ناصعة الشفافية',
+    subtitleEn: 'Deep petrol sidebar & iridescent frosted glass',
+    layoutId: 'liquid_glass',
+    themeId: 'aqua_glass_prism',
+    previewImage: '/assets/aistudio/5631bfb5fb22d764d23d1fe0ae9e1bd6_df20faa3.jpg',
+    category: 'glass_3d',
+  },
+  {
+    id: 'gallery_daily_ads',
+    titleAr: 'المحيط العميق والبرتقالي (Ocean Pro)',
+    titleEn: 'Deep Ocean & Flame Pro',
+    subtitleAr: 'لوحة داكنة فاخرة بألوان المحيط ولمسات برتقالية بارزة',
+    subtitleEn: 'Rich marine navy with vibrant flame CTA',
+    layoutId: 'operations_cockpit',
+    themeId: 'deep_ocean_flame',
+    previewImage: '/assets/aistudio/e171b3bc697d9682d34f86df6e0e467b_de6aca1a.jpg',
+    category: 'dark',
+  },
+  {
+    id: 'gallery_shareflow',
+    titleAr: 'شير فلو الكورال الأبيض (ShareFlow)',
+    titleEn: 'ShareFlow Coral & Slate',
+    subtitleAr: 'قائمة بيضاء أنيقة مع أزرار مرجانية ناصعة',
+    subtitleEn: 'Clean white sidebar & vivid coral actions',
+    layoutId: 'clean_light_sidebar',
+    themeId: 'coral_shareflow',
+    previewImage: '/assets/aistudio/6b6012307f2c30b41d392abd3e46280d_e5be31e3.jpg',
+    category: 'light',
+  },
+  {
+    id: 'gallery_learnthru',
+    titleAr: 'السماوي والوردي الهادئ (Learnthru)',
+    titleEn: 'Learnthru Periwinkle & Rose',
+    subtitleAr: 'واجهة مضيئة منظمة بأزرق سماوي ولمسات وردية',
+    subtitleEn: 'Light clean workspace with periwinkle cards',
+    layoutId: 'clean_light_sidebar',
+    themeId: 'periwinkle_learn',
+    previewImage: '/assets/aistudio/8b99a54b7ba1bbb4ef701da83636ae73_15bb5a09.jpg',
+    category: 'light',
+  },
+  {
+    id: 'gallery_pastel_social',
+    titleAr: 'البنفسجي الباستيل المضيء (Pastel)',
+    titleEn: 'Pastel Violet Cloud Rail',
+    subtitleAr: 'شريط أيقونات أنيق وبطاقات سحابية باستيل ناعمة',
+    subtitleEn: 'Compact pastel rail & airy snow-white cards',
+    layoutId: 'bento_mosaic',
+    themeId: 'pastel_violet_cloud',
+    previewImage: '/assets/aistudio/3f4e45946e4ecbe0be1cd32c8f314876_9da0be22.jpg',
+    category: 'light',
+  },
+  {
+    id: 'gallery_plum_sunflower',
+    titleAr: 'البرقوقي والذهبي المشرق (Plum Gold)',
+    titleEn: 'Plum & Sunflower Studio',
+    subtitleAr: 'قائمة برقوقية مخملية مع لمسات ذهبية دافئة',
+    subtitleEn: 'Velvet plum sidebar & warm golden highlights',
+    layoutId: 'frosted_slate',
+    themeId: 'plum_sunflower',
+    previewImage: '/assets/aistudio/522165cfcd8b895f6b80577fd9b82c7c_9c021a25.jpg',
+    category: 'featured',
+  },
+  {
+    id: 'gallery_helper_indigo',
+    titleAr: 'النيلي الملكي والعسلي (Helper Pro)',
+    titleEn: 'Helper Indigo & Honey',
+    subtitleAr: 'شريط أيقونات نيلي عميق وبطاقات بيضاء وعسلية',
+    subtitleEn: 'Deep indigo icon rail & honey accents',
+    layoutId: 'bento_mosaic',
+    themeId: 'royal_indigo_honey',
+    previewImage: '/assets/aistudio/d042dcac27d81e48ff7e0853b1d08060_436f7bd8.jpg',
+    category: 'light',
+  },
+  {
+    id: 'gallery_twilight_peach',
+    titleAr: 'نيلي الغسق والخوخي (Fleet UI)',
+    titleEn: 'Twilight Indigo & Peach',
+    subtitleAr: 'قائمة نيلية أنيقة مع تمييز خوخي دافئ وتباين مريح',
+    subtitleEn: 'Twilight sidebar with apricot active tabs',
+    layoutId: 'frosted_slate',
+    themeId: 'twilight_peach',
+    previewImage: '/assets/aistudio/ec22d5bcbb92c398ecb3c959fdbbd672_18f9215d.jpg',
+    category: 'featured',
+  },
+  {
+    id: 'gallery_lavender_cloud',
+    titleAr: 'سحابة اللافندر الهادئة (Cloud Tasks)',
+    titleEn: 'Lavender Cloud Workspace',
+    subtitleAr: 'تصميم خفيف وهادئ للتركيز والمهام اليومية',
+    subtitleEn: 'Serene mist-lavender minimal workspace',
+    layoutId: 'clean_light_sidebar',
+    themeId: 'pastel_violet_cloud',
+    previewImage: '/assets/aistudio/f3be18bb13eccfca4c6346f497983b72_0b87084a.jpg',
+    category: 'light',
+  },
+  {
+    id: 'gallery_midnight_lavender',
+    titleAr: 'الأوبسيديان واللافندر (Midnight Rail)',
+    titleEn: 'Midnight Rail & Lavender',
+    subtitleAr: 'شريط أيقونات داكن أنيق على خلفية بيضاء مشرقة',
+    subtitleEn: 'Obsidian icon rail with crisp white stage',
+    layoutId: 'bento_mosaic',
+    themeId: 'humandeck_violet',
+    previewImage: '/assets/aistudio/53c64040da206b0b2b42f15fb35488d9_1831b041.jpg',
+    category: 'featured',
+  },
+  {
+    id: 'gallery_monochrome_feeds',
+    titleAr: 'استوديو الأبيض والأسود (Monochrome)',
+    titleEn: 'Monochrome Editorial Ink',
+    subtitleAr: 'بساطة تحريرية فائقة بالأبيض والأسود الفحمي',
+    subtitleEn: 'Crisp white panels with bold jet-black buttons',
+    layoutId: 'clean_light_sidebar',
+    themeId: 'monochrome_studio',
+    previewImage: '/assets/aistudio/f9db22a291b680ed119a29b96d3c5875_77b520d4.jpg',
+    category: 'light',
+  },
+  {
+    id: 'gallery_studio_builder',
+    titleAr: 'استوديو الكحلي واليوسفي (Builder)',
+    titleEn: 'Studio Navy & Tangerine',
+    subtitleAr: 'شريط أدوات كحلي داكن مع مساحة عمل بيضاء ويوسفي',
+    subtitleEn: 'Dark studio sidebar with crisp bright canvas',
+    layoutId: 'frosted_slate',
+    themeId: 'navy_tangerine_pro',
+    previewImage: '/assets/aistudio/fd7ebfd86525198cfa68d44925d828b6_e3b0365e.jpg',
+    category: 'featured',
+  },
+  {
+    id: 'gallery_dual_analytics',
+    titleAr: 'التحليلات التنفيذية المزدوجة (Analytics)',
+    titleEn: 'Executive Split Analytics',
+    subtitleAr: 'كحلي ليلي متباين مع بطاقات بيضاء ولمسات كهرمانية',
+    subtitleEn: 'Charcoal-navy nav & high-contrast KPI stage',
+    layoutId: 'royal_heritage',
+    themeId: 'navy_tangerine_pro',
+    previewImage: '/assets/aistudio/74d274d58b8418841c1c6a7d4c3bfc1b_030c63a4.jpg',
+    category: 'featured',
+  },
+  {
+    id: 'gallery_humandeck',
+    titleAr: 'هيومان ديك الملكي (Humandeck HR)',
+    titleEn: 'Humandeck Royal Navy & Violet',
+    subtitleAr: 'لوحة موارد بشرية وقيادة مؤسسية بالكحلي والبنفسجي',
+    subtitleEn: 'Enterprise indigo sidebar & regal violet KPIs',
+    layoutId: 'frosted_slate',
+    themeId: 'humandeck_violet',
+    previewImage: '/assets/aistudio/91063e2a98e0d23dd7846ff08830f8c4_50b2cb54.jpg',
+    category: 'featured',
+  },
+  {
+    id: 'gallery_learning_light',
+    titleAr: 'السماوي النقي والكوبالت (LearningLight)',
+    titleEn: 'LearningLight Sky & Cobalt',
+    subtitleAr: 'قائمة بيضاء مسطحة مع أزرق كوبالت مشرق ومريح للعين',
+    subtitleEn: 'Minimal white sidebar & electric cobalt accents',
+    layoutId: 'clean_light_sidebar',
+    themeId: 'periwinkle_learn',
+    previewImage: '/assets/aistudio/ed3b2359b803c6d05ae0430530dd279a_593140d2.jpg',
+    category: 'light',
+  },
+  // === Classic & Glass Core System Skins ===
   {
     id: 'skin_crystal_liquid',
     titleAr: 'الكريستال الزجاجي الفاخر',
@@ -385,6 +772,7 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     subtitleEn: 'Translucent glass layers & crisp frost',
     layoutId: 'liquid_glass',
     themeId: 'crystal_glass',
+    category: 'glass_3d',
   },
   {
     id: 'skin_obsidian_glass',
@@ -394,6 +782,7 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     subtitleEn: 'Dark smoked glass & luminous blue glow',
     layoutId: 'glass_split',
     themeId: 'obsidian_glass',
+    category: 'dark',
   },
   {
     id: 'skin_aurora_prism',
@@ -403,6 +792,7 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     subtitleEn: 'Aurora mesh backdrop & frosted panels',
     layoutId: 'liquid_glass',
     themeId: 'aurora_glass',
+    category: 'dark',
   },
   {
     id: 'skin_emerald_glass',
@@ -412,6 +802,7 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     subtitleEn: 'Frosted emerald glass & sovereign gold',
     layoutId: 'liquid_glass',
     themeId: 'emerald_glass',
+    category: 'glass_3d',
   },
   {
     id: 'skin_glass_modern',
@@ -421,6 +812,7 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     subtitleEn: 'Frosted teal & floating sidebar',
     layoutId: 'frosted_slate',
     themeId: 'frosted_teal',
+    category: 'featured',
   },
   {
     id: 'skin_exec_ribbon',
@@ -430,42 +822,7 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     subtitleEn: 'Top ribbon nav & sapphire executive',
     layoutId: 'executive_command',
     themeId: 'sapphire_executive',
-  },
-  {
-    id: 'skin_bento_indigo',
-    titleAr: 'شبكة بينتو الذكية',
-    titleEn: 'Smart Bento Mosaic',
-    subtitleAr: 'شريط أيقونات مضغوط وألوان نيلية حديثة',
-    subtitleEn: 'Icon rail & indigo mosaic grid',
-    layoutId: 'bento_mosaic',
-    themeId: 'indigo_horizon',
-  },
-  {
-    id: 'skin_copper_heritage',
-    titleAr: 'الطراز النحاسي التحريري',
-    titleEn: 'Copper Editorial Sovereign',
-    subtitleAr: 'هيكلة سيادية فاخرة بألوان النحاس الدافئ',
-    subtitleEn: 'Sovereign frame & warm copper tones',
-    layoutId: 'royal_heritage',
-    themeId: 'copper_editorial',
-  },
-  {
-    id: 'skin_minimal_paper',
-    titleAr: 'البساطة الهادئة لراحة العين',
-    titleEn: 'Calm Minimal Paper',
-    subtitleAr: 'تخطيط مسطح مريح بألوان دافئة',
-    subtitleEn: 'Flat crisp grid & soft paper',
-    layoutId: 'ultra_minimal',
-    themeId: 'eye_comfort',
-  },
-  {
-    id: 'skin_night_cockpit',
-    titleAr: 'غرفة العمليات الليلية',
-    titleEn: 'Night Operations Cockpit',
-    subtitleAr: 'وضع داكن عالي التباين للعمل الليلي',
-    subtitleEn: 'Midnight aurora dark telemetry',
-    layoutId: 'operations_cockpit',
-    themeId: 'midnight_aurora',
+    category: 'featured',
   },
 ];
 
@@ -500,6 +857,10 @@ const VALID_LAYOUTS = new Set<UiLayoutId>([
   'operations_cockpit',
   'liquid_glass',
   'glass_split',
+  'floating_top_glass',
+  'tactile_clay_3d',
+  'clean_light_sidebar',
+  'cyber_hud_cockpit',
 ]);
 
 function normalizeLayout(v: unknown): UiLayoutId {
@@ -792,6 +1153,8 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
       prefs.themeId === 'midnight_aurora' ||
       prefs.themeId === 'obsidian_glass' ||
       prefs.themeId === 'aurora_glass' ||
+      prefs.themeId === 'cyber_ocean_dark' ||
+      prefs.themeId === 'deep_ocean_flame' ||
       isCustomDark;
     if (isDarkTheme) {
       root.classList.add('dark');
@@ -804,9 +1167,23 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
       prefs.themeId === 'obsidian_glass' ||
       prefs.themeId === 'aurora_glass' ||
       prefs.themeId === 'emerald_glass' ||
+      prefs.themeId === 'cyber_ocean_dark' ||
+      prefs.themeId === 'aqua_glass_prism' ||
+      prefs.themeId === 'crextio_sky_glass' ||
       prefs.uiLayout === 'liquid_glass' ||
-      prefs.uiLayout === 'glass_split';
+      prefs.uiLayout === 'glass_split' ||
+      prefs.uiLayout === 'floating_top_glass' ||
+      prefs.uiLayout === 'cyber_hud_cockpit';
     root.setAttribute('data-glass-ui', isGlassActive ? 'true' : 'false');
+
+    const isClayActive =
+      prefs.themeId === 'clay_slate_3d' || prefs.uiLayout === 'tactile_clay_3d';
+    root.setAttribute('data-clay-ui', isClayActive ? 'true' : 'false');
+
+    root.setAttribute(
+      'data-light-sidebar',
+      prefs.uiLayout === 'clean_light_sidebar' && !isDarkTheme ? 'true' : 'false'
+    );
 
     // متغير مقياس الخط المركزي (حقيقي بدون zoom)
     const scaleRatio = Number((effectiveFontScale / 100).toFixed(3));
