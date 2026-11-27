@@ -326,6 +326,21 @@ export default function DebtsDashboardTab({
         sortable: true,
         render: (r) => <DebtPaymentBadge status={r.paymentStatus} />,
       },
+      {
+        key: 'actions',
+        label: 'الإجراءات',
+        headerText: 'الإجراءات',
+        type: 'actions',
+        render: (r) => (
+          <button
+            type="button"
+            onClick={() => onOpenBakeryProfile(r.bakeryId)}
+            className="px-2.5 py-1 rounded bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10px] font-black cursor-pointer whitespace-nowrap"
+          >
+            فتح ملف المخبز
+          </button>
+        ),
+      },
     ],
     [onOpenBakeryProfile]
   );

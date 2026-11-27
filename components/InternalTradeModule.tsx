@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   BarChart3,
@@ -30,7 +30,7 @@ import {
   Warehouse,
   X,
 } from 'lucide-react';
-import { User } from '@/types';
+import { BakeryRecord, InspectionRecord, User } from '@/types';
 import {
   ButaneDistributorMovementRecord,
   ButaneDistributorRecord,
@@ -119,6 +119,7 @@ import { OfficialPrintModal } from './debts/DebtsSharedUi';
 import InternalTradeEnergyAndComparisonView from './trade/InternalTradeEnergyAndComparisonView';
 import InternalTradeAlertsReportsSettingsView from './trade/InternalTradeAlertsReportsSettingsView';
 import FactoryResetButton from './FactoryResetButton';
+import BakeryInspectionModule from './BakeryInspectionModule';
 import {
   EditableFieldSpec,
   TableActionButtons,
@@ -132,6 +133,8 @@ export type InternalTradeScreenId =
   | 'licenses'
   | 'campaigns'
   | 'violations'
+  | 'field_inspection'
+  | 'field_violations'
   | 'settlements'
   | 'seizures'
   | 'markets'
@@ -173,34 +176,36 @@ const INTERNAL_TRADE_NAV_GROUPS: NavGroupConfig[] = [
     groupId: 'grp-oversight',
     groupTitle: 'الحملات والمخالفات والمضبوطات والأسواق',
     items: [
-      { id: 'campaigns', num: 5, label: '٥. الحملات التموينية', icon: SearchCheck },
-      { id: 'violations', num: 6, label: '٦. المخالفات والمحاضر', icon: FileText },
-      { id: 'settlements', num: 7, label: '٧. التصالحات والتسويات', icon: Scale },
-      { id: 'seizures', num: 8, label: '٨. المضبوطات والتحفظات', icon: Package },
-      { id: 'markets', num: 9, label: '٩. متابعة الأسواق والأسعار', icon: ShoppingBag },
+      { id: 'campaigns', num: 5, label: '٥. الحملات التموينية التجارية', icon: SearchCheck },
+      { id: 'violations', num: 6, label: '٦. المخالفات والمحاضر التجارية', icon: FileText },
+      { id: 'field_inspection', num: 7, label: '٧. الحملات والتفتيش التمويني', icon: SearchCheck },
+      { id: 'field_violations', num: 8, label: '٨. المخالفات والمحاضر والنيابات', icon: Gavel },
+      { id: 'settlements', num: 9, label: '٩. التصالحات والتسويات', icon: Scale },
+      { id: 'seizures', num: 10, label: '١٠. المضبوطات والتحفظات', icon: Package },
+      { id: 'markets', num: 11, label: '١١. متابعة الأسواق والأسعار', icon: ShoppingBag },
     ],
   },
   {
     groupId: 'grp-energy',
-    groupTitle: 'البوتاجاز والمواد البترولية والمحطات',
+    groupTitle: 'تداول البوتاجاز والمواد البترولية والمحطات',
     items: [
-      { id: 'butane_management', num: 10, label: '١٠. إدارة أسطوانات البوتاجاز', icon: Flame },
-      { id: 'butane_beneficiaries', num: 11, label: '١١. نصيب الفرد والمستفيدون من البوتاجاز', icon: Flame },
-      { id: 'petroleum_management', num: 12, label: '١٢. إدارة المواد البترولية', icon: Fuel },
-      { id: 'petroleum_beneficiaries', num: 13, label: '١٣. نصيب الفرد والمستفيدون من المواد البترولية', icon: Fuel },
-      { id: 'fuel_stations', num: 14, label: '١٤. محطات الوقود والرقابة اليومية', icon: Fuel },
-      { id: 'butane_warehouses', num: 15, label: '١٥. مستودعات البوتاجاز', icon: Warehouse },
-      { id: 'butane_distributors', num: 16, label: '١٦. سجل الموزعين', icon: Truck },
+      { id: 'butane_management', num: 12, label: '١٢. إدارة أسطوانات البوتاجاز', icon: Flame },
+      { id: 'butane_beneficiaries', num: 13, label: '١٣. نصيب الفرد والمستفيدون من البوتاجاز', icon: Flame },
+      { id: 'petroleum_management', num: 14, label: '١٤. إدارة المواد البترولية', icon: Fuel },
+      { id: 'petroleum_beneficiaries', num: 15, label: '١٥. نصيب الفرد والمستفيدون من المواد البترولية', icon: Fuel },
+      { id: 'fuel_stations', num: 16, label: '١٦. محطات الوقود والرقابة اليومية', icon: Fuel },
+      { id: 'butane_warehouses', num: 17, label: '١٧. مستودعات البوتاجاز', icon: Warehouse },
+      { id: 'butane_distributors', num: 18, label: '١٨. سجل الموزعين', icon: Truck },
     ],
   },
   {
     groupId: 'grp-analytics',
     groupTitle: 'المقارنات والتنبيهات والتقارير والإعدادات',
     items: [
-      { id: 'village_comparison', num: 17, label: '١٧. المقارنة بين القرى والوحدات', icon: BarChart3 },
-      { id: 'smart_alerts', num: 18, label: '١٨. التنبيهات الذكية', icon: ShieldAlert },
-      { id: 'reports_center', num: 19, label: '١٩. مركز التقارير والطباعة', icon: Printer },
-      { id: 'settings_and_schema', num: 20, label: '٢٠. الإعدادات وقوائم البيانات', icon: Settings },
+      { id: 'village_comparison', num: 19, label: '١٩. المقارنة بين القرى والوحدات', icon: BarChart3 },
+      { id: 'smart_alerts', num: 20, label: '٢٠. التنبيهات الذكية', icon: ShieldAlert },
+      { id: 'reports_center', num: 21, label: '٢١. مركز التقارير والطباعة', icon: Printer },
+      { id: 'settings_and_schema', num: 22, label: '٢٢. الإعدادات وقوائم البيانات', icon: Settings },
     ],
   },
 ];
@@ -209,12 +214,22 @@ interface InternalTradeModuleProps {
   currentUser: User;
   todayRef: string;
   initialScreen?: InternalTradeScreenId;
+  bakeries?: BakeryRecord[];
+  inspections?: InspectionRecord[];
+  onAddInspection?: (record: Omit<InspectionRecord, 'id'>) => void;
+  onUpdateInspectionStatus?: (id: string, status: InspectionRecord['status']) => void;
+  onSelectBakeryDetails?: (bakery: BakeryRecord) => void;
 }
 
 export default function InternalTradeModule({
   currentUser,
   todayRef,
   initialScreen = 'dashboard',
+  bakeries = [],
+  inspections = [],
+  onAddInspection,
+  onUpdateInspectionStatus,
+  onSelectBakeryDetails,
 }: InternalTradeModuleProps) {
   const [activeScreen, setActiveScreen] = useState<InternalTradeScreenId>(initialScreen);
   const [screenSearchQuery, setScreenSearchQuery] = useState<string>('');
@@ -224,6 +239,13 @@ export default function InternalTradeModule({
     'grp-energy': true,
     'grp-analytics': true,
   });
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setActiveScreen(initialScreen);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [initialScreen]);
 
   // حالة جميع قواعد بيانات قسم التجارة الداخلية
   const [settings, setSettings] = useState<InternalTradeSettings>(() => loadTradeSettings());
@@ -1221,7 +1243,7 @@ export default function InternalTradeModule({
           <div className="flex items-center gap-2">
             <Store className="w-4 h-4 text-[#164E83]" />
             <span className="text-xs font-black text-[#102A43]">
-              خريطة شاشات قسم التجارة الداخلية (٢٠ شاشة مترابطة)
+              خريطة شاشات قسم التجارة الداخلية (٢٢ شاشة مترابطة)
             </span>
           </div>
           <div className="relative w-full sm:w-72">
@@ -1230,7 +1252,7 @@ export default function InternalTradeModule({
               type="text"
               value={screenSearchQuery}
               onChange={(e) => setScreenSearchQuery(e.target.value)}
-              placeholder="بحث سريع في شاشات التجارة الداخلية (٢٠)..."
+              placeholder="بحث سريع في شاشات التجارة الداخلية (٢٢)..."
               className="w-full pr-9 pl-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
             />
           </div>
@@ -2666,7 +2688,21 @@ export default function InternalTradeModule({
             </div>
           )}
 
-          {/* ==================== الشاشات ١٠ إلى ١٧: البوتاجاز، المواد البترولية، المحطات، المستودعات، الموزعين، المقارنة ==================== */}
+          {/* ==================== ٧ و ٨: الحملات والتفتيش التمويني والمخالفات والمحاضر والنيابات (المدمجة من الشريط الأيمن) ==================== */}
+          {(activeScreen === 'field_inspection' || activeScreen === 'field_violations') && (
+            <BakeryInspectionModule
+              bakeries={bakeries}
+              inspections={inspections}
+              currentUser={currentUser}
+              activeFocus={activeScreen === 'field_inspection' ? 'ins-campaigns' : 'ins-violations'}
+              todayRef={todayRef}
+              onAddInspection={onAddInspection || (() => undefined)}
+              onUpdateStatus={onUpdateInspectionStatus || (() => undefined)}
+              onSelectBakeryDetails={onSelectBakeryDetails || (() => undefined)}
+            />
+          )}
+
+          {/* ==================== الشاشات ١٢ إلى ١٩: البوتاجاز، المواد البترولية، المحطات، المستودعات، الموزعين، المقارنة ==================== */}
           {(activeScreen === 'butane_management' ||
             activeScreen === 'butane_beneficiaries' ||
             activeScreen === 'petroleum_management' ||
@@ -3024,6 +3060,7 @@ export default function InternalTradeModule({
                   <th className="p-2 border">المخالفات والسند القانوني</th>
                   <th className="p-2 border">المضبوطات</th>
                   <th className="p-2 border">المبلغ المستحق</th>
+                  <th className="p-2 border print:hidden">الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -3036,6 +3073,15 @@ export default function InternalTradeModule({
                       <td className="p-2 border font-bold">{r.items.map((i) => `${i.violationTitle} (${i.legalBasis})`).join(' + ')}</td>
                       <td className="p-2 border font-bold">{r.totalSeizedQuantitySummary}</td>
                       <td className="p-2 border font-black">{formatArabicCurrency(r.totalFineAmountEgp)}</td>
+                      <td className="p-2 border print:hidden">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCampaignReport(null)}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          إغلاق المعينة
+                        </button>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -3250,6 +3296,7 @@ export default function InternalTradeModule({
                 <th className="p-2 border">الرصيد الفعلي الحالي</th>
                 <th className="p-2 border">مكان التحفظ وأمين العهدة</th>
                 <th className="p-2 border">الحالة القانونية</th>
+                <th className="p-2 border print:hidden">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -3262,6 +3309,15 @@ export default function InternalTradeModule({
                   <td className="p-2 border text-center font-black">{formatArabicNumber(sz.currentActualBalance)} {sz.unit}</td>
                   <td className="p-2 border">{sz.custodyLocation} ({sz.custodianName})</td>
                   <td className="p-2 border font-bold">{sz.legalStatus}</td>
+                  <td className="p-2 border print:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowInventoryPrintModal(false)}
+                      className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                    >
+                      عودة للسجل
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

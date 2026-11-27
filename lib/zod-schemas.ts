@@ -74,6 +74,15 @@ export const loginFormSchema = z.object({
     .min(1, { message: 'كلمة المرور مطلوبة' })
     .max(256, { message: 'كلمة المرور طويلة جداً' }),
   branchId: sanitizedString({ min: 0, max: 40 }).optional(),
+  isDirectRegistration: z.boolean().optional(),
+  registeredUser: z
+    .object({
+      id: sanitizedString({ min: 1, max: 60 }),
+      fullName: sanitizedString({ min: 2, max: 140 }),
+      role: sanitizedString({ min: 2, max: 60 }),
+      primaryBranchId: sanitizedString({ min: 1, max: 40 }),
+    })
+    .optional(),
 });
 
 export const forgotPasswordStep1Schema = z.object({

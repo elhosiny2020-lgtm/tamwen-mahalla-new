@@ -7,10 +7,13 @@ import {
   Building,
   Bell,
   RefreshCw,
+  MessageSquare,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { User, Branch } from '@/types';
 import { getStoredBakeries } from '@/lib/mock-db';
 import { evaluateDocumentExpiry } from '@/lib/bakery-math';
+import { loadChatMessages, loadUnifiedNotifications } from '@/lib/major-debts-tasks-chat-store';
 import { toArabicNumerals, getRoleArabicLabel } from '@/lib/utils';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
 import ClientClock from './ClientClock';
@@ -37,6 +40,13 @@ export default function Header({
   );
   const [showNotifPanel, setShowNotifPanel] = useState<boolean>(false);
   const [urgentAlerts, setUrgentAlerts] = useState<{ id: string; title: string; status: string }[]>([]);
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+  const [unreadSystemNotifsCount, setUnreadSystemNotifsCount] = useState<number>(0);
+
+  const openTasksSubTab = (subTab: 'internal_chat' | 'notifications' | 'reports_center') => {
+    setShowNotifPanel(false);
+    window.dispatchEvent(new CustomEvent('gharbia-open-tasks-subtab', { detail: { subTab } }));
+  };
 
   useEffect(() => {
     const loadAlerts = () => {
@@ -53,10 +63,33 @@ export default function Header({
         }
       });
       setUrgentAlerts(list);
+
+      const msgs = loadChatMessages();
+      const chatUnread = msgs.filter(
+        (m) =>
+          !m.isDeletedFromUi &&
+          m.senderId !== currentUser.id &&
+          !m.readByUserIds.includes(currentUser.id)
+      ).length;
+      setUnreadChatCount(chatUnread);
+
+      const sysNotifs = loadUnifiedNotifications();
+      const notifUnread = sysNotifs.filter(
+        (n) => !n.isRead && (n.recipientUserId === 'ALL' || n.recipientUserId === currentUser.id)
+      ).length;
+      setUnreadSystemNotifsCount(notifUnread);
     };
     const frameId = requestAnimationFrame(loadAlerts);
-    return () => cancelAnimationFrame(frameId);
-  }, []);
+    window.addEventListener('storage', loadAlerts);
+    window.addEventListener('gharbia-chat-updated', loadAlerts);
+    return () => {
+      cancelAnimationFrame(frameId);
+      window.removeEventListener('storage', loadAlerts);
+      window.removeEventListener('gharbia-chat-updated', loadAlerts);
+    };
+  }, [currentUser.id]);
+
+  const totalNotifCount = urgentAlerts.length + unreadSystemNotifsCount;
 
   return (
     <header className="app-header bg-[#102A43] text-white shadow-md border-b border-[#164E83] sticky top-0 z-40 print:hidden font-sans">
@@ -84,28 +117,53 @@ export default function Header({
           </div>
         </div>
 
-        {/* Zone 2: Clock & Date + Global Control Bar (Font Size, Language, Colors & Theme, Display Settings) */}
+        {/* Zone 2: Clock & Date + Global Control Bar + Quick Enlarged Employee Chat & Notifications */}
         <div className="flex flex-wrap items-center gap-2">
           <ClientClock />
           <GlobalControlBar />
+          <button
+            type="button"
+            onClick={() => openTasksSubTab('internal_chat')}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-l from-[#C6A15B] to-[#d9b672] hover:from-[#b58f48] hover:to-[#C6A15B] text-[#102A43] font-black text-xs shadow-md border border-white/20 cursor-pointer transition-transform hover:scale-[1.02]"
+            title="فتح المحادثات الداخلية والإشعارات بين الموظفين"
+          >
+            <MessageSquare className="w-4 h-4 shrink-0" />
+            <span>المحادثات الداخلية والإشعارات</span>
+            {(unreadChatCount + unreadSystemNotifsCount) > 0 && (
+              <span className="num-cell px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-black">
+                {isRtl ? toArabicNumerals(unreadChatCount + unreadSystemNotifsCount) : unreadChatCount + unreadSystemNotifsCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Zone 3: Branch Switch, Notification Center, User Account, Logout */}
+        {/* Zone 3: Branch Switch, Notification Center, Reports Shortcut, User Account, Logout */}
         <div className="flex items-center gap-1.5 shrink-0">
           {onChangeBranch && (
             <button
               type="button"
               onClick={onChangeBranch}
-              className="hidden lg:flex items-center gap-1.5 bg-[#164E83] hover:bg-[#1e609e] px-2.5 py-1.5 rounded-xl border border-white/15 text-[11px] text-white font-black transition-colors cursor-pointer"
+              className="hidden xl:flex items-center gap-1.5 bg-[#164E83] hover:bg-[#1e609e] px-2.5 py-1.5 rounded-xl border border-white/15 text-[11px] text-white font-black transition-colors cursor-pointer"
               title={t('switchBranch')}
             >
               <Building className="w-3.5 h-3.5 text-[#C6A15B]" />
-              <span className="max-w-[150px] truncate">
+              <span className="max-w-[140px] truncate">
                 {currentBranch?.arabicName || t('defaultBranch')}
               </span>
               <RefreshCw className="w-3 h-3 text-[#C6A15B]" />
             </button>
           )}
+
+          {/* Quick Reports Center Button */}
+          <button
+            type="button"
+            onClick={() => openTasksSubTab('reports_center')}
+            className="hidden md:flex items-center gap-1 px-2.5 py-1.5 bg-[#164E83]/80 hover:bg-[#164E83] rounded-xl border border-white/15 text-[11px] font-black text-white cursor-pointer"
+            title="فتح مركز التقارير الموحد"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-[#C6A15B]" />
+            <span>مركز التقارير</span>
+          </button>
 
           {/* Notification Center Bell */}
           <div className="relative">
@@ -116,20 +174,20 @@ export default function Header({
               title={t('notificationsCenter')}
             >
               <Bell className="w-4 h-4 text-[#C6A15B]" />
-              {urgentAlerts.length > 0 && (
+              {totalNotifCount > 0 && (
                 <span className="num-cell absolute -top-1 -right-1 px-1.5 py-0.2 bg-red-600 text-white rounded-full text-[10px] font-black">
-                  {isRtl ? toArabicNumerals(urgentAlerts.length) : urgentAlerts.length}
+                  {isRtl ? toArabicNumerals(totalNotifCount) : totalNotifCount}
                 </span>
               )}
             </button>
 
             {showNotifPanel && (
               <div
-                className={`absolute ${isRtl ? 'left-0' : 'right-0'} mt-2 w-80 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-3 space-y-2 text-[11px] font-bold`}
+                className={`absolute ${isRtl ? 'left-0' : 'right-0'} mt-2 w-80 sm:w-96 bg-white text-[#102A43] rounded-2xl shadow-2xl border border-slate-200 z-50 p-3.5 space-y-2.5 text-[11px] font-bold`}
               >
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <span className="font-black text-[#102A43]">
-                    {t('notificationsCenter')} ({isRtl ? toArabicNumerals(urgentAlerts.length) : urgentAlerts.length})
+                    {t('notificationsCenter')} ({isRtl ? toArabicNumerals(totalNotifCount) : totalNotifCount})
                   </span>
                   <button
                     type="button"
@@ -137,6 +195,29 @@ export default function Header({
                     className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
                   >
                     ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => openTasksSubTab('internal_chat')}
+                    className="px-2 py-2 rounded-xl bg-[#102A43] text-[#C6A15B] font-black text-[10.5px] cursor-pointer text-center"
+                  >
+                    المحادثات ({isRtl ? toArabicNumerals(unreadChatCount) : unreadChatCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openTasksSubTab('notifications')}
+                    className="px-2 py-2 rounded-xl bg-amber-500 text-[#102A43] font-black text-[10.5px] cursor-pointer text-center"
+                  >
+                    مركز التنبيهات
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openTasksSubTab('reports_center')}
+                    className="px-2 py-2 rounded-xl bg-[#164E83] text-white font-black text-[10.5px] cursor-pointer text-center"
+                  >
+                    مركز التقارير
                   </button>
                 </div>
                 <div className="max-h-60 overflow-y-auto space-y-1.5">
@@ -148,6 +229,9 @@ export default function Header({
                       </span>
                     </div>
                   ))}
+                  {urgentAlerts.length === 0 && (
+                    <p className="text-center text-slate-500 py-3">لا توجد تنبيهات تراخيص عاجلة حالياً.</p>
+                  )}
                 </div>
               </div>
             )}

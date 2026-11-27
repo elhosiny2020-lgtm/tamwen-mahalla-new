@@ -36,7 +36,7 @@ export const INITIAL_DEPARTMENTS: Department[] = [
   { id: 'd-05', code: 'CTRL', name: 'المركز الرقابي الموحد', arabicName: 'المركز الرقابي الموحد', description: 'غرفة العمليات والبلاغات والشكاوى العاجلة', iconName: 'ShieldAlert', isCore: true },
   { id: 'd-06', code: 'GAS', name: 'تداول البوتاجاز والمواد البترولية', arabicName: 'تداول البوتاجاز والمواد البترولية', description: 'مستودعات البوتاجاز ومحطات الوقود', iconName: 'Fuel', isCore: true },
   { id: 'd-07', code: 'COMM', name: 'قسم السلع التموينية', arabicName: 'قسم السلع التموينية', description: 'إدارة السلع التموينية والتجار والحصص والمخازن والبطاقات والمستفيدين والتقارير', iconName: 'Package', isCore: true },
-  { id: 'd-08', code: 'GRAIN', name: 'صيانة الحبوب', arabicName: 'صيانة الحبوب والأقماح', description: 'متابعة الأقماح المحلية والمستوردة', iconName: 'Wheat', isCore: true },
+  { id: 'd-08', code: 'GRAIN', name: 'قسم صيانة الحبوب', arabicName: 'قسم صيانة الحبوب', description: 'صيانة الحبوب والأقماح، الشون والصوامع الهندسية، المطاحن التموينية، والثلاجات وحفظ الأغذية', iconName: 'Wheat', isCore: true },
   { id: 'd-09', code: 'SILOS', name: 'الشون والصوامع', arabicName: 'الشون والصوامع الهندسية', description: 'السعات التخزينية وتوريد الأقماح', iconName: 'Warehouse', isCore: true },
   { id: 'd-10', code: 'MILLS', name: 'المطاحن', arabicName: 'المطاحن التموينية', description: 'متابعة طحن الدقيق التمويني استخراج ٨٧٫٥٪', iconName: 'Factory', isCore: true },
   { id: 'd-11', code: 'COLD', name: 'الثلاجات', arabicName: 'الثلاجات وحفظ الأغذية', description: 'رقابة السلع الغذائية المجمدة والمبردة', iconName: 'ThermometerSnowflake', isCore: false },
@@ -47,14 +47,13 @@ export const INITIAL_DEPARTMENTS: Department[] = [
   { id: 'd-16', code: 'VIOL', name: 'المخالفات والمحاضر', arabicName: 'المخالفات والمحاضر والنيابات', description: 'قيد ومتابعة القضايا والمحاضر التموينية', iconName: 'FileText', isCore: true },
   { id: 'd-17', code: 'COMP', name: 'الشكاوى وخدمة المواطنين', arabicName: 'الشكاوى وخدمة المواطنين', description: 'تلقي وفحص شكاوى المواطنين', iconName: 'MessageSquareWarning', isCore: true },
   { id: 'd-18', code: 'REP', name: 'التقارير والإحصائيات', arabicName: 'التقارير والإحصائيات المركزية', description: 'إعداد التقارير الدورية والتحليلية للمديرية', iconName: 'BarChart3', isCore: true },
-  { id: 'd-19', code: 'DOCS', name: 'إدارة المستندات والأرشيف', arabicName: 'إدارة المستندات والأرشيف الإلكتروني', description: 'حفظ واسترجاع القرارات الوزارية والكتب الدورية', iconName: 'FolderArchive', isCore: false },
   { id: 'd-20', code: 'SETT', name: 'الإعدادات العامة', arabicName: 'الإعدادات العامة للنظام', description: 'إعدادات المنظومة والربط المؤسسي', iconName: 'Settings', isCore: true },
   { id: 'd-21', code: 'USERS', name: 'إدارة المستخدمين', arabicName: 'إدارة المستخدمين والحسابات', description: 'إنشاء ومتابعة حسابات العاملين', iconName: 'UserCog', isCore: true },
   { id: 'd-22', code: 'ROLES', name: 'إدارة الصلاحيات والأقسام', arabicName: 'إدارة الصلاحيات والفروع الإدارية', description: 'تخصيص أدوار وصلاحيات العاملين حسب الإدارات والأقسام', iconName: 'ShieldCheck', isCore: true },
   { id: 'd-23', code: 'AUDIT', name: 'سجل العمليات والمراجعة', arabicName: 'سجل العمليات والمراجعة الأمنية', description: 'رصد ومراقبة كافة العمليات والتعديلات', iconName: 'History', isCore: true },
   { id: 'd-24', code: 'BACK', name: 'النسخ الاحتياطي والاستعادة', arabicName: 'النسخ الاحتياطي وقواعد البيانات', description: 'إدارة النسخ الاحتياطي وحماية البيانات', iconName: 'Database', isCore: true },
-  { id: 'd-25', code: 'TASKS', name: 'إدارة المهام اليومية والمتابعة', arabicName: 'إدارة المهام اليومية والمتابعة', description: 'متابعة المهام اليومية والتكليفات والمتابعة الشاملة للأقسام والمحادثات الداخلية بين الموظفين', iconName: 'SearchCheck', isCore: true },
-  { id: 'd-26', code: 'LISTS', name: 'إدارة القوائم المنسدلة', arabicName: 'إدارة القوائم المنسدلة', description: 'تعديل رؤوس أعمدة الجداول وإدارة القرى والوحدات المحلية والبطاقات والتراخيص وتواريخ الانتهاء بالكالندر', iconName: 'ListChecks', isCore: true }
+  { id: 'd-26', code: 'LISTS', name: 'إدارة القوائم المنسدلة', arabicName: 'إدارة القوائم المنسدلة', description: 'تعديل رؤوس أعمدة الجداول وإدارة القرى والوحدات المحلية والبطاقات والتراخيص وتواريخ الانتهاء بالكالندر', iconName: 'ListChecks', isCore: true },
+  { id: 'd-25', code: 'TASKS', name: 'إدارة المهام اليومية والمتابعة', arabicName: 'إدارة المهام اليومية والمتابعة', description: 'متابعة المهام اليومية والتكليفات والمتابعة الشاملة للأقسام والمحادثات الداخلية بين الموظفين', iconName: 'SearchCheck', isCore: true }
 ];
 
 export const INITIAL_USERS: User[] = [
@@ -711,23 +710,71 @@ export function saveStoredBranches(branches: Branch[]) {
   localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(branches));
 }
 
+const DELETED_DEPTS_KEY = 'gharbia_supply_deleted_depts_v1';
+
+export function getDeletedDepartmentIds(): string[] {
+  if (typeof window === 'undefined') return ['d-19'];
+  try {
+    const raw = localStorage.getItem(DELETED_DEPTS_KEY);
+    const parsed: string[] = raw ? JSON.parse(raw) : [];
+    return Array.from(new Set(['d-19', ...parsed]));
+  } catch {
+    return ['d-19'];
+  }
+}
+
+export function markDepartmentDeleted(deptId: string) {
+  if (typeof window === 'undefined') return;
+  const current = getDeletedDepartmentIds();
+  localStorage.setItem(DELETED_DEPTS_KEY, JSON.stringify(Array.from(new Set([...current, deptId]))));
+}
+
+export function saveStoredDepartments(depts: Department[]) {
+  if (typeof window === 'undefined') return;
+  const cleaned = depts.filter((d) => d.id !== 'd-19' && d.code !== 'DOCS');
+  localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(cleaned));
+  window.dispatchEvent(new CustomEvent('gharbia-departments-updated'));
+}
+
 export function getStoredDepartments(): Department[] {
   if (typeof window === 'undefined') return INITIAL_DEPARTMENTS;
   try {
+    const deletedIds = new Set(getDeletedDepartmentIds());
     const data = localStorage.getItem(STORAGE_KEYS.DEPARTMENTS);
-    if (!data) return INITIAL_DEPARTMENTS;
-    const parsed: Department[] = JSON.parse(data).map((d: Department) =>
-      d.id === 'd-04'
-        ? {
+    if (!data) {
+      return INITIAL_DEPARTMENTS.filter((d) => !deletedIds.has(d.id) && d.id !== 'd-19' && d.code !== 'DOCS');
+    }
+    const parsed: Department[] = JSON.parse(data)
+      .filter((d: Department) => d.id !== 'd-19' && d.code !== 'DOCS' && !deletedIds.has(d.id))
+      .map((d: Department) => {
+        if (d.id === 'd-04') {
+          return {
             ...d,
             name: 'قسم التجارة الداخلية',
             arabicName: 'قسم التجارة الداخلية',
-            description: 'إدارة ومتابعة المنشآت التجارية والأسواق والسلع والأنشطة التموينية والمواد البترولية',
-          }
-        : d
-    );
+            description: 'إدارة ومتابعة المنشآت التجارية والأسواق والسلع والأنشطة التموينية والمواد البترولية والحملات والمخالفات',
+          };
+        }
+        if (d.id === 'd-08') {
+          return {
+            ...d,
+            name: 'قسم صيانة الحبوب',
+            arabicName: 'قسم صيانة الحبوب',
+            description: 'صيانة الحبوب والأقماح، الشون والصوامع الهندسية، المطاحن التموينية، والثلاجات وحفظ الأغذية',
+          };
+        }
+        if (d.id === 'd-12') {
+          return {
+            ...d,
+            name: 'إدارة الموارد البشرية وشؤون العاملين',
+            arabicName: 'إدارة الموارد البشرية وشؤون العاملين',
+            description: 'ملفات العاملين الموحدة والموقف الوظيفي اليومي والحضور والإعارات والخدمة العامة والاستعانة وطلبات التجديد',
+          };
+        }
+        return d;
+      });
     const existingIds = new Set(parsed.map((d) => d.id));
-    const missing = INITIAL_DEPARTMENTS.filter((d) => !existingIds.has(d.id));
+    const missing = INITIAL_DEPARTMENTS.filter((d) => !existingIds.has(d.id) && !deletedIds.has(d.id));
     return missing.length > 0 ? [...parsed, ...missing] : parsed;
   } catch {
     return INITIAL_DEPARTMENTS;

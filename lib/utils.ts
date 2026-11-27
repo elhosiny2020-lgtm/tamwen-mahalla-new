@@ -54,9 +54,9 @@ export function formatArabicNumber(value: number | string | undefined | null): s
 }
 
 /**
- * تنسيق رقم عشري ثابت المنازل بأرقام عربية هندية
+ * تنسيق رقم عشري ثابت المنازل بأرقام عربية هندية (رقمين عشريين افتراضياً للمتوسطات)
  */
-export function formatArabicDecimal(value: number | string | undefined | null, decimals = 3): string {
+export function formatArabicDecimal(value: number | string | undefined | null, decimals = 2): string {
   const num = Number(arabicToWesternDigits(value ?? 0).replace(/[,٬\s]/g, '').replace(/٫/g, '.'));
   if (!Number.isFinite(num)) return toArabicNumerals((0).toFixed(decimals)).replace('.', '٫');
   return toArabicNumerals(num.toFixed(decimals)).replace('.', '٫');

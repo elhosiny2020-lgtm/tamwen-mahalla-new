@@ -26,6 +26,10 @@ import {
   Scale,
   Printer,
   Users,
+  Search,
+  ChevronDown,
+  ChevronLeft,
+  Eye,
 } from 'lucide-react';
 import {
   BakeryDebtItem,
@@ -59,7 +63,7 @@ import {
   loadDebtsStore,
   saveDebtsStore,
 } from '@/lib/debts-data';
-import { formatArabicCurrency, toArabicNumerals } from '@/lib/utils';
+import { formatArabicCurrency, normalizeSearchText, toArabicNumerals } from '@/lib/utils';
 import DebtsDashboardTab from './debts/DebtsDashboardTab';
 import DebtsRegistryTab from './debts/DebtsRegistryTab';
 import DebtsPaymentsTab from './debts/DebtsPaymentsTab';
@@ -1033,15 +1037,21 @@ export default function BakeryDebtsModule({
     { id: 'settings', label: '١٢. إعدادات القسم', icon: Settings2 },
   ];
 
-  // المجموعات الست المتطابقة بصرياً وهيكليةً مع BakeryNavigationGrid في منظومة إدارة المخابز
+  const [screenSearchQuery, setScreenSearchQuery] = useState('');
+  const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({
+    basic: true,
+    quotas_calc: true,
+    schedules_alerts: true,
+    inspection_followups: true,
+    financial_payments: true,
+    reports_admin: true,
+  });
+
+  // شبكة المجموعات الست المتطابقة مع شكل قسم التجارة الداخلية (قوائم رأسية واضحة قابلة للطي مع بحث سريع)
   const debtNavGroups: {
     id: string;
     title: string;
     groupIcon: React.ElementType;
-    headerBg: string;
-    borderAccent: string;
-    activeBg: string;
-    iconAccent: string;
     items: {
       id: string;
       label: string;
@@ -1053,74 +1063,54 @@ export default function BakeryDebtsModule({
   }[] = [
     {
       id: 'basic',
-      title: '١. إدارة المديونيات والبيانات الأساسية',
+      title: '١. القيادة والبيانات الأساسية للمديونيات',
       groupIcon: Landmark,
-      headerBg: 'bg-[#102A43] text-white',
-      borderAccent: 'border-[#102A43]/25',
-      activeBg: 'bg-[#102A43] text-white',
-      iconAccent: 'text-[#102A43]',
       items: [
-        { id: 'g1-dash', label: 'لوحة التحكم', tab: 'dashboard', icon: LayoutDashboard },
-        { id: 'g1-major', label: 'المديونيات الكبرى', tab: 'major_debts', icon: Wallet, badgeCount: openDebtsCount },
-        { id: 'g1-reg', label: 'سجل المديونيات وPOS', tab: 'registry', icon: Table2, badgeCount: openDebtsCount },
+        { id: 'g1-dash', label: '١. لوحة التحكم الرئيسية للمديونيات', tab: 'dashboard', icon: LayoutDashboard },
+        { id: 'g1-major', label: '٢. متابعة المديونيات الكبرى والحرجة', tab: 'major_debts', icon: Wallet, badgeCount: openDebtsCount },
+        { id: 'g1-reg', label: '٣. سجل المديونيات الشامل وماكينات POS', tab: 'registry', icon: Table2, badgeCount: openDebtsCount },
       ],
     },
     {
       id: 'quotas_calc',
       title: '٢. الحصص التأمينية وحاسبة الوزن (١٧٥/٢٠٢٤)',
       groupIcon: Wheat,
-      headerBg: 'bg-[#164E83] text-white',
-      borderAccent: 'border-[#164E83]/25',
-      activeBg: 'bg-[#164E83] text-white',
-      iconAccent: 'text-[#164E83]',
       items: [
-        { id: 'g2-calc', label: 'حاسبة نقص الوزن', tab: 'calculator', icon: Calculator },
-        { id: 'g2-viols', label: 'سجل المخالفات', tab: 'calculator', icon: Scale, badgeCount: store.violations.length },
-        { id: 'g2-rules', label: 'القرار ١٧٥/٢٠٢٤', tab: 'calculator', icon: FileBadge },
+        { id: 'g2-calc', label: '٤. حاسبة نقص وزن الرغيف (قرار ١٧٥/٢٠٢٤)', tab: 'calculator', icon: Calculator },
+        { id: 'g2-viols', label: '٥. سجل المخالفات التموينية المسجلة', tab: 'calculator', icon: Scale, badgeCount: store.violations.length },
+        { id: 'g2-rules', label: '٦. ضوابط ومعادلات القرار الوزاري ١٧٥/٢٠٢٤', tab: 'calculator', icon: FileBadge },
       ],
     },
     {
       id: 'schedules_alerts',
-      title: '٣. الجدولة والأقساط والتنبيهات',
+      title: '٣. الجدولة والأقساط والتنبيهات الذكية',
       groupIcon: FileBadge,
-      headerBg: 'bg-emerald-900 text-white',
-      borderAccent: 'border-emerald-900/25',
-      activeBg: 'bg-emerald-900 text-white',
-      iconAccent: 'text-emerald-800',
       items: [
-        { id: 'g3-sched', label: 'خطط الجدولة', tab: 'scheduling', icon: CalendarClock },
-        { id: 'g3-alerts', label: 'التنبيهات الذكية', tab: 'alerts', icon: BellRing, badgeCount: unreadAlertsCount },
-        { id: 'g3-late', label: 'المخابز المتأخرة', tab: 'late', icon: AlertTriangle, badgeCount: lateBakeriesCount },
+        { id: 'g3-sched', label: '٧. خطط الجدولة وتقسيط المديونيات', tab: 'scheduling', icon: CalendarClock },
+        { id: 'g3-alerts', label: '٨. مركز التنبيهات والإشعارات الذكية', tab: 'alerts', icon: BellRing, badgeCount: unreadAlertsCount },
+        { id: 'g3-late', label: '٩. سجل المخابز المتأخرة عن السداد', tab: 'late', icon: AlertTriangle, badgeCount: lateBakeriesCount },
       ],
     },
     {
       id: 'inspection_followups',
-      title: '٤. الرقابة والمتابعة والإنذارات',
+      title: '٤. الرقابة والمتابعة والإنذارات الرسمية',
       groupIcon: ShieldAlert,
-      headerBg: 'bg-amber-900 text-white',
-      borderAccent: 'border-amber-900/25',
-      activeBg: 'bg-amber-900 text-white',
-      iconAccent: 'text-amber-800',
       items: [
-        { id: 'g4-flw', label: 'متابعة المخابز', tab: 'followups', icon: PhoneCall },
-        { id: 'g4-warn', label: 'الإنذارات الرسمية', tab: 'alerts', icon: AlertTriangle },
-        { id: 'g4-calc', label: 'غرامات الرقابة', tab: 'calculator', icon: Scale },
+        { id: 'g4-flw', label: '١٠. سجل الاتصالات والمتابعة الميدانية للمخابز', tab: 'followups', icon: PhoneCall },
+        { id: 'g4-warn', label: '١١. الإنذارات والإخطارات الرسمية للمتأخرين', tab: 'alerts', icon: AlertTriangle },
+        { id: 'g4-calc', label: '١٢. تسوية الغرامات الرقابية والتظلمات', tab: 'calculator', icon: Scale },
       ],
     },
     {
       id: 'financial_payments',
-      title: '٥. المديونيات والحسابات المالية',
+      title: '٥. المديونيات والتحصيلات والحسابات المالية',
       groupIcon: Wallet,
-      headerBg: 'bg-red-900 text-white',
-      borderAccent: 'border-red-900/25',
-      activeBg: 'bg-red-900 text-white',
-      iconAccent: 'text-red-800',
       items: [
-        { id: 'g5-debts', label: 'المديونيات', tab: 'registry', icon: Wallet },
-        { id: 'g5-pay', label: 'السداد والمدفوعات', tab: 'payments', icon: CreditCard },
+        { id: 'g5-debts', label: '١٣. أرصدة المديونيات القائمة والمعتمدة', tab: 'registry', icon: Wallet },
+        { id: 'g5-pay', label: '١٤. تسجيل السدادات وإيصالات التحصيل', tab: 'payments', icon: CreditCard },
         {
           id: 'g5-stmt',
-          label: 'كشف حساب مخبز',
+          label: '١٥. كشف حساب المخبز التفصيلي (POS)',
           action: () => setProfileBakeryId(selectedStatementBakeryId || bakeries[0]?.id || null),
           icon: BookOpenText,
         },
@@ -1130,21 +1120,35 @@ export default function BakeryDebtsModule({
       id: 'reports_admin',
       title: '٦. التقارير والإحصائيات والإدارة',
       groupIcon: FolderKanban,
-      headerBg: 'bg-indigo-950 text-white',
-      borderAccent: 'border-indigo-900/25',
-      activeBg: 'bg-indigo-950 text-white',
-      iconAccent: 'text-indigo-800',
       items: [
-        { id: 'g6-rep', label: 'التقارير (٣٦)', tab: 'reports', icon: FileSpreadsheet },
-        { id: 'g6-aud', label: 'سجل التدقيق', tab: 'audit', icon: History },
-        { id: 'g6-set', label: 'إعدادات القسم', tab: 'settings', icon: Settings2 },
+        { id: 'g6-rep', label: '١٦. مركز التقارير المالية والرقابية (٣٦ تقريراً)', tab: 'reports', icon: FileSpreadsheet },
+        { id: 'g6-aud', label: '١٧. سجل التدقيق والمراجعة التاريخية', tab: 'audit', icon: History },
+        { id: 'g6-set', label: '١٨. إعدادات القسم وضوابط التنبيهات', tab: 'settings', icon: Settings2 },
       ],
     },
   ];
 
+  const totalDebtScreensCount = debtNavGroups.reduce((acc, g) => acc + g.items.length, 0);
+
+  const filteredDebtNavGroups = (() => {
+    const q = normalizeSearchText(screenSearchQuery);
+    if (!q) return debtNavGroups;
+    return debtNavGroups
+      .map((grp) => ({
+        ...grp,
+        items: grp.items.filter((item) =>
+          normalizeSearchText(`${grp.title} ${item.label}`).includes(q)
+        ),
+      }))
+      .filter((grp) => grp.items.length > 0);
+  })();
+
+  const activeScreenTitle =
+    navItems.find((t) => t.id === activeTab)?.label || '١. لوحة التحكم الرئيسية للمديونيات';
+
   return (
     <div className="space-y-4">
-      {/* رأس منظومة المديونيات وحاسبة المخالفات — متطابق مع رأس منظومة إدارة المخابز */}
+      {/* رأس منظومة المديونيات وحاسبة المخالفات — متطابق مع رأس منظومة إدارة المخابز وقسم التجارة الداخلية */}
       <div className="bg-[#102A43] text-white rounded-2xl p-5 shadow-md border border-[#164E83] space-y-3 print:hidden">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
@@ -1214,28 +1218,37 @@ export default function BakeryDebtsModule({
         </div>
       </div>
 
-      {/* شبكة المجموعات الست المتطابقة مع منظومة إدارة المخابز الأساسية */}
+      {/* قائمة الوصول السريع لوظائف منظومة إدارة مديونيات أصحاب المخابز — بنفس شكل قسم التجارة الداخلية */}
       <nav
-        aria-label="أقسام منظومة إدارة مديونيات أصحاب المخابز"
-        className="bg-white rounded-2xl p-2.5 shadow-xs border border-slate-200 space-y-2 print:hidden"
+        aria-label="الوصول السريع لوظائف منظومة إدارة مديونيات أصحاب المخابز"
+        className="bg-white rounded-2xl border-2 border-[#102A43]/15 p-3.5 space-y-3 shadow-xs print:hidden overflow-visible"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-200 pb-2.5">
           <div className="flex items-center gap-2">
-            <span className="text-[13px] font-black text-[#102A43]">
-              الوصول السريع لوظائف منظومة إدارة مديونيات أصحاب المخابز
-            </span>
-            <span className="text-[11px] font-extrabold text-slate-600">
-              ({toArabicNumerals(6)} مجموعات متطابقة مع منظومة إدارة المخابز)
+            <Wallet className="w-4 h-4 text-[#164E83] shrink-0" />
+            <span className="text-xs sm:text-[13px] font-black text-[#102A43]">
+              الوصول السريع لوظائف منظومة إدارة مديونيات أصحاب المخابز ({toArabicNumerals(totalDebtScreensCount)} شاشة ووظيفة مترابطة)
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2" />
+              <input
+                type="text"
+                value={screenSearchQuery}
+                onChange={(e) => setScreenSearchQuery(e.target.value)}
+                placeholder={`بحث سريع في وظائف المديونيات (${toArabicNumerals(totalDebtScreensCount)})...`}
+                className="w-full pr-9 pl-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-[#102A43] focus:outline-none focus:border-[#164E83]"
+              />
+            </div>
             <button
               type="button"
               onClick={() => setActiveTab('dashboard')}
-              className={`px-3 py-1 rounded-lg text-[11.5px] font-black flex items-center gap-1.5 cursor-pointer border ${
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
                 activeTab === 'dashboard'
-                  ? 'bg-[#C6A15B] text-[#102A43] border-[#C6A15B]'
-                  : 'bg-[#102A43] text-white border-[#102A43]'
+                  ? 'bg-[#102A43] text-[#C6A15B] border-[#C6A15B]/60 shadow-xs'
+                  : 'bg-slate-50 hover:bg-blue-50 text-[#102A43] border-slate-300'
               }`}
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
@@ -1244,10 +1257,10 @@ export default function BakeryDebtsModule({
             <button
               type="button"
               onClick={() => setActiveTab('registry')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 cursor-pointer border ${
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
                 activeTab === 'registry'
-                  ? 'bg-[#164E83] text-white border-[#164E83]'
-                  : 'bg-[#F4F7FB] text-[#102A43] border-slate-300'
+                  ? 'bg-[#164E83] text-white border-[#164E83] shadow-xs'
+                  : 'bg-slate-50 hover:bg-blue-50 text-[#102A43] border-slate-300'
               }`}
             >
               <Table2 className="w-3.5 h-3.5 text-[#164E83]" />
@@ -1256,22 +1269,22 @@ export default function BakeryDebtsModule({
             <button
               type="button"
               onClick={() => setActiveTab('calculator')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 cursor-pointer border ${
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
                 activeTab === 'calculator'
-                  ? 'bg-emerald-800 text-white border-emerald-800'
-                  : 'bg-emerald-700 text-white border-emerald-700'
+                  ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs'
+                  : 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-700'
               }`}
             >
               <Calculator className="w-3.5 h-3.5" />
-              <span>حاسبة نقص الوزن (١٧٥/٢٠٢٤)</span>
+              <span>حاسبة الوزن (١٧٥/٢٠٢٤)</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('payments')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1.5 cursor-pointer border ${
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
                 activeTab === 'payments'
-                  ? 'bg-teal-800 text-white border-teal-800'
-                  : 'bg-teal-50 text-teal-900 border-teal-200'
+                  ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
+                  : 'bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100'
               }`}
             >
               <CreditCard className="w-3.5 h-3.5" />
@@ -1316,67 +1329,98 @@ export default function BakeryDebtsModule({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {debtNavGroups.map((group) => {
+        {/* بطاقات المجموعات الست القابلة للطي بأسلوب قسم التجارة الداخلية بدون قص للنصوص */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {filteredDebtNavGroups.map((group) => {
             const GroupIcon = group.groupIcon;
+            const isOpen = openNavGroups[group.id] ?? true;
             return (
               <div
                 key={group.id}
-                className={`rounded-xl border ${group.borderAccent} bg-[#FAFBFD] overflow-hidden flex flex-col`}
+                className="border border-slate-200 rounded-xl overflow-hidden bg-[#FAFBFD] flex flex-col"
               >
-                <div className={`px-2.5 py-1.5 text-[11px] font-black flex items-center justify-between ${group.headerBg}`}>
-                  <span className="flex items-center gap-1.5 truncate">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenNavGroups((prev) => ({ ...prev, [group.id]: !isOpen }))
+                  }
+                  className="w-full px-3 py-2 bg-[#102A43] text-white hover:bg-[#164E83] flex items-center justify-between gap-2 text-[11px] font-black cursor-pointer transition-colors"
+                >
+                  <span className="flex items-center gap-1.5 min-w-0 text-right">
                     <GroupIcon className="w-3.5 h-3.5 text-[#C6A15B] shrink-0" />
-                    <span className="truncate">{group.title}</span>
+                    <span className="break-words whitespace-normal leading-snug">{group.title}</span>
                   </span>
-                  <span className="text-[10px] font-extrabold opacity-90 shrink-0">
-                    {toArabicNumerals(group.items.length)} وظائف
-                  </span>
-                </div>
-                <div className="p-1.5 grid grid-cols-3 gap-1">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isSelected = item.tab ? activeTab === item.tab : false;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          if (item.action) item.action();
-                          else if (item.tab) setActiveTab(item.tab);
-                        }}
-                        className={`px-2 py-1 rounded-lg text-[10.5px] font-extrabold transition-all flex items-center justify-between gap-1 text-right cursor-pointer border ${
-                          isSelected
-                            ? `${group.activeBg} border-transparent shadow-xs`
-                            : 'bg-white text-[#102A43] border-slate-200/90 hover:bg-slate-100 hover:border-slate-300'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1 min-w-0">
-                          <Icon
-                            className={`w-3 h-3 shrink-0 ${
-                              isSelected ? 'text-[#C6A15B]' : group.iconAccent
-                            }`}
-                          />
-                          <span className="truncate leading-tight">{item.label}</span>
-                        </span>
-                        {typeof item.badgeCount === 'number' && item.badgeCount > 0 && (
-                          <span
-                            className={`num-cell px-1.5 py-0.5 rounded text-[9.5px] font-black shrink-0 ${
-                              isSelected ? 'bg-[#C6A15B] text-[#102A43]' : 'bg-red-700 text-white'
-                            }`}
-                          >
-                            {toArabicNumerals(item.badgeCount)}
+                  {isOpen ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-[#C6A15B] shrink-0" />
+                  ) : (
+                    <ChevronLeft className="w-3.5 h-3.5 text-[#C6A15B] shrink-0" />
+                  )}
+                </button>
+
+                {isOpen && (
+                  <div className="p-1.5 space-y-1 bg-white flex-1">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isSelected = item.tab ? activeTab === item.tab : false;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            if (item.action) item.action();
+                            else if (item.tab) setActiveTab(item.tab);
+                          }}
+                          className={`w-full text-right px-2.5 py-1.5 rounded-lg text-[11px] font-black flex items-center justify-between gap-2 transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-[#102A43] text-[#C6A15B] border-[#C6A15B]/60 shadow-xs'
+                              : 'bg-slate-50/70 text-[#102A43] border-slate-200/80 hover:bg-blue-50 hover:border-[#164E83]/40'
+                          }`}
+                        >
+                          <span className="flex items-start gap-2 min-w-0 flex-1">
+                            <Icon className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <span className="leading-snug break-words whitespace-normal">
+                              {item.label}
+                            </span>
                           </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                          {typeof item.badgeCount === 'number' && item.badgeCount > 0 && (
+                            <span
+                              className={`num-cell px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
+                                isSelected ? 'bg-[#C6A15B] text-[#102A43]' : 'bg-red-700 text-white'
+                              }`}
+                            >
+                              {toArabicNumerals(item.badgeCount)}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </nav>
+
+      {/* شريط عنوان الشاشة النشطة أسفل خريطة الشاشات على نمط قسم التجارة الداخلية */}
+      <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 shadow-2xs print:hidden">
+        <div className="flex items-center gap-2 text-xs font-black text-[#102A43]">
+          <Eye className="w-4 h-4 text-[#C6A15B] shrink-0" />
+          <span>الشاشة النشطة حالياً:</span>
+          <span className="text-[#164E83]">{activeScreenTitle}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-extrabold text-slate-600">
+          <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[#102A43]">
+            مديونيات نشطة: {toArabicNumerals(openDebtsCount)}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900">
+            مخابز متأخرة: {toArabicNumerals(lateBakeriesCount)}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-900">
+            تنبيهات غير مقروءة: {toArabicNumerals(unreadAlertsCount)}
+          </span>
+        </div>
+      </div>
 
       {/* إشعار Toast غير حاجز */}
       {toast && (

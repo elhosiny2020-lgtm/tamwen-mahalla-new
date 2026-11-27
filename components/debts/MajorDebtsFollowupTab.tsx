@@ -1472,6 +1472,7 @@ export default function MajorDebtsFollowupTab({
                         <th className="p-2">تاريخ الاستحقاق</th>
                         <th className="p-2">قيمة القسط المستحق</th>
                         <th className="p-2">حالة القسط عند الإنشاء</th>
+                        <th className="p-2 text-center">الإجراءات</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1501,6 +1502,11 @@ export default function MajorDebtsFollowupTab({
                           </td>
                           <td className="p-2 font-bold text-slate-600">
                             لم يستحق (لا يعتبر مسدداً إلا بحركة سداد موثقة)
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-[#102A43] text-[10px] font-black">
+                              جاهز للاعتماد
+                            </span>
                           </td>
                         </tr>
                       ))}
@@ -1584,7 +1590,7 @@ export default function MajorDebtsFollowupTab({
                       <th className="p-2">طريقة الدفع</th>
                       <th className="p-2">رقم الإيصال</th>
                       <th className="p-2">حالة القسط</th>
-                      <th className="p-2">إجراء</th>
+                      <th className="p-2">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1768,6 +1774,7 @@ export default function MajorDebtsFollowupTab({
                     <th className="p-2">القاعدة والنطاق</th>
                     <th className="p-2">المستخدم</th>
                     <th className="p-2">ملاحظات</th>
+                    <th className="p-2 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1784,6 +1791,15 @@ export default function MajorDebtsFollowupTab({
                       </td>
                       <td className="p-2 font-black text-[#164E83]">{h.changedBy}</td>
                       <td className="p-2 text-slate-600">{h.notes}</td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowHistoryModal(false)}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          إغلاق
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1816,6 +1832,7 @@ export default function MajorDebtsFollowupTab({
               <th className="border border-slate-300 p-1.5">صافي المديونية</th>
               <th className="border border-slate-300 p-1.5">التجاوز عن الحد</th>
               <th className="border border-slate-300 p-1.5">حالة السداد</th>
+              <th className="border border-slate-300 p-1.5 print:hidden">الإجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -1831,6 +1848,18 @@ export default function MajorDebtsFollowupTab({
                 <td className="border border-slate-300 p-1.5 num-cell font-black">{formatArabicCurrency(r.netCurrentDebtEgp)}</td>
                 <td className="border border-slate-300 p-1.5 num-cell">{formatArabicCurrency(r.exceedAmountEgp)}</td>
                 <td className="border border-slate-300 p-1.5">{r.paymentStatusLabel}</td>
+                <td className="border border-slate-300 p-1.5 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrintOpen(false);
+                      onOpenBakeryProfile(r.bakeryId);
+                    }}
+                    className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[9.5px] font-black cursor-pointer"
+                  >
+                    ملف المخبز
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

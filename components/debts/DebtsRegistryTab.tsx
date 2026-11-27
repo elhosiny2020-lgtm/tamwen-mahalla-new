@@ -643,6 +643,21 @@ export default function DebtsRegistryTab({
       { key: 'remainingAmount', label: 'المتبقي', headerText: 'المتبقي', type: 'currency', sortable: true, render: (i) => <span className="num-cell font-black text-red-700">{formatArabicCurrency(i.remainingAmount)}</span> },
       { key: 'status', label: 'الحالة', headerText: 'الحالة', type: 'badge', sortable: true, render: (i) => <span className="px-2 py-0.5 rounded bg-slate-100 font-black text-[10px]">{i.status}</span> },
       { key: 'notes', label: 'ملاحظات', headerText: 'ملاحظات', type: 'text', render: (i) => <span className="font-bold text-slate-600">{i.notes || '—'}</span> },
+      {
+        key: 'actions',
+        label: 'الإجراءات',
+        headerText: 'الإجراءات',
+        type: 'actions',
+        render: (i) => (
+          <button
+            type="button"
+            onClick={() => setDetailDebtId(i.debtId)}
+            className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+          >
+            معاينة المديونية
+          </button>
+        ),
+      },
     ],
     []
   );
@@ -1205,6 +1220,7 @@ export default function DebtsRegistryTab({
               <th className="border border-slate-400 p-1.5">المسدد</th>
               <th className="border border-slate-400 p-1.5">المتبقي</th>
               <th className="border border-slate-400 p-1.5">الحالة</th>
+              <th className="border border-slate-400 p-1.5 print:hidden">الإجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -1220,6 +1236,18 @@ export default function DebtsRegistryTab({
                 <td className="border border-slate-300 p-1.5 num-cell text-emerald-800">{formatArabicCurrency(d.totalPaidAmount)}</td>
                 <td className="border border-slate-300 p-1.5 num-cell font-black text-red-800">{formatArabicCurrency(d.remainingAmount)}</td>
                 <td className="border border-slate-300 p-1.5 font-black">{d.paymentStatus}</td>
+                <td className="border border-slate-300 p-1.5 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPrint(false);
+                      onOpenBakeryProfile(d.bakeryId);
+                    }}
+                    className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[9.5px] font-black cursor-pointer"
+                  >
+                    ملف المخبز
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

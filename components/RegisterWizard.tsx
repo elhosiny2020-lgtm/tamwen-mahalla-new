@@ -1,15 +1,28 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, Shield, Building2, Layers, CheckCircle2, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
-import { INITIAL_BRANCHES, INITIAL_DEPARTMENTS, getStoredBranches, getStoredDepartments, getStoredRegistrationRequests, saveStoredRegistrationRequests, addAuditLog } from '@/lib/mock-db';
-import { Branch, Department, UserRole, RegistrationRequest } from '@/types';
+import { User as UserIcon, Shield, Building2, Layers, CheckCircle2, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
+import {
+  INITIAL_BRANCHES,
+  INITIAL_DEPARTMENTS,
+  getStoredBranches,
+  getStoredDepartments,
+  getStoredRegistrationRequests,
+  saveStoredRegistrationRequests,
+  getStoredUsers,
+  saveStoredUsers,
+  setCurrentSessionUser,
+  setSelectedBranchSession,
+  addAuditLog,
+} from '@/lib/mock-db';
+import { Branch, Department, User, UserRole, RegistrationRequest } from '@/types';
 import { registerSchema } from '@/lib/zod-schemas';
 import { getRoleArabicLabel, toArabicNumerals } from '@/lib/utils';
+import { setClientSessionExpiryTimestamp } from '@/hooks/useSessionExpiryMonitor';
 
 interface RegisterWizardProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (newUser: User) => void;
 }
 
 export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardProps) {
@@ -42,10 +55,12 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
   const [selectedBranches, setSelectedBranches] = useState<string[]>(['b-03']);
   
   const [requestedRole, setRequestedRole] = useState<UserRole>('bakery_officer');
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>(['d-01', 'd-02']);
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>(
+    INITIAL_DEPARTMENTS.map((d) => d.id)
+  );
   
   const [errorMsg, setErrorMsg] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleNextStep = () => {
     setErrorMsg('');
@@ -64,6 +79,12 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
       if (!result.success) {
         const firstError = result.error.issues[0]?.message || 'يرجى التحقق من صحة المدخلات (الرقم القومي ١٤ رقماً والهاتف ١١ رقماً)';
         setErrorMsg(firstError);
+        return;
+      }
+
+      const existingUsers = getStoredUsers();
+      if (existingUsers.some((u) => u.username.toLowerCase() === username.trim().toLowerCase())) {
+        setErrorMsg('اسم المستخدم مسجل بالفعل، يرجى اختيار اسم مستخدم آخر.');
         return;
       }
     }
@@ -108,44 +129,103 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
     }
   };
 
-  const handleSubmitRequest = (e: React.FormEvent) => {
+  const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setErrorMsg('');
+
+    const nowIso = new Date().toISOString();
+    const effectiveBranches = selectedBranches.length > 0 ? selectedBranches : [primaryBranchId];
+    const effectiveDepts =
+      selectedDepartments.length > 0 ? selectedDepartments : departments.map((d) => d.id);
+
+    const newUser: User = {
+      id: `usr-${Date.now()}`,
+      fullName: fullName.trim(),
+      nationalId: nationalId.trim(),
+      phone: phone.trim(),
+      email: email.trim() || `${username.trim()}@supply.gov.eg`,
+      username: username.trim(),
+      password: tempPassword,
+      jobTitle: jobTitle.trim() || 'موظف تموين',
+      jobGrade,
+      workplace: workplace.trim() || 'إدارة تموين مركز المحلة الكبرى',
+      primaryBranchId,
+      branchIds: effectiveBranches,
+      departmentIds: effectiveDepts,
+      role: requestedRole,
+      status: 'active',
+      employeeNumber: String(Math.floor(10000 + Math.random() * 90000)),
+      failedLoginAttempts: 0,
+      createdAt: nowIso,
+      lastLogin: nowIso,
+    };
+
+    const existingUsers = getStoredUsers();
+    saveStoredUsers([newUser, ...existingUsers]);
+
     const newReq: RegistrationRequest = {
       id: `req-${Date.now()}`,
-      fullName,
-      nationalId,
-      phone,
-      email,
-      username,
+      fullName: newUser.fullName,
+      nationalId: newUser.nationalId,
+      phone: newUser.phone,
+      email: newUser.email,
+      username: newUser.username,
       tempPassword,
-      jobTitle: jobTitle || 'موظف تموين',
+      jobTitle: newUser.jobTitle,
       jobGrade,
-      workplace: workplace || 'إدارة تموين مركز المحلة الكبرى',
+      workplace: newUser.workplace,
       primaryBranchId,
-      branchIds: selectedBranches,
+      branchIds: effectiveBranches,
       requestedRole,
-      requestedDepartments: selectedDepartments,
-      status: 'pending',
-      createdAt: new Date().toISOString()
+      requestedDepartments: effectiveDepts,
+      status: 'approved',
+      createdAt: nowIso,
     };
 
     const reqs = getStoredRegistrationRequests();
     saveStoredRegistrationRequests([newReq, ...reqs]);
 
+    try {
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: newUser.username,
+          password: tempPassword,
+          branchId: primaryBranchId,
+          isDirectRegistration: true,
+          registeredUser: {
+            id: newUser.id,
+            fullName: newUser.fullName,
+            role: newUser.role,
+            primaryBranchId: newUser.primaryBranchId,
+          },
+        }),
+      });
+    } catch {
+      // المتابعة للدخول الفوري حتى في حال عدم استجابة طلب الشبكة الثانوي
+    }
+
     addAuditLog({
-      userId: 'anonymous',
-      username: username,
-      fullName: fullName,
-      action: 'طلب تسجيل مستخدم جديد',
+      userId: newUser.id,
+      username: newUser.username,
+      fullName: newUser.fullName,
+      action: 'تسجيل مستخدم جديد ودخول فوري للنظام',
       module: 'إدارة المستخدمين',
       branchId: primaryBranchId,
-      details: `تم تقديم طلب تسجيل جديد برتبة (${requestedRole})`,
+      details: `تم إنشاء وتفعيل حساب المستخدم (${newUser.fullName}) برتبة (${getRoleArabicLabel(requestedRole)}) والدخول المباشر للمنظومة`,
       ipAddress: '192.168.1.50',
       deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
-      status: 'success'
+      status: 'success',
     });
 
-    setSubmitted(true);
+    setCurrentSessionUser(newUser);
+    setSelectedBranchSession(primaryBranchId);
+    setClientSessionExpiryTimestamp();
+    setIsSubmitting(false);
+    onSuccess(newUser);
   };
 
   return (
@@ -153,33 +233,18 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
       <div className="bg-white/95 backdrop-blur-md rounded-2xl max-w-3xl w-full p-8 shadow-2xl border border-slate-200 my-8">
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
           <div>
-            <h2 className="text-2xl font-black text-[#102A43]">طلب إنشاء حساب مستخدم جديد</h2>
-            <p className="text-[11px] font-bold text-slate-600">مديرية التموين والتجارة الداخلية بالغربية · نظام التحقق القياسي المعتمد</p>
+            <h2 className="text-2xl font-black text-[#102A43]">إنشاء حساب مستخدم جديد والدخول المباشر</h2>
+            <p className="text-[11px] font-bold text-slate-600">مديرية التموين والتجارة الداخلية بالغربية · تفعيل ودخول فوري للمنظومة دون انتظار</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer">✕</button>
         </div>
 
-        {submitted ? (
-          <div className="py-10 text-center space-y-4">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto text-2xl font-bold shadow-sm">✓</div>
-            <h3 className="text-2xl font-black text-[#102A43]">تم إرسال طلب التسجيل بنجاح</h3>
-            <p className="text-[11px] font-bold text-slate-600 max-w-md mx-auto">
-              حسابك الآن بحالة <span className="font-black text-amber-700">«قيد المراجعة»</span> من قبل مدير النظام. سيتم تفعيل الحساب ومراجعة الصلاحيات في أقرب وقت.
-            </p>
-            <button
-              onClick={onSuccess}
-              className="px-6 py-3 bg-[#102A43] hover:bg-[#164E83] text-white font-extrabold rounded-xl text-[11px] transition-all shadow-sm cursor-pointer"
-            >
-              العودة لتسجيل الدخول
-            </button>
-          </div>
-        ) : (
-          <>
+        <>
             {/* Step Progress Bar */}
             <div className="flex justify-between mb-8 relative">
               <div className="absolute top-1/2 right-0 left-0 h-1 bg-slate-200 -translate-y-1/2 z-0"></div>
               {[
-                { s: 1, title: 'البيانات الشخصية', icon: User },
+                { s: 1, title: 'البيانات الشخصية', icon: UserIcon },
                 { s: 2, title: 'الدور الوظيفي', icon: Shield },
                 { s: 3, title: 'الفروع والنطاق', icon: Building2 },
                 { s: 4, title: 'الأقسام والصلاحيات', icon: Layers },
@@ -541,16 +606,16 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
                 ) : (
                   <button
                     type="submit"
-                    className="px-7 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl text-[11px] flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                    disabled={isSubmitting}
+                    className="px-7 py-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-black rounded-xl text-[11px] flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                   >
-                    <span>إرسال طلب التسجيل للمراجعة</span>
+                    <span>{isSubmitting ? 'جارٍ تفعيل الحساب والدخول...' : 'إنشاء الحساب والدخول للنظام مباشرة'}</span>
                     <CheckCircle2 className="w-4 h-4" />
                   </button>
                 )}
               </div>
             </form>
           </>
-        )}
       </div>
     </div>
   );

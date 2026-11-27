@@ -73,6 +73,9 @@ export default function FactoryResetButton({
   const [includeCustomLists, setIncludeCustomLists] = useState(false);
   const [confirmPhrase, setConfirmPhrase] = useState('');
   const [adminCredential, setAdminCredential] = useState('');
+  const [confirmAdminCredential, setConfirmAdminCredential] = useState('');
+  const [passcodeConfigured, setPasscodeConfigured] = useState<boolean | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const [createdBackup, setCreatedBackup] = useState<FactoryResetBackupRecord | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [resetDone, setResetDone] = useState(false);
@@ -107,15 +110,36 @@ export default function FactoryResetButton({
 
   const fmtNum = (n: number) => (isRtl ? toArabicNumerals(n) : String(n));
 
+  const checkServerPasscodeStatus = async () => {
+    try {
+      const res = await fetch('/api/auth/verify-admin', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { configured?: boolean };
+        setPasscodeConfigured(Boolean(data.configured));
+      } else if (res.status === 401) {
+        setPasscodeConfigured(true);
+      }
+    } catch {
+      setPasscodeConfigured(true);
+    }
+  };
+
   const openModal = () => {
     setConfirmPhrase('');
     setAdminCredential('');
+    setConfirmAdminCredential('');
+    setPasscodeConfigured(null);
+    setVerifying(false);
     setCreatedBackup(null);
     setErrorMsg(null);
     setResetDone(false);
     setRestoredMsg(null);
     setIncludeCustomLists(false);
     setConfirmOpen(true);
+    void checkServerPasscodeStatus();
   };
 
   const handleCreateBackup = () => {
@@ -150,8 +174,10 @@ export default function FactoryResetButton({
     confirmPhrase.trim() === 'تأكيد إعادة ضبط المصنع' ||
     confirmPhrase.trim().toUpperCase() === 'CONFIRM FACTORY RESET';
 
-  const credentialValid = verifyAdminResetCredential(effectiveUser, adminCredential);
-  const canExecute = Boolean(createdBackup && phraseMatches && credentialValid);
+  const needsInitialClaim = passcodeConfigured === false;
+  const credentialValid = verifyAdminResetCredential(effectiveUser, adminCredential) &&
+    (!needsInitialClaim || confirmAdminCredential.trim() === adminCredential.trim());
+  const canExecute = Boolean(createdBackup && phraseMatches && credentialValid && !verifying);
 
   const handleExecuteReset = async () => {
     setErrorMsg(null);
@@ -173,28 +199,63 @@ export default function FactoryResetButton({
     }
     if (!credentialValid) {
       setErrorMsg(
-        isRtl
+        needsInitialClaim
+          ? isRtl
+            ? 'يرجى إدخال وتأكيد كلمة المرور الإدارية (٤ أحرف على الأقل) بشكل متطابق.'
+            : 'Please enter and confirm a matching admin password (at least 4 characters).'
+          : isRtl
           ? 'فشل التحقق الإداري: يرجى إدخال كلمة المرور الإدارية الصحيحة.'
           : 'Administrative verification failed: please enter your valid admin credential.'
       );
       return;
     }
 
+    setVerifying(true);
     try {
       const verifyRes = await fetch('/api/auth/verify-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: adminCredential }),
+        body: JSON.stringify({
+          action: needsInitialClaim ? 'claim' : 'verify',
+          password: adminCredential.trim(),
+        }),
       });
       if (!verifyRes.ok) {
-        const verifyData = (await verifyRes.json().catch(() => ({}))) as { error?: string };
+        const verifyData = (await verifyRes.json().catch(() => ({}))) as {
+          error?: string;
+          needsSetup?: boolean;
+        };
+        if (verifyData.needsSetup) {
+          setPasscodeConfigured(false);
+          setErrorMsg(
+            isRtl
+              ? 'يرجى تعيين وتأكيد كلمة المرور الإدارية لأول مرة في الحقلين أدناه ثم الضغط على تنفيذ.'
+              : 'Please set and confirm your initial admin password below, then click execute.'
+          );
+          setVerifying(false);
+          return;
+        }
+        if (verifyRes.status === 401) {
+          setErrorMsg(
+            isRtl
+              ? 'انتهت جلسة الخادم الحالية. يرجى تسجيل الخروج ثم إعادة تسجيل الدخول بكلمة مرور مدير النظام.'
+              : 'Your server session expired. Please sign out and sign in again with your admin password.'
+          );
+          setVerifying(false);
+          return;
+        }
         setErrorMsg(
           verifyData.error ||
             (isRtl
               ? 'فشل التحقق الإداري على الخادم — تم إيقاف عملية إعادة الضبط.'
               : 'Server administrative verification failed.')
         );
+        setVerifying(false);
         return;
+      }
+
+      if (needsInitialClaim) {
+        setPasscodeConfigured(true);
       }
 
       onConfirmReset({ clearCustomLists: includeCustomLists });
@@ -222,6 +283,8 @@ export default function FactoryResetButton({
         errorMessage: msg,
       });
       setErrorMsg(msg);
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -364,6 +427,7 @@ export default function FactoryResetButton({
                       <tr className="bg-[#102A43] text-white">
                         <th className="p-2">{t('factoryResetTableCol')}</th>
                         <th className="p-2 text-center">{t('factoryResetCountCol')}</th>
+                        <th className="p-2 text-center">{t('actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -372,6 +436,11 @@ export default function FactoryResetButton({
                           <td className="p-2 font-black text-[#102A43]">{row.tableName}</td>
                           <td className="p-2 text-center num-cell font-black text-red-700">
                             {fmtNum(row.count)}
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className="px-2 py-0.5 rounded bg-red-50 text-red-800 text-[10px] font-black">
+                              نسخ احتياطي + تصفير
+                            </span>
                           </td>
                         </tr>
                       ))}
@@ -451,18 +520,41 @@ export default function FactoryResetButton({
                 </div>
 
                 {/* الخطوة ٣: التحقق الإداري بكلمة المرور */}
-                <div className="space-y-1.5">
+                <div className="space-y-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                   <label className="text-xs font-black text-[#102A43] flex items-center gap-1.5">
                     <KeyRound className="w-3.5 h-3.5 text-[#164E83]" />
-                    <span>{t('factoryResetPasswordLabel')}</span>
+                    <span>
+                      {needsInitialClaim
+                        ? isRtl
+                          ? 'الخطوة ٣: تعيين كلمة مرور مدير النظام لأول مرة (للتحقق الإداري)'
+                          : 'Step 3: First-Run Admin Password Setup'
+                        : t('factoryResetPasswordLabel')}
+                    </span>
                   </label>
+
+                  {needsInitialClaim && (
+                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] font-bold text-amber-950">
+                      {isRtl
+                        ? 'لم يتم تسجيل كلمة مرور التحقق الإداري على الخادم بعد. أدخل كلمة المرور الإدارية التي ترغب في اعتمادها وأكّدها أدناه ليتم تشفيرها وحفظها على الخادم وتنفيذ العملية فوراً.'
+                        : 'No server admin passcode is set yet. Enter and confirm your chosen admin password below to securely hash and lock it on the server and execute the reset.'}
+                    </div>
+                  )}
+
                   <div className="relative">
                     <Lock className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 right-3" />
                     <input
                       type="password"
                       value={adminCredential}
                       onChange={(e) => setAdminCredential(e.target.value)}
-                      placeholder={t('factoryResetPasswordPlaceholder')}
+                      placeholder={
+                        needsInitialClaim
+                          ? isRtl
+                            ? 'أدخل كلمة المرور الإدارية الجديدة (٤ أحرف فأكثر)...'
+                            : 'Enter new admin password (4+ chars)...'
+                          : isRtl
+                          ? 'أدخل كلمة مرور مدير النظام...'
+                          : t('factoryResetPasswordPlaceholder')
+                      }
                       className={`w-full pr-9 pl-3 py-2 rounded-xl border text-xs font-bold outline-none ${
                         credentialValid
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
@@ -470,10 +562,32 @@ export default function FactoryResetButton({
                       }`}
                     />
                   </div>
+
+                  {needsInitialClaim && (
+                    <div className="relative">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 right-3" />
+                      <input
+                        type="password"
+                        value={confirmAdminCredential}
+                        onChange={(e) => setConfirmAdminCredential(e.target.value)}
+                        placeholder={
+                          isRtl
+                            ? 'أعد إدخال كلمة المرور الإدارية للتأكيد...'
+                            : 'Re-enter admin password to confirm...'
+                        }
+                        className={`w-full pr-9 pl-3 py-2 rounded-xl border text-xs font-bold outline-none ${
+                          credentialValid
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                            : 'border-slate-300 bg-white text-[#102A43]'
+                        }`}
+                      />
+                    </div>
+                  )}
+
                   <p className="text-[10.5px] font-bold text-slate-500">
                     {isRtl
-                      ? `حساب المسؤول الحالي: ${effectiveUser?.username || 'admin'} — أدخل كلمة مرور الحساب أو اسم المستخدم الإداري للتحقق.`
-                      : `Active Admin: ${effectiveUser?.username || 'admin'} — re-enter your account password or admin username to verify.`}
+                      ? `حساب المسؤول الحالي: ${effectiveUser?.username || 'admin'} — يتم التحقق من كلمة مرور مدير النظام بأمان على الخادم قبل تنفيذ إعادة ضبط المصنع.`
+                      : `Active Admin: ${effectiveUser?.username || 'admin'} — admin password is verified securely on the server before executing reset.`}
                   </p>
                 </div>
 
@@ -499,7 +613,13 @@ export default function FactoryResetButton({
                     className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>{t('factoryResetExecuteBtn')}</span>
+                    <span>
+                      {verifying
+                        ? isRtl
+                          ? 'جاري التحقق الإداري والتنفيذ...'
+                          : 'Verifying...'
+                        : t('factoryResetExecuteBtn')}
+                    </span>
                   </button>
                 </div>
               </>

@@ -1,15 +1,32 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Building2, ShieldCheck, UserCheck, Search } from 'lucide-react';
+import {
+  Users,
+  Building2,
+  ShieldCheck,
+  UserCheck,
+  Search,
+  KeyRound,
+  Trash2,
+  PlusCircle,
+  Layers,
+  UserPlus,
+  Eye,
+  X,
+} from 'lucide-react';
 import {
   INITIAL_USERS,
   INITIAL_BRANCHES,
+  INITIAL_DEPARTMENTS,
   INITIAL_REGISTRATION_REQUESTS,
   INITIAL_AUDIT_LOGS,
   getStoredUsers,
   saveStoredUsers,
   getStoredBranches,
+  getStoredDepartments,
+  saveStoredDepartments,
+  markDepartmentDeleted,
   getStoredRegistrationRequests,
   saveStoredRegistrationRequests,
   getStoredAuditLogs,
@@ -21,15 +38,16 @@ import {
   getRoleArabicLabel,
   normalizeSearchText,
 } from '@/lib/utils';
-import { User, Branch, RegistrationRequest, AuditLog } from '@/types';
+import { User, Branch, Department, RegistrationRequest, AuditLog, UserRole } from '@/types';
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 
 export default function AdminDashboard({ userId = 'default' }: { userId?: string }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'requests' | 'branches' | 'audit'>('requests');
+  const [activeTab, setActiveTab] = useState<'users' | 'permissions' | 'requests' | 'branches' | 'audit'>('users');
 
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
+  const [departments, setDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
   const [requests, setRequests] = useState<RegistrationRequest[]>(INITIAL_REGISTRATION_REQUESTS);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
 
@@ -42,12 +60,38 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
   const [userSort, setUserSort] = useState<{ key: string; asc: boolean }>({ key: 'fullName', asc: true });
   const [auditSort, setAuditSort] = useState<{ key: string; asc: boolean }>({ key: 'timestamp', asc: false });
 
+  // نافذة إضافة مستخدم أو تعديل/إضافة كلمة مرور
+  const [passwordModalUser, setPasswordModalUser] = useState<User | null>(null);
+  const [newPassValue, setNewPassValue] = useState('');
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    fullName: '',
+    username: '',
+    password: '',
+    nationalId: '',
+    phone: '01000000000',
+    jobTitle: 'مفتش تمويني',
+    role: 'bakery_officer' as UserRole,
+    primaryBranchId: 'b-03',
+  });
+
+  // إدارة الأقسام والصلاحيات (إضافة قسم / إلغاء قسم / تخصيص للمستخدم)
+  const [selectedPermUserId, setSelectedPermUserId] = useState<string>(INITIAL_USERS[1]?.id || INITIAL_USERS[0]?.id || '');
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptCode, setNewDeptCode] = useState('');
+  const [newDeptDesc, setNewDeptDesc] = useState('');
+
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
-      setUsers(getStoredUsers());
+      const storedUsers = getStoredUsers();
+      setUsers(storedUsers);
       setBranches(getStoredBranches());
+      setDepartments(getStoredDepartments());
       setRequests(getStoredRegistrationRequests());
       setAuditLogs(getStoredAuditLogs());
+      if (storedUsers.length > 0) {
+        setSelectedPermUserId((prev) => prev || storedUsers[0].id);
+      }
     });
 
     let cancelled = false;
@@ -163,9 +207,9 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
     showNotice('تم رفض طلب التسجيل');
   };
 
-  const handleToggleUserStatus = (userId: string) => {
+  const handleToggleUserStatus = (targetUserId: string) => {
     const updated = users.map((u) => {
-      if (u.id === userId) {
+      if (u.id === targetUserId) {
         const nextStatus: 'active' | 'suspended' = u.status === 'active' ? 'suspended' : 'active';
         return { ...u, status: nextStatus };
       }
@@ -174,6 +218,199 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
     setUsers(updated);
     saveStoredUsers(updated);
     showNotice('تم تحديث حالة حساب المستخدم');
+  };
+
+  const handleSaveUserPassword = async (targetUser: User, passwordText: string) => {
+    const clean = passwordText.trim();
+    if (clean.length < 4) {
+      showNotice('كلمة المرور يجب ألا تقل عن ٤ أحرف.');
+      return;
+    }
+    const updated = users.map((u) =>
+      u.id === targetUser.id ? { ...u, password: clean, passwordDisabled: false } : u
+    );
+    setUsers(updated);
+    saveStoredUsers(updated);
+
+    try {
+      await fetch('/api/auth/manage-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', username: targetUser.username, password: clean }),
+      });
+    } catch {
+      // ignore network error; local store already updated
+    }
+
+    addAuditLog({
+      userId: 'admin',
+      username: 'admin',
+      fullName: 'مدير النظام',
+      action: 'تعديل / إضافة كلمة مرور',
+      module: 'إدارة المستخدمين والصلاحيات',
+      details: `تم تعيين كلمة مرور جديدة للحساب (${targetUser.username})`,
+      ipAddress: '192.168.1.50',
+      deviceInfo: 'متصفح الويب المعتمد',
+      status: 'success',
+    });
+    setAuditLogs(getStoredAuditLogs());
+    setPasswordModalUser(null);
+    setNewPassValue('');
+    showNotice(`تم تحديث كلمة مرور المستخدم (${targetUser.fullName}) بنجاح.`);
+  };
+
+  const handleDeleteUserPassword = async (targetUser: User) => {
+    const updated = users.map((u) =>
+      u.id === targetUser.id ? { ...u, password: undefined, passwordDisabled: true } : u
+    );
+    setUsers(updated);
+    saveStoredUsers(updated);
+
+    try {
+      await fetch('/api/auth/manage-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', username: targetUser.username }),
+      });
+    } catch {
+      // ignore network error
+    }
+
+    addAuditLog({
+      userId: 'admin',
+      username: 'admin',
+      fullName: 'مدير النظام',
+      action: 'حذف كلمة مرور مستخدم',
+      module: 'إدارة المستخدمين والصلاحيات',
+      details: `تم حذف كلمة مرور الحساب (${targetUser.username}) وتعطيل الدخول بها مؤقتاً`,
+      ipAddress: '192.168.1.50',
+      deviceInfo: 'متصفح الويب المعتمد',
+      status: 'warning',
+    });
+    setAuditLogs(getStoredAuditLogs());
+    showNotice(`تم حذف كلمة مرور (${targetUser.fullName}) — لن يتمكن من الدخول بكلمة مرور حتى تعيين كلمة جديدة.`);
+  };
+
+  const handleCreateNewUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserForm.fullName.trim() || !newUserForm.username.trim() || newUserForm.password.trim().length < 4) {
+      showNotice('يرجى إدخال الاسم واسم المستخدم وكلمة مرور لا تقل عن ٤ أحرف.');
+      return;
+    }
+    if (users.some((u) => u.username.toLowerCase() === newUserForm.username.trim().toLowerCase())) {
+      showNotice('اسم المستخدم مسجل مسبقاً.');
+      return;
+    }
+    const created: User = {
+      id: `usr-${Date.now()}`,
+      fullName: newUserForm.fullName.trim(),
+      username: newUserForm.username.trim(),
+      password: newUserForm.password.trim(),
+      passwordDisabled: false,
+      nationalId: newUserForm.nationalId.trim() || '29001011600099',
+      phone: newUserForm.phone.trim(),
+      email: `${newUserForm.username.trim()}@supply.gov.eg`,
+      jobTitle: newUserForm.jobTitle.trim(),
+      jobGrade: 'الثالثة التخصصية',
+      workplace: 'مديرية التموين بالغربية',
+      branchIds: [newUserForm.primaryBranchId],
+      primaryBranchId: newUserForm.primaryBranchId,
+      departmentIds: departments.map((d) => d.id),
+      role: newUserForm.role,
+      status: 'active',
+      failedLoginAttempts: 0,
+      createdAt: new Date().toISOString(),
+    };
+    const updatedUsers = [created, ...users];
+    setUsers(updatedUsers);
+    saveStoredUsers(updatedUsers);
+
+    try {
+      await fetch('/api/auth/manage-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', username: created.username, password: created.password }),
+      });
+    } catch {
+      // ignore
+    }
+
+    setShowAddUserModal(false);
+    setNewUserForm({
+      fullName: '',
+      username: '',
+      password: '',
+      nationalId: '',
+      phone: '01000000000',
+      jobTitle: 'مفتش تمويني',
+      role: 'bakery_officer',
+      primaryBranchId: 'b-03',
+    });
+    showNotice(`تم إنشاء حساب (${created.fullName}) بكلمة المرور المحددة بنجاح.`);
+  };
+
+  const handleAddDepartment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeptName.trim()) return;
+    const cleanCode = (newDeptCode.trim() || `SEC_${departments.length + 1}`).toUpperCase();
+    const newDept: Department = {
+      id: `d-custom-${Date.now()}`,
+      code: cleanCode,
+      name: newDeptName.trim(),
+      arabicName: newDeptName.trim(),
+      description: newDeptDesc.trim() || 'قسم إداري مضاف من قائمة الصلاحيات والأقسام',
+      iconName: 'Layers',
+      isCore: false,
+    };
+    const updatedDepts = [...departments, newDept];
+    setDepartments(updatedDepts);
+    saveStoredDepartments(updatedDepts);
+
+    const updatedUsers = users.map((u) =>
+      u.role === 'super_admin' || u.id === selectedPermUserId
+        ? { ...u, departmentIds: Array.from(new Set([...u.departmentIds, newDept.id])) }
+        : u
+    );
+    setUsers(updatedUsers);
+    saveStoredUsers(updatedUsers);
+
+    setNewDeptName('');
+    setNewDeptCode('');
+    setNewDeptDesc('');
+    showNotice(`تمت إضافة قسم (${newDept.arabicName}) وتفعيله في قائمة الصلاحيات والشريط الجانبي.`);
+  };
+
+  const handleRemoveDepartment = (dept: Department) => {
+    if (dept.code === 'DASH' || dept.code === 'USERS' || dept.code === 'ROLES') {
+      showNotice('لا يمكن إلغاء الأقسام السيادية الأساسية لإدارة النظام.');
+      return;
+    }
+    markDepartmentDeleted(dept.id);
+    const updatedDepts = departments.filter((d) => d.id !== dept.id);
+    setDepartments(updatedDepts);
+    saveStoredDepartments(updatedDepts);
+
+    const updatedUsers = users.map((u) => ({
+      ...u,
+      departmentIds: u.departmentIds.filter((id) => id !== dept.id),
+    }));
+    setUsers(updatedUsers);
+    saveStoredUsers(updatedUsers);
+    showNotice(`تم إلغاء وحذف قسم (${dept.arabicName}) من قائمة الصلاحيات والمنظومة.`);
+  };
+
+  const handleToggleUserDeptPerm = (targetUserId: string, deptId: string) => {
+    const updated = users.map((u) => {
+      if (u.id !== targetUserId) return u;
+      const exists = u.departmentIds.includes(deptId);
+      return {
+        ...u,
+        departmentIds: exists ? u.departmentIds.filter((id) => id !== deptId) : [...u.departmentIds, deptId],
+      };
+    });
+    setUsers(updated);
+    saveStoredUsers(updated);
+    showNotice('تم تحديث صلاحيات الأقسام للمستخدم بنجاح.');
   };
 
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
@@ -324,29 +561,73 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
         ),
     },
     {
+      key: 'passwordStatus',
+      label: 'حالة كلمة المرور',
+      headerText: 'حالة كلمة المرور',
+      type: 'badge',
+      align: 'center',
+      defaultWidth: 135,
+      render: (u) =>
+        u.passwordDisabled ? (
+          <span className="bg-red-100 text-red-900 px-2 py-0.5 rounded-md text-[10px] font-black">محذوفة (معطلة)</span>
+        ) : u.password ? (
+          <span className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md text-[10px] font-black">مخصصة ومفعلة ✓</span>
+        ) : (
+          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md text-[10px] font-black">افتراضية</span>
+        ),
+    },
+    {
       key: 'actions',
-      label: 'التحكم بالحساب',
-      headerText: 'التحكم بالحساب',
+      label: 'الإجراءات',
+      headerText: 'الإجراءات',
       type: 'actions',
       align: 'center',
       sortable: false,
-      defaultWidth: 145,
-      render: (u) =>
-        u.role !== 'super_admin' ? (
+      defaultWidth: 320,
+      render: (u) => (
+        <div className="flex flex-wrap items-center justify-center gap-1">
           <button
             type="button"
-            onClick={() => handleToggleUserStatus(u.id)}
-            className={`px-3 py-1 rounded-lg text-[10.5px] font-extrabold cursor-pointer ${
-              u.status === 'active'
-                ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-            }`}
+            onClick={() => {
+              setPasswordModalUser(u);
+              setNewPassValue(u.password || '');
+            }}
+            className="px-2 py-1 rounded-lg bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
           >
-            {u.status === 'active' ? 'إيقاف الحساب' : 'تفعيل الحساب'}
+            {u.password && !u.passwordDisabled ? 'تعديل كلمة المرور' : 'إضافة كلمة مرور'}
           </button>
-        ) : (
-          <span className="text-slate-400 text-[10.5px]">حساب سيادي</span>
-        ),
+          <button
+            type="button"
+            onClick={() => handleDeleteUserPassword(u)}
+            className="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-950 text-[10px] font-black cursor-pointer"
+          >
+            حذف الباسورد
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedPermUserId(u.id);
+              setActiveTab('permissions');
+            }}
+            className="px-2 py-1 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 text-[10px] font-black cursor-pointer"
+          >
+            الصلاحيات
+          </button>
+          {u.role !== 'super_admin' && (
+            <button
+              type="button"
+              onClick={() => handleToggleUserStatus(u.id)}
+              className={`px-2 py-1 rounded-lg text-[10px] font-black cursor-pointer ${
+                u.status === 'active'
+                  ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                  : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+              }`}
+            >
+              {u.status === 'active' ? 'إيقاف' : 'تفعيل'}
+            </button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -418,6 +699,25 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
           <span className="text-red-800 font-extrabold">فشل ✕</span>
         ),
     },
+    {
+      key: 'actions',
+      label: 'الإجراءات',
+      headerText: 'الإجراءات',
+      type: 'actions',
+      align: 'center',
+      sortable: false,
+      defaultWidth: 120,
+      render: (l) => (
+        <button
+          type="button"
+          onClick={() => showNotice(`${l.action} — ${l.details}`)}
+          className="px-2.5 py-1 rounded-lg bg-[#102A43] text-[#C6A15B] text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
+        >
+          <Eye className="w-3 h-3" />
+          <span>معاينة</span>
+        </button>
+      ),
+    },
   ];
 
   return (
@@ -470,7 +770,27 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
 
       {/* Tabs Navigation & Search */}
       <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => { setActiveTab('users'); setSelectedIds([]); }}
+            className={`px-4 py-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
+              activeTab === 'users' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            إدارة المستخدمين وكلمات المرور ({toArabicNumerals(users.length)})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('permissions'); setSelectedIds([]); }}
+            className={`px-4 py-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
+              activeTab === 'permissions' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            إدارة الصلاحيات والأقسام ({toArabicNumerals(departments.length)})
+          </button>
+
           <button
             type="button"
             onClick={() => { setActiveTab('requests'); setSelectedIds([]); }}
@@ -484,16 +804,6 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
                 {toArabicNumerals(pendingCount)}
               </span>
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setActiveTab('users'); setSelectedIds([]); }}
-            className={`px-4 py-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
-              activeTab === 'users' ? 'bg-[#102A43] text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            إدارة المستخدمين ({toArabicNumerals(users.length)})
           </button>
 
           <button
@@ -566,8 +876,20 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       {activeTab === 'users' && (
         <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
           <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
-            <h3 className="text-[13px] font-black text-[#102A43]">إدارة حسابات العاملين والموظفين</h3>
-            <span className="text-[11px] font-bold text-slate-600">إجمالي الحسابات: <span className="num-cell">{toArabicNumerals(users.length)}</span></span>
+            <div>
+              <h3 className="text-[13px] font-black text-[#102A43]">إدارة حسابات العاملين وكلمات المرور</h3>
+              <span className="text-[11px] font-bold text-slate-600">
+                يمكنك إضافة مستخدم جديد بكلمة مرور، أو تعديل/حذف كلمة المرور لأي حساب · الإجمالي: <span className="num-cell">{toArabicNumerals(users.length)}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAddUserModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-[#102A43] text-[#C6A15B] text-xs font-black flex items-center gap-1.5 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>إضافة مستخدم جديد + كلمة مرور</span>
+            </button>
           </div>
 
           <SmartAutoFitTable
@@ -661,6 +983,222 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
             onNotify={showNotice}
             emptyMessage="لا توجد سجلات تدقيق مطابقة."
           />
+        </div>
+      )}
+
+      {/* Tab Content: Permissions & Departments Management */}
+      {activeTab === 'permissions' && (
+        <div className="space-y-4">
+          {/* إضافة قسم جديد لقائمة الصلاحيات والمنظومة */}
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 space-y-3">
+            <h3 className="text-[13px] font-black text-[#102A43] flex items-center gap-2 border-b border-slate-200 pb-2">
+              <Layers className="w-4 h-4 text-[#C6A15B]" />
+              <span>إدارة الأقسام في قائمة الصلاحيات (إضافة قسم جديد أو إلغاء قسم)</span>
+            </h3>
+            <form onSubmit={handleAddDepartment} className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <input
+                type="text"
+                required
+                value={newDeptName}
+                onChange={(e) => setNewDeptName(e.target.value)}
+                placeholder="اسم القسم الجديد *"
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold"
+              />
+              <input
+                type="text"
+                value={newDeptCode}
+                onChange={(e) => setNewDeptCode(e.target.value)}
+                placeholder="رمز القسم (اختياري)"
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold"
+              />
+              <input
+                type="text"
+                value={newDeptDesc}
+                onChange={(e) => setNewDeptDesc(e.target.value)}
+                placeholder="وصف ومهام القسم"
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-[#102A43] text-[#C6A15B] font-black flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>إضافة قسم للصلاحيات</span>
+              </button>
+            </form>
+
+            {/* تخصيص أقسام المستخدم المختار */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-black text-[#102A43]">تعديل صلاحيات الأقسام للموظف:</span>
+                <select
+                  value={selectedPermUserId}
+                  onChange={(e) => setSelectedPermUserId(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 font-black text-[#102A43] bg-slate-50"
+                >
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName} ({u.username})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="text-[11px] font-bold text-slate-600">
+                اضغط على «منح / إلغاء» أمام أي قسم لتعديله في صلاحيات الموظف أو حذفه نهائياً
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-right border-collapse text-[11px]">
+                <thead>
+                  <tr className="bg-[#102A43] text-white">
+                    <th className="p-2 border border-slate-300">الكود</th>
+                    <th className="p-2 border border-slate-300">اسم القسم</th>
+                    <th className="p-2 border border-slate-300">الوصف</th>
+                    <th className="p-2 border border-slate-300 text-center">صلاحية الموظف المحدد</th>
+                    <th className="p-2 border border-slate-300 text-center">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {departments.map((dept) => {
+                    const targetUser = users.find((u) => u.id === selectedPermUserId);
+                    const hasDept = Boolean(targetUser?.departmentIds.includes(dept.id));
+                    return (
+                      <tr key={dept.id} className="border-b border-slate-200 hover:bg-blue-50/40">
+                        <td className="p-2 border border-slate-200 num-cell font-black text-[#164E83]">{dept.code}</td>
+                        <td className="p-2 border border-slate-200 font-black text-[#102A43]">{dept.arabicName}</td>
+                        <td className="p-2 border border-slate-200 font-bold text-slate-600">{dept.description}</td>
+                        <td className="p-2 border border-slate-200 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${hasDept ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-500'}`}>
+                            {hasDept ? 'ممنوح ✓' : 'غير ممنوح'}
+                          </span>
+                        </td>
+                        <td className="p-2 border border-slate-200 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {targetUser && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleUserDeptPerm(targetUser.id, dept.id)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-black cursor-pointer ${
+                                  hasDept
+                                    ? 'bg-amber-100 text-amber-950 hover:bg-amber-200'
+                                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                                }`}
+                              >
+                                {hasDept ? 'إلغاء من الموظف' : 'منح للموظف'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDepartment(dept)}
+                              className="px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-900 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>حذف القسم</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: تعديل / إضافة كلمة مرور لمستخدم */}
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setPasswordModalUser(null)}>
+          <div className="bg-white rounded-2xl border-2 border-[#102A43] shadow-2xl max-w-md w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h4 className="text-sm font-black text-[#102A43] flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[#C6A15B]" />
+                <span>تعيين / تعديل كلمة مرور: {passwordModalUser.fullName}</span>
+              </h4>
+              <button type="button" onClick={() => setPasswordModalUser(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2 text-xs">
+              <label className="block font-black text-[#102A43]">كلمة المرور الجديدة (٤ أحرف على الأقل)</label>
+              <input
+                type="text"
+                value={newPassValue}
+                onChange={(e) => setNewPassValue(e.target.value)}
+                placeholder="أدخل كلمة المرور الجديدة..."
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono font-black"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setPasswordModalUser(null)} className="px-3.5 py-2 rounded-xl bg-slate-200 text-[#102A43] text-xs font-black cursor-pointer">
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveUserPassword(passwordModalUser, newPassValue)}
+                className="px-4 py-2 rounded-xl bg-[#102A43] text-[#C6A15B] text-xs font-black cursor-pointer"
+              >
+                حفظ كلمة المرور
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: إضافة مستخدم جديد بكلمة مرور */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setShowAddUserModal(false)}>
+          <div className="bg-white rounded-2xl border-2 border-[#102A43] shadow-2xl max-w-lg w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h4 className="text-sm font-black text-[#102A43] flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-[#C6A15B]" />
+                <span>إضافة مستخدم جديد وتعيين كلمة المرور</span>
+              </h4>
+              <button type="button" onClick={() => setShowAddUserModal(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateNewUser} className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block font-black mb-1">الاسم الرباعي *</label>
+                <input type="text" required value={newUserForm.fullName} onChange={(e) => setNewUserForm({ ...newUserForm, fullName: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold" />
+              </div>
+              <div>
+                <label className="block font-black mb-1">اسم المستخدم *</label>
+                <input type="text" required value={newUserForm.username} onChange={(e) => setNewUserForm({ ...newUserForm, username: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold" />
+              </div>
+              <div>
+                <label className="block font-black mb-1">كلمة المرور *</label>
+                <input type="text" required value={newUserForm.password} onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono font-bold" />
+              </div>
+              <div>
+                <label className="block font-black mb-1">المسمى الوظيفي</label>
+                <input type="text" value={newUserForm.jobTitle} onChange={(e) => setNewUserForm({ ...newUserForm, jobTitle: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold" />
+              </div>
+              <div>
+                <label className="block font-black mb-1">الدور الوظيفي</label>
+                <select value={newUserForm.role} onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as UserRole })} className="w-full px-3 py-2 rounded-xl border border-slate-300 font-black">
+                  <option value="bakery_officer">مسؤول مخابز</option>
+                  <option value="hr_officer">مسؤول الموارد البشرية</option>
+                  <option value="internal_trade_officer">مسؤول التجارة الداخلية</option>
+                  <option value="supply_admin_manager">مدير إدارة تموين</option>
+                  <option value="admin">مدير نظام</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-black mb-1">الإدارة التموينية</label>
+                <select value={newUserForm.primaryBranchId} onChange={(e) => setNewUserForm({ ...newUserForm, primaryBranchId: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-300 font-black">
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.arabicName}</option>)}
+                </select>
+              </div>
+              <div className="sm:col-span-2 flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button type="button" onClick={() => setShowAddUserModal(false)} className="px-4 py-2 rounded-xl bg-slate-200 text-[#102A43] font-black cursor-pointer">إلغاء</button>
+                <button type="submit" className="px-4 py-2 rounded-xl bg-[#102A43] text-[#C6A15B] font-black cursor-pointer">حفظ وإنشاء المستخدم</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

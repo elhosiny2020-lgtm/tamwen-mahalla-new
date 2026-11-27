@@ -1,13 +1,23 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import LoginForm from '@/components/LoginForm';
-import RegisterWizard from '@/components/RegisterWizard';
-import BranchSelection from '@/components/BranchSelection';
-import UserPortal from '@/components/UserPortal';
 import SessionExpiryBanner from '@/components/SessionExpiryBanner';
+
+const RegisterWizard = dynamic(() => import('@/components/RegisterWizard'), { ssr: false });
+const BranchSelection = dynamic(() => import('@/components/BranchSelection'), { ssr: false });
+const UserPortal = dynamic(() => import('@/components/UserPortal'), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-[#102A43]">
+      <div className="w-10 h-10 rounded-full border-4 border-[#102A43]/20 border-t-[#102A43] animate-spin" />
+      <p className="text-xs font-black">جارٍ تحميل بوابة المنظومة...</p>
+    </div>
+  ),
+});
 import {
   INITIAL_BRANCHES,
   getCurrentSessionUser,
@@ -136,7 +146,14 @@ export default function Home() {
           {isRegisterOpen && (
             <RegisterWizard
               onClose={() => setIsRegisterOpen(false)}
-              onSuccess={() => setIsRegisterOpen(false)}
+              onSuccess={(newUser) => {
+                setIsRegisterOpen(false);
+                setCurrentUser(newUser);
+                setActiveUserId(newUser.id);
+                setBranches(getStoredBranches());
+                setSelectedBranchId(newUser.primaryBranchId);
+                setSelectedBranchSession(newUser.primaryBranchId);
+              }}
             />
           )}
         </main>

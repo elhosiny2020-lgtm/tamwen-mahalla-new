@@ -107,6 +107,18 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         return;
       }
 
+      if (found.passwordDisabled) {
+        setLoading(false);
+        setErrorMsg('تم حذف كلمة المرور الخاصة بهذا الحساب من قبل مدير النظام. يرجى مراجعة الإدارة لتعيين كلمة مرور جديدة.');
+        return;
+      }
+
+      if (typeof found.password === 'string' && found.password.length > 0 && found.password !== validated.data.password) {
+        setLoading(false);
+        setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة.');
+        return;
+      }
+
       const activeBranchId = selectedBranchId || found.primaryBranchId || 'b-03';
       const authRes = await fetch('/api/auth/login', {
         method: 'POST',
@@ -115,6 +127,12 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
           username: found.username,
           password: validated.data.password,
           branchId: activeBranchId,
+          registeredUser: {
+            id: found.id,
+            fullName: found.fullName,
+            role: found.role,
+            primaryBranchId: activeBranchId,
+          },
         }),
       });
 

@@ -227,6 +227,21 @@ export default function DebtsReportsAndSettingsTab({
       { key: 'beforeData', label: 'القيمة قبل التعديل', headerText: 'قبل', type: 'text', render: (r) => <span className="font-bold text-slate-600">{r.beforeData}</span> },
       { key: 'afterData', label: 'القيمة بعد التعديل', headerText: 'بعد', type: 'text', render: (r) => <span className="font-bold text-emerald-800">{r.afterData}</span> },
       { key: 'reason', label: 'السبب / الملاحظة', headerText: 'السبب', type: 'text', render: (r) => <span className="font-bold">{r.reason}</span> },
+      {
+        key: 'actions',
+        label: 'الإجراءات',
+        headerText: 'الإجراءات',
+        type: 'actions',
+        render: (r) => (
+          <button
+            type="button"
+            onClick={() => setShowPrint(true)}
+            className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+          >
+            طباعة ({toArabicNumerals(r.recordRef)})
+          </button>
+        ),
+      },
     ],
     []
   );
@@ -298,11 +313,12 @@ export default function DebtsReportsAndSettingsTab({
                 <thead className="bg-[#102A43] text-white font-black sticky top-0">
                   <tr>
                     {reportTable.headers.map((h) => <th key={h} className="p-2 whitespace-nowrap">{h}</th>)}
+                    <th className="p-2 whitespace-nowrap text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reportTable.rows.length === 0 ? (
-                    <tr><td colSpan={reportTable.headers.length} className="p-6 text-center font-bold text-slate-500">لا توجد سجلات مطابقة لهذا التقرير حالياً.</td></tr>
+                    <tr><td colSpan={reportTable.headers.length + 1} className="p-6 text-center font-bold text-slate-500">لا توجد سجلات مطابقة لهذا التقرير حالياً.</td></tr>
                   ) : (
                     reportTable.rows.map((row, idx) => (
                       <tr key={idx} className="border-t border-slate-100 even:bg-slate-50">
@@ -311,6 +327,15 @@ export default function DebtsReportsAndSettingsTab({
                             {typeof cell === 'number' ? formatArabicDecimal(cell, 2).replace(/٫00$/, '') : toArabicNumerals(String(cell))}
                           </td>
                         ))}
+                        <td className="p-2 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setShowPrint(true)}
+                            className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                          >
+                            طباعة
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -494,6 +519,7 @@ export default function DebtsReportsAndSettingsTab({
           <thead>
             <tr className="bg-[#102A43] text-white">
               {reportTable.headers.map((h) => <th key={h} className="border border-slate-400 p-1.5">{h}</th>)}
+              <th className="border border-slate-400 p-1.5 print:hidden">الإجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -504,6 +530,15 @@ export default function DebtsReportsAndSettingsTab({
                     {typeof cell === 'number' ? formatArabicDecimal(cell, 2).replace(/٫00$/, '') : toArabicNumerals(String(cell))}
                   </td>
                 ))}
+                <td className="border border-slate-300 p-1.5 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrint(false)}
+                    className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[9.5px] font-black cursor-pointer"
+                  >
+                    عودة
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

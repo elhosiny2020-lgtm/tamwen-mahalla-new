@@ -1,8 +1,13 @@
-import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { INITIAL_USERS } from '@/lib/mock-db';
 import { loginFormSchema } from '@/lib/zod-schemas';
 import { recordServerAuditLog } from '@/lib/server/audit-log-store';
+import {
+  claimInitialAdminPasscode,
+  getAdminPasscodeStatus,
+  verifyAdminPasscode,
+  verifyServerUserPasswordOverride,
+} from '@/lib/server/admin-credential-store';
 import {
   checkSlidingWindowRateLimit,
   getClientIp,
@@ -14,12 +19,6 @@ import {
   signSessionToken,
 } from '@/lib/server/session-token';
 import { getRoleArabicLabel } from '@/lib/utils';
-
-function timingSafeCompareStrings(a: string, b: string): boolean {
-  const hashA = crypto.createHash('sha256').update(a, 'utf8').digest();
-  const hashB = crypto.createHash('sha256').update(b, 'utf8').digest();
-  return crypto.timingSafeEqual(hashA, hashB) && a.length === b.length;
-}
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -62,11 +61,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { username, password, branchId } = parsed.data;
+  const { username, password, branchId, isDirectRegistration, registeredUser } = parsed.data;
   const trimmedUsername = username.toLowerCase();
-  const user =
+  const staticUser =
     INITIAL_USERS.find((u) => u.username.toLowerCase() === trimmedUsername) ||
     (trimmedUsername === 'admin' ? INITIAL_USERS[0] : undefined);
+
+  const user =
+    staticUser ||
+    (registeredUser
+      ? {
+          id: registeredUser.id,
+          username,
+          fullName: registeredUser.fullName,
+          role: (registeredUser.role || 'bakery_officer') as (typeof INITIAL_USERS)[number]['role'],
+          primaryBranchId: registeredUser.primaryBranchId || branchId || 'b-03',
+          status: 'active' as const,
+        }
+      : undefined);
 
   if (!user) {
     recordServerAuditLog({
@@ -105,24 +117,71 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim() ?? '';
-  if (bootstrapPassword && !timingSafeCompareStrings(password, bootstrapPassword)) {
-    recordServerAuditLog({
-      userId: user.id,
-      username: user.username,
-      fullName: user.fullName,
-      action: 'محاولة تسجيل دخول فاشلة (كلمة مرور خاطئة)',
-      module: 'بوابة المصادقة الموحدة',
-      branchId: branchId || user.primaryBranchId,
-      details: 'كلمة المرور المدخلة غير مطابقة',
-      ipAddress: ip,
-      deviceInfo: userAgent,
-      status: 'failed',
-    });
-    return NextResponse.json(
-      { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة.' },
-      { status: 401 }
-    );
+  const isAdminRole =
+    user.role === 'super_admin' ||
+    user.role === 'admin' ||
+    user.role === 'supply_admin_manager' ||
+    user.role === 'department_manager';
+
+  if (!isDirectRegistration) {
+    const userOverride = verifyServerUserPasswordOverride(user.username, password);
+    if (userOverride.hasOverride) {
+      if (userOverride.deleted) {
+        return NextResponse.json(
+          { ok: false, error: 'تم حذف كلمة المرور الخاصة بهذا الحساب من قبل مدير النظام. يرجى تعيين كلمة مرور جديدة.' },
+          { status: 401 }
+        );
+      }
+      if (!userOverride.valid) {
+        recordServerAuditLog({
+          userId: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          action: 'محاولة تسجيل دخول فاشلة (كلمة مرور خاطئة)',
+          module: 'بوابة المصادقة الموحدة',
+          branchId: branchId || user.primaryBranchId,
+          details: 'كلمة المرور المدخلة غير مطابقة لكلمة المرور المعدلة',
+          ipAddress: ip,
+          deviceInfo: userAgent,
+          status: 'failed',
+        });
+        return NextResponse.json(
+          { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة.' },
+          { status: 401 }
+        );
+      }
+    } else {
+      const passcodeStatus = getAdminPasscodeStatus();
+      if (passcodeStatus.configured && staticUser) {
+        const check = verifyAdminPasscode(password);
+        if (!check.valid) {
+          recordServerAuditLog({
+            userId: user.id,
+            username: user.username,
+            fullName: user.fullName,
+            action: 'محاولة تسجيل دخول فاشلة (كلمة مرور خاطئة)',
+            module: 'بوابة المصادقة الموحدة',
+            branchId: branchId || user.primaryBranchId,
+            details: 'كلمة المرور المدخلة غير مطابقة',
+            ipAddress: ip,
+            deviceInfo: userAgent,
+            status: 'failed',
+          });
+          return NextResponse.json(
+            { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة.' },
+            { status: 401 }
+          );
+        }
+      } else if (isAdminRole && !passcodeStatus.configured) {
+        const claimed = claimInitialAdminPasscode(password, user.username);
+        if (!claimed.ok) {
+          return NextResponse.json(
+            { ok: false, error: 'تعذر تهيئة كلمة المرور الإدارية. يرجى استخدام كلمة مرور لا تقل عن ٤ أحرف.' },
+            { status: 400 }
+          );
+        }
+      }
+    }
   }
 
   try {

@@ -74,6 +74,7 @@ export interface User {
   email: string;
   username: string;
   password?: string;
+  passwordDisabled?: boolean;
   jobTitle: string;
   jobGrade: string;
   workplace: string;

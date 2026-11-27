@@ -683,7 +683,7 @@ export default function RationControlReportsView({
                 <th className="p-2.5 border border-slate-700">الجهة والقرية</th>
                 <th className="p-2.5 border border-slate-700 text-center">درجة الخطورة</th>
                 <th className="p-2.5 border border-slate-700">الإجراء المقترح</th>
-                <th className="p-2.5 border border-slate-700 text-center">المعالجة</th>
+                <th className="p-2.5 border border-slate-700 text-center">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -837,6 +837,7 @@ export default function RationControlReportsView({
                     {activeReportData.headers.map((h) => (
                       <th key={h} className="p-2 border border-slate-700 whitespace-nowrap">{h}</th>
                     ))}
+                    <th className="p-2 border border-slate-700 whitespace-nowrap text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -847,6 +848,15 @@ export default function RationControlReportsView({
                           {toArabicNumerals(String(cell))}
                         </td>
                       ))}
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => onNavigateScreen('print_export')}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          طباعة
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -962,6 +972,7 @@ export default function RationControlReportsView({
                   {chosenHeaders.map((h) => (
                     <th key={h} className="p-2 border border-slate-700">{h}</th>
                   ))}
+                  <th className="p-2 border border-slate-700 text-center">الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -970,6 +981,15 @@ export default function RationControlReportsView({
                     {r.map((c, ci) => (
                       <td key={ci} className="p-2 num-cell font-bold">{toArabicNumerals(String(c))}</td>
                     ))}
+                    <td className="p-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowOfficialPrintModal(true)}
+                        className="px-2 py-1 rounded bg-[#102A43]/10 text-[#102A43] text-[10px] font-black hover:bg-[#102A43]/20"
+                      >
+                        معاينة
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -993,6 +1013,7 @@ export default function RationControlReportsView({
                     {chosenHeaders.map((h) => (
                       <th key={h} className="p-1.5 border border-slate-400 font-black">{h}</th>
                     ))}
+                    <th className="p-1.5 border border-slate-400 font-black print:hidden text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1001,6 +1022,15 @@ export default function RationControlReportsView({
                       {r.map((c, ci) => (
                         <td key={ci} className="p-1.5 border border-slate-400 num-cell">{toArabicNumerals(String(c))}</td>
                       ))}
+                      <td className="p-1.5 border border-slate-400 print:hidden text-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowOfficialPrintModal(false)}
+                          className="px-2 py-0.5 rounded bg-slate-200 text-slate-800 text-[10px] font-black hover:bg-slate-300"
+                        >
+                          إغلاق
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1111,6 +1141,7 @@ export default function RationControlReportsView({
                 <th className="p-2 border border-slate-700">الشاشة</th>
                 <th className="p-2 border border-slate-700 text-center">الإجراء</th>
                 <th className="p-2 border border-slate-700">التفاصيل الموثقة</th>
+                <th className="p-2 border border-slate-700 text-center">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -1125,6 +1156,15 @@ export default function RationControlReportsView({
                     </span>
                   </td>
                   <td className="p-2 font-bold text-slate-700">{log.details}</td>
+                  <td className="p-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onNotify(`قيد مراجعة (${log.screenName}): ${log.details}`)}
+                      className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                    >
+                      معاينة
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

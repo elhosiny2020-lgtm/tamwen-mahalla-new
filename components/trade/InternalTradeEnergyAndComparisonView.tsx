@@ -2668,6 +2668,7 @@ export default function InternalTradeEnergyAndComparisonView({
                 <th className="p-2 border text-center">التصالحات المحصلة</th>
                 <th className="p-2 border text-center">موزع البوتاجاز ونصيب الفرد</th>
                 <th className="p-2 border text-center">منصرف المواد البترولية</th>
+                <th className="p-2 border text-center print:hidden">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -2679,6 +2680,15 @@ export default function InternalTradeEnergyAndComparisonView({
                   <td className="p-2 border text-center">{formatArabicCurrency(r.collectedAmountEgp)}</td>
                   <td className="p-2 border text-center">{formatArabicNumber(r.butaneDistributed)} ({formatArabicNumber(r.butanePerCapita)}/مستفيد)</td>
                   <td className="p-2 border text-center">{formatArabicNumber(r.petroleumDistributed)} لتر</td>
+                  <td className="p-2 border text-center print:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowPrintComparison(false)}
+                      className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                    >
+                      تفاصيل القرية
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

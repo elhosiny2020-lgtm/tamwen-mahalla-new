@@ -43,6 +43,9 @@ import {
   ListChecks,
   ChevronDown,
   ChevronLeft,
+  MessageSquare,
+  Bell,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   AuditLog,
@@ -82,19 +85,33 @@ import {
   formatDateArabic,
   normalizeSearchText,
 } from '@/lib/utils';
-import AdminDashboard from './AdminDashboard';
-import BakeryManagementSystem from './BakeryManagementSystem';
-import BakeryInspectionModule from './BakeryInspectionModule';
-import BakeryDebtsModule from './BakeryDebtsModule';
-import DepartmentWorkspace from './DepartmentWorkspace';
+import dynamic from 'next/dynamic';
+import type { GrainSubTabCode } from './DepartmentWorkspace';
+import type { TasksModuleSubTab } from './DailyTasksAndInternalChatModule';
+import type { InternalTradeScreenId } from './InternalTradeModule';
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
-import DailyTasksAndInternalChatModule from './DailyTasksAndInternalChatModule';
-import InternalTradeModule from './InternalTradeModule';
-import RationCommoditiesModule from './ration/RationCommoditiesModule';
-import DropdownListsManagerModule from './DropdownListsManagerModule';
 import FactoryResetButton from './FactoryResetButton';
 import { TableActionButtons } from './trade/TradeSharedCrudUi';
+
+const ModuleLoadingFallback = () => (
+  <div className="bg-white rounded-2xl border border-slate-200 p-10 flex flex-col items-center justify-center gap-3 text-[#102A43]">
+    <div className="w-9 h-9 rounded-full border-4 border-[#102A43]/20 border-t-[#102A43] animate-spin" />
+    <p className="text-xs font-black">جارٍ تحميل وحدة القسم...</p>
+  </div>
+);
+
+const AdminDashboard = dynamic(() => import('./AdminDashboard'), { ssr: false, loading: ModuleLoadingFallback });
+const BakeryManagementSystem = dynamic(() => import('./BakeryManagementSystem'), { ssr: false, loading: ModuleLoadingFallback });
+const BakeryInspectionModule = dynamic(() => import('./BakeryInspectionModule'), { ssr: false, loading: ModuleLoadingFallback });
+const BakeryDebtsModule = dynamic(() => import('./BakeryDebtsModule'), { ssr: false, loading: ModuleLoadingFallback });
+const DepartmentWorkspace = dynamic(() => import('./DepartmentWorkspace'), { ssr: false, loading: ModuleLoadingFallback });
+const DailyTasksAndInternalChatModule = dynamic(() => import('./DailyTasksAndInternalChatModule'), { ssr: false, loading: ModuleLoadingFallback });
+const InternalTradeModule = dynamic(() => import('./InternalTradeModule'), { ssr: false, loading: ModuleLoadingFallback });
+const RationCommoditiesModule = dynamic(() => import('./ration/RationCommoditiesModule'), { ssr: false, loading: ModuleLoadingFallback });
+const DropdownListsManagerModule = dynamic(() => import('./DropdownListsManagerModule'), { ssr: false, loading: ModuleLoadingFallback });
+const GrainMaintenanceModule = dynamic(() => import('./GrainMaintenanceModule'), { ssr: false, loading: ModuleLoadingFallback });
+const HrPersonnelModule = dynamic(() => import('./hr/HrPersonnelModule'), { ssr: false, loading: ModuleLoadingFallback });
 import {
   loadButaneWarehouses,
   loadCommercialEstablishments,
@@ -104,6 +121,9 @@ import {
   loadRationCommodities,
   loadRationMerchants,
 } from '@/lib/ration-commodities-store';
+import { loadGrainMaintenanceStore } from '@/lib/grain-maintenance-store';
+import { loadHrPersonnelStore } from '@/lib/hr-personnel-store';
+import { loadChatMessages, loadUnifiedNotifications } from '@/lib/major-debts-tasks-chat-store';
 import { loadMasterDocExpiries, subscribeDropdownLists } from '@/lib/dropdown-lists-store';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
 import { getLocalizedDepartmentDesc, getLocalizedDepartmentName } from '@/lib/i18n';
@@ -159,11 +179,14 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   const [todayRef, setTodayRef] = useState<string>('2026-11-25');
 
   const [activeDeptId, setActiveDeptId] = useState<string>('d-02');
+  const [tradeInitialScreen, setTradeInitialScreen] = useState<InternalTradeScreenId>('dashboard');
+  const [grainInitialSubTab, setGrainInitialSubTab] = useState<GrainSubTabCode>('GRAIN');
+  const [tasksInitialSubTab, setTasksInitialSubTab] = useState<TasksModuleSubTab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [sidebarSearch, setSidebarSearch] = useState<string>('');
-  const [pinnedDeptIds, setPinnedDeptIds] = useState<string[]>(['d-01', 'd-02', 'd-03', 'd-04', 'd-07', 'd-26', 'd-25']);
+  const [pinnedDeptIds, setPinnedDeptIds] = useState<string[]>(['d-01', 'd-02', 'd-03', 'd-04', 'd-07', 'd-26', 'd-25', 'd-12']);
   const [openSidebarGroups, setOpenSidebarGroups] = useState<Record<string, boolean>>({
     grp_cmd: true,
     grp_bakery: true,
@@ -171,6 +194,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     grp_ration: true,
     grp_grain: true,
     grp_citizens: true,
+    grp_hr: true,
     grp_admin: true,
   });
   const [liveExtraCounts, setLiveExtraCounts] = useState({
@@ -178,6 +202,9 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     gasEntities: 6,
     rationItemsAndMerchants: 10,
     managedDocs: 4,
+    hrEmployees: 8,
+    unreadChat: 0,
+    unreadNotifs: 0,
   });
 
   // Complaints table state
@@ -201,37 +228,137 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       setInspections(getStoredInspections());
       setDebtTransactions(getStoredDebtTransactions());
       setTodayRef(new Date().toISOString().slice(0, 10));
-      setLiveExtraCounts({
-        tradeMerchants: loadCommercialEstablishments().length,
-        gasEntities: loadButaneWarehouses().length + loadFuelStations().length,
-        rationItemsAndMerchants: loadRationCommodities().length + loadRationMerchants().length,
-        managedDocs: loadMasterDocExpiries().length,
-      });
+      const refreshCounts = () => {
+        const msgs = loadChatMessages();
+        const unreadChat = msgs.filter(
+          (m) =>
+            !m.isDeletedFromUi &&
+            m.senderId !== currentUser.id &&
+            !m.readByUserIds.includes(currentUser.id)
+        ).length;
+        const sysNotifs = loadUnifiedNotifications();
+        const unreadNotifs = sysNotifs.filter(
+          (n) => !n.isRead && (n.recipientUserId === 'ALL' || n.recipientUserId === currentUser.id)
+        ).length;
+        setLiveExtraCounts({
+          tradeMerchants: loadCommercialEstablishments().length,
+          gasEntities: loadButaneWarehouses().length + loadFuelStations().length,
+          rationItemsAndMerchants: loadRationCommodities().length + loadRationMerchants().length,
+          managedDocs: loadMasterDocExpiries().length,
+          hrEmployees: loadHrPersonnelStore().employees.length,
+          unreadChat,
+          unreadNotifs,
+        });
+      };
+      refreshCounts();
 
       try {
         const savedTab = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-        if (savedTab) setActiveDeptId(savedTab);
+        if (savedTab) {
+          if (savedTab === 'd-06') {
+            setTradeInitialScreen('butane_management');
+            setActiveDeptId('d-04');
+          } else if (savedTab === 'd-15') {
+            setTradeInitialScreen('field_inspection');
+            setActiveDeptId('d-04');
+          } else if (savedTab === 'd-16') {
+            setTradeInitialScreen('field_violations');
+            setActiveDeptId('d-04');
+          } else if (savedTab === 'd-09') {
+            setGrainInitialSubTab('SILOS');
+            setActiveDeptId('d-08');
+          } else if (savedTab === 'd-10') {
+            setGrainInitialSubTab('MILLS');
+            setActiveDeptId('d-08');
+          } else if (savedTab === 'd-11') {
+            setGrainInitialSubTab('COLD');
+            setActiveDeptId('d-08');
+          } else if (savedTab !== 'd-19') {
+            setActiveDeptId(savedTab);
+          }
+        }
       } catch {
         // Ignore storage errors
       }
     });
+    const onDepartmentsUpdated = () => {
+      setAllDepartments(getStoredDepartments());
+      setAllUsers(getStoredUsers());
+    };
+    const onOpenTasksSubTab = (ev: Event) => {
+      const custom = ev as CustomEvent<{ subTab?: TasksModuleSubTab }>;
+      if (custom.detail?.subTab) {
+        setTasksInitialSubTab(custom.detail.subTab);
+      }
+      setActiveDeptId('d-25');
+      setMobileMenuOpen(false);
+      try {
+        sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, 'd-25');
+      } catch {
+        // Ignore storage errors
+      }
+    };
+    const onChatUpdated = () => {
+      const msgs = loadChatMessages();
+      const unreadChat = msgs.filter(
+        (m) =>
+          !m.isDeletedFromUi &&
+          m.senderId !== currentUser.id &&
+          !m.readByUserIds.includes(currentUser.id)
+      ).length;
+      const sysNotifs = loadUnifiedNotifications();
+      const unreadNotifs = sysNotifs.filter(
+        (n) => !n.isRead && (n.recipientUserId === 'ALL' || n.recipientUserId === currentUser.id)
+      ).length;
+      setLiveExtraCounts((prev) => ({ ...prev, unreadChat, unreadNotifs }));
+    };
     const unsubDropdowns = subscribeDropdownLists(() => {
       setLiveExtraCounts((prev) => ({
         ...prev,
         managedDocs: loadMasterDocExpiries().length,
       }));
     });
+    window.addEventListener('gharbia-departments-updated', onDepartmentsUpdated);
+    window.addEventListener('gharbia-open-tasks-subtab', onOpenTasksSubTab);
+    window.addEventListener('gharbia-chat-updated', onChatUpdated);
     return () => {
       cancelAnimationFrame(frameId);
       unsubDropdowns();
+      window.removeEventListener('gharbia-departments-updated', onDepartmentsUpdated);
+      window.removeEventListener('gharbia-open-tasks-subtab', onOpenTasksSubTab);
+      window.removeEventListener('gharbia-chat-updated', onChatUpdated);
     };
-  }, []);
+  }, [currentUser.id]);
 
   const handleSelectDept = (deptId: string) => {
-    setActiveDeptId(deptId);
+    let resolvedId = deptId;
+    if (deptId === 'd-04') {
+      setTradeInitialScreen('dashboard');
+    } else if (deptId === 'd-06') {
+      setTradeInitialScreen('butane_management');
+      resolvedId = 'd-04';
+    } else if (deptId === 'd-15') {
+      setTradeInitialScreen('field_inspection');
+      resolvedId = 'd-04';
+    } else if (deptId === 'd-16') {
+      setTradeInitialScreen('field_violations');
+      resolvedId = 'd-04';
+    } else if (deptId === 'd-08') {
+      setGrainInitialSubTab('GRAIN');
+    } else if (deptId === 'd-09') {
+      setGrainInitialSubTab('SILOS');
+      resolvedId = 'd-08';
+    } else if (deptId === 'd-10') {
+      setGrainInitialSubTab('MILLS');
+      resolvedId = 'd-08';
+    } else if (deptId === 'd-11') {
+      setGrainInitialSubTab('COLD');
+      resolvedId = 'd-08';
+    }
+    setActiveDeptId(resolvedId);
     setMobileMenuOpen(false);
     try {
-      sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, deptId);
+      sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, resolvedId);
     } catch {
       // Ignore storage errors
     }
@@ -374,20 +501,44 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     }
   };
 
+  // الأقسام الفرعية المدمجة والأقسام الإدارية المستبعدة من الشريط الأيمن بناءً على طلب المستخدم
+  const CONSOLIDATED_SIDEBAR_SUB_CODES = useMemo(
+    () =>
+      new Set([
+        'CTRL',
+        'GAS',
+        'INSP',
+        'VIOL',
+        'SILOS',
+        'MILLS',
+        'COLD',
+        'REP',
+        'BACK',
+        'SETT',
+        'AUDIT',
+        'FIN',
+        'STORE',
+        'ROLES',
+        'DOCS',
+      ]),
+    []
+  );
+
   const filteredSidebarDepts = useMemo(() => {
+    const visibleDepts = allowedDepartments.filter((d) => !CONSOLIDATED_SIDEBAR_SUB_CODES.has(d.code));
     const q = normalizeSearchText(sidebarSearch);
     const list = q
-      ? allowedDepartments.filter(
+      ? visibleDepts.filter(
           (d) => normalizeSearchText(`${d.arabicName} ${d.description}`).includes(q)
         )
-      : allowedDepartments;
+      : visibleDepts;
 
     return [...list].sort((a, b) => {
       const aPinned = pinnedDeptIds.includes(a.id) ? 1 : 0;
       const bPinned = pinnedDeptIds.includes(b.id) ? 1 : 0;
       return bPinned - aPinned;
     });
-  }, [allowedDepartments, sidebarSearch, pinnedDeptIds]);
+  }, [allowedDepartments, CONSOLIDATED_SIDEBAR_SUB_CODES, sidebarSearch, pinnedDeptIds]);
 
   const ultraMetrics = useMemo(() => {
     const activeBaks = bakeries.filter((b) => !b.isArchived);
@@ -412,41 +563,46 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     };
   }, [bakeries, allUsers, branches, regRequests, auditLogs, inspections, debtTransactions, todayRef]);
 
+  const grainEntitiesCount = useMemo(() => {
+    const gs = loadGrainMaintenanceStore();
+    return gs.warehouses.length + gs.mills.length + gs.refrigerators.length + gs.assets.length;
+  }, []);
+
   // عدادات حية رقمية بجانب كل قسم في القائمة الجانبية
   const deptLiveCounts = useMemo<Record<string, number>>(
     () => ({
       DASH: ultraMetrics.totalAlerts,
       BAK: ultraMetrics.totalBakeries,
       DEBTS: bakeries.filter((b) => !b.isArchived && (b.remainingDebtEgp || 0) > 0).length || debtTransactions.length,
-      TRADE: liveExtraCounts.tradeMerchants,
+      LISTS: liveExtraCounts.managedDocs,
+      TRADE: liveExtraCounts.tradeMerchants + liveExtraCounts.gasEntities,
       GAS: liveExtraCounts.gasEntities,
       COMM: liveExtraCounts.rationItemsAndMerchants,
-      CTRL: ultraMetrics.totalAlerts + ultraMetrics.totalViolations,
+      GRAIN: grainEntitiesCount,
+      HR: liveExtraCounts.hrEmployees,
       INSP: inspections.length,
       VIOL: ultraMetrics.totalViolations,
       COMP: complaintsList.length,
-      LISTS: liveExtraCounts.managedDocs,
       USERS: allUsers.length,
-      ROLES: branches.length,
-      AUDIT: auditLogs.length,
       TASKS: ultraMetrics.pendingReviews,
     }),
-    [ultraMetrics, bakeries, debtTransactions.length, liveExtraCounts, inspections.length, complaintsList.length, allUsers.length, branches.length, auditLogs.length]
+    [ultraMetrics, bakeries, debtTransactions.length, liveExtraCounts, grainEntitiesCount, inspections.length, complaintsList.length, allUsers.length]
   );
 
-  // تنظيم القائمة الجانبية في مجموعات منطقية مترابطة مع دعم العربية والإنجليزية
+  // تنظيم القائمة الجانبية مع وضع إدارة المهام اليومية والمتابعة مباشرة بعد إدارة القوائم المنسدلة وإظهار الموارد البشرية وحذف الأرشيف
   const sidebarGroupedSections = useMemo(() => {
     const groupsDef: { id: string; title: string; codes: string[] }[] = [
-      { id: 'grp_cmd', title: t('grp_cmd'), codes: ['DASH', 'CTRL'] },
-      { id: 'grp_bakery', title: t('grp_bakery'), codes: ['BAK', 'DEBTS'] },
-      { id: 'grp_trade', title: t('grp_trade'), codes: ['TRADE', 'GAS', 'INSP', 'VIOL'] },
+      { id: 'grp_cmd', title: t('grp_cmd'), codes: ['DASH'] },
+      { id: 'grp_bakery', title: t('grp_bakery'), codes: ['BAK', 'DEBTS', 'LISTS', 'TASKS'] },
+      { id: 'grp_trade', title: t('grp_trade'), codes: ['TRADE'] },
       { id: 'grp_ration', title: t('grp_ration'), codes: ['COMM'] },
-      { id: 'grp_grain', title: t('grp_grain'), codes: ['GRAIN', 'SILOS', 'MILLS', 'COLD'] },
-      { id: 'grp_citizens', title: t('grp_citizens'), codes: ['COMP', 'TASKS'] },
+      { id: 'grp_grain', title: t('grp_grain'), codes: ['GRAIN'] },
+      { id: 'grp_hr', title: isRtl ? 'الموارد البشرية وشؤون العاملين' : 'Human Resources & Personnel', codes: ['HR'] },
+      { id: 'grp_citizens', title: t('grp_citizens'), codes: ['COMP'] },
       {
         id: 'grp_admin',
         title: t('grp_admin'),
-        codes: ['LISTS', 'REP', 'DOCS', 'BACK', 'SETT', 'USERS', 'ROLES', 'AUDIT', 'HR', 'FIN', 'STORE'],
+        codes: ['USERS'],
       },
     ];
     const usedIds = new Set<string>();
@@ -782,40 +938,86 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
 
             {activeDept?.code === 'DASH' && (
               <div className="space-y-5">
-                {/* Hero Sovereign Banner */}
-                <div className="bg-gradient-to-l from-[#0B1F33] via-[#102A43] to-[#164E83] text-white rounded-2xl p-6 shadow-md border border-[#164E83] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-white shrink-0 border-2 border-[#C6A15B] shadow-md">
-                      <Image
-                        src="/assets/aistudio/logo_4234585c.jpg"
-                        alt="شعار وزارة التموين"
-                        fill
-                        sizes="64px"
-                        className="object-cover"
-                        referrerPolicy="no-referrer"
-                      />
+                {/* Hero Sovereign Banner + Enlarged Employee Chat, Notifications & Reports Strip */}
+                <div className="bg-gradient-to-l from-[#0B1F33] via-[#102A43] to-[#164E83] text-white rounded-2xl p-6 shadow-md border border-[#164E83] space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-white shrink-0 border-2 border-[#C6A15B] shadow-md">
+                        <Image
+                          src="/assets/aistudio/logo_4234585c.jpg"
+                          alt="شعار وزارة التموين"
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-black text-[#C6A15B] mb-1">
+                          {t('republicSubtitle')}
+                        </p>
+                        <h2 className="text-xl sm:text-2xl font-black">
+                          {t('centralDashboardTitle')} — {currentBranch?.arabicName}
+                        </h2>
+                        <p className="text-[11px] text-slate-200 font-bold mt-1">
+                          {t('centralDashboardDesc')}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[11px] font-black text-[#C6A15B] mb-1">
-                        {t('republicSubtitle')}
-                      </p>
-                      <h2 className="text-xl sm:text-2xl font-black">
-                        {t('centralDashboardTitle')} — {currentBranch?.arabicName}
-                      </h2>
-                      <p className="text-[11px] text-slate-200 font-bold mt-1">
-                        {t('centralDashboardDesc')}
-                      </p>
+
+                    <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTasksInitialSubTab('internal_chat');
+                          handleSelectDept('d-25');
+                        }}
+                        className="px-5 py-3.5 bg-gradient-to-l from-[#C6A15B] to-[#dfc082] hover:from-[#b58f48] hover:to-[#C6A15B] text-[#102A43] font-black rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg border-2 border-white/40 cursor-pointer"
+                      >
+                        <MessageSquare className="w-5 h-5" />
+                        <span>المحادثات الداخلية والإشعارات بين الموظفين</span>
+                        {(liveExtraCounts.unreadChat + liveExtraCounts.unreadNotifs) > 0 && (
+                          <span className="num-cell px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px]">
+                            {toArabicNumerals(liveExtraCounts.unreadChat + liveExtraCounts.unreadNotifs)}
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTasksInitialSubTab('notifications');
+                          handleSelectDept('d-25');
+                        }}
+                        className="px-4 py-3 bg-white/15 hover:bg-white/25 text-white font-black rounded-xl text-xs flex items-center gap-1.5 border border-[#C6A15B]/50 cursor-pointer"
+                      >
+                        <Bell className="w-4 h-4 text-[#C6A15B]" />
+                        <span>مركز التنبيهات</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTasksInitialSubTab('reports_center');
+                          handleSelectDept('d-25');
+                        }}
+                        className="px-4 py-3 bg-white/15 hover:bg-white/25 text-white font-black rounded-xl text-xs flex items-center gap-1.5 border border-white/25 cursor-pointer"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-[#C6A15B]" />
+                        <span>مركز التقارير</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDept('d-02')}
+                        className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center gap-2 shrink-0 shadow-md cursor-pointer"
+                      >
+                        <Flame className="w-4 h-4" />
+                        <span>{t('openBakerySystem')}</span>
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectDept('d-02')}
-                    className="px-5 py-3 bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] font-black rounded-xl text-[11px] flex items-center gap-2 shrink-0 shadow-md cursor-pointer"
-                  >
-                    <Flame className="w-4 h-4" />
-                    <span>{t('openBakerySystem')}</span>
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
                 </div>
 
                 {/* 8 Animated Colored Enterprise KPI Cards across all 6 themes */}
@@ -910,12 +1112,12 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                       <p className="text-[11px] font-bold text-slate-600">{t('mainDepartmentsDesc')}</p>
                     </div>
                     <span className="num-cell text-[11px] font-black text-[#164E83]">
-                      {isRtl ? toArabicNumerals(allowedDepartments.length) : allowedDepartments.length} {t('authorizedSections')}
+                      {isRtl ? toArabicNumerals(filteredSidebarDepts.length) : filteredSidebarDepts.length} {t('authorizedSections')}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                    {allowedDepartments.map((dept) => (
+                    {filteredSidebarDepts.map((dept) => (
                       <div
                         key={dept.id}
                         onClick={() => handleSelectDept(dept.id)}
@@ -1108,6 +1310,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                 bakeries={bakeries.filter((b) => !b.isArchived)}
                 inspections={inspections}
                 todayRef={todayRef}
+                initialSubTab={tasksInitialSubTab}
                 onNavigateToDepartment={(deptId) => handleSelectDept(deptId)}
                 onSelectBakeryDetails={(b) => setPortalSelectedBakery(b)}
               />
@@ -1115,10 +1318,14 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
 
             {(activeDept?.code === 'TRADE' || activeDept?.code === 'GAS') && (
               <InternalTradeModule
-                key={activeDept.code}
                 currentUser={currentUser}
                 todayRef={todayRef}
-                initialScreen={activeDept.code === 'GAS' ? 'butane_management' : 'dashboard'}
+                initialScreen={activeDept.code === 'GAS' ? 'butane_management' : tradeInitialScreen}
+                bakeries={bakeries.filter((b) => !b.isArchived)}
+                inspections={inspections}
+                onAddInspection={handleStandaloneAddInspection}
+                onUpdateInspectionStatus={handleStandaloneUpdateInspection}
+                onSelectBakeryDetails={(b) => setPortalSelectedBakery(b)}
               />
             )}
 
@@ -1130,6 +1337,31 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               <DropdownListsManagerModule currentUserName={currentUser.fullName} />
             )}
 
+            {activeDept?.code === 'HR' && (
+              <HrPersonnelModule currentUser={currentUser} todayRef={todayRef} />
+            )}
+
+            {(activeDept?.code === 'GRAIN' ||
+              activeDept?.code === 'SILOS' ||
+              activeDept?.code === 'MILLS' ||
+              activeDept?.code === 'COLD') && (
+              <GrainMaintenanceModule
+                currentUser={currentUser}
+                bakeries={bakeries.filter((b) => !b.isArchived)}
+                todayRef={todayRef}
+                initialScreen={
+                  grainInitialSubTab === 'SILOS'
+                    ? 'warehouses'
+                    : grainInitialSubTab === 'MILLS'
+                    ? 'mills'
+                    : grainInitialSubTab === 'COLD'
+                    ? 'refrigerators'
+                    : 'dashboard'
+                }
+                onOpenBakeries={() => handleSelectDept('d-02')}
+              />
+            )}
+
             {activeDept &&
               activeDept.code !== 'DASH' &&
               activeDept.code !== 'BAK' &&
@@ -1138,6 +1370,11 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               activeDept.code !== 'GAS' &&
               activeDept.code !== 'COMM' &&
               activeDept.code !== 'LISTS' &&
+              activeDept.code !== 'HR' &&
+              activeDept.code !== 'GRAIN' &&
+              activeDept.code !== 'SILOS' &&
+              activeDept.code !== 'MILLS' &&
+              activeDept.code !== 'COLD' &&
               activeDept.code !== 'TASKS' &&
               activeDept.code !== 'INSP' &&
               activeDept.code !== 'VIOL' &&
@@ -1155,6 +1392,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                   inspections={inspections}
                   debtTransactions={debtTransactions}
                   auditLogs={auditLogs}
+                  initialGrainSubTab={grainInitialSubTab}
                   onOpenBakeries={() => handleSelectDept('d-02')}
                 />
               )}

@@ -100,7 +100,7 @@ import {
 } from '@/lib/table-autofit';
 import { useSmartAutoFit } from '@/hooks/useSmartAutoFit';
 import { bakeryStep1Schema, bakeryStep2Schema } from '@/lib/zod-schemas';
-import BakeryNavigationGrid, { BakerySubTab } from './BakeryNavigationGrid';
+import BakeryNavigationGrid, { BakerySubTab, getBakeryActiveScreenLabel } from './BakeryNavigationGrid';
 import BakeryInspectionModule from './BakeryInspectionModule';
 import BakeryDebtsModule from './BakeryDebtsModule';
 import AnimatedStatCard from './AnimatedStatCard';
@@ -943,7 +943,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
         pinned: col.pinned,
         sampleValues: sampleRows.map((b) => {
           const raw = b[col.key as keyof BakeryRecord];
-          if (isDecimalCol) return formatArabicDecimal(Number(raw || 0), 3);
+          if (isDecimalCol) return formatArabicDecimal(Number(raw || 0), 2);
           if (isCurrencyCol) return `${formatArabicNumber(Number(raw || 0))} ج.م`;
           if (isIntegerCol) return formatArabicNumber(Number(raw || 0));
           if (col.key === 'licenseExpiryDate') {
@@ -1537,7 +1537,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
         </div>
       )}
 
-      {/* 6-Group No-Scroll Functional Navigation Grid */}
+      {/* خريطة الشاشات بنمط قسم التجارة الداخلية (٦ مجموعات قابلة للطي مع بحث سريع) */}
       <BakeryNavigationGrid
         activeSubTab={activeSubTab}
         activeFocus={activeFocus}
@@ -1547,188 +1547,206 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
         onSelect={handleNavSelect}
       />
 
+      {/* شريط عنوان الشاشة النشطة بنفس تصميم قسم التجارة الداخلية */}
+      <div className="bg-white rounded-2xl border border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black text-[#164E83]">الشاشة النشطة:</span>
+          <h3 className="text-sm font-black text-[#102A43]">
+            {getBakeryActiveScreenLabel(activeSubTab, activeFocus)}
+          </h3>
+        </div>
+        <div className="text-[11px] font-bold text-slate-600">
+          التاريخ المرجعي: {formatDateArabic(todayRef)} · المستخدم: {currentUser.fullName}
+        </div>
+      </div>
+
       {/* =====================================================================
-          1. لوحة مؤشرات إدارة المخابز (Section 13)
+          1. لوحة مؤشرات إدارة المخابز (بنفس تصميم لوحة التحكم في قسم التجارة الداخلية)
          ===================================================================== */}
       {activeSubTab === 'dashboard' && (
-        <div className="space-y-5">
-          {/* 14 Animated Colored KPI Cards (6 Official Themes, Real DB Values) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div className="space-y-4">
+          {/* ١٤ بطاقة إحصائية مرقمة قابلة للنقر بنظام ٤ أعمدة بنفس تنسيق قسم التجارة الداخلية */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <AnimatedStatCard
-              title="إجمالي عدد المخابز"
+              title="١. إجمالي عدد المخابز"
               value={kpiStats.total}
               unit="مخبز مسجل"
+              indicator="اضغط لفتح السجل"
               icon={Flame}
               theme="navy"
-              compact
               delay={0}
               onClick={() => handleNavSelect('registry', 'registry')}
             />
             <AnimatedStatCard
-              title="المخابز النشطة"
+              title="٢. المخابز النشطة"
               value={kpiStats.active}
               unit="يعمل بانتظام"
+              indicator="تشغيل مستقر"
               icon={CheckCircle2}
               theme="green"
-              compact
               delay={0.03}
               onClick={() => handleNavSelect('registry', 'registry')}
             />
             <AnimatedStatCard
-              title="المخابز المتوقفة"
+              title="٣. المخابز المتوقفة"
               value={kpiStats.stopped}
               unit="توقف / صيانة"
+              indicator="تستوجب المتابعة"
               icon={XCircle}
               theme="red"
-              compact
               delay={0.06}
+              onClick={() => handleNavSelect('registry', 'registry')}
             />
             <AnimatedStatCard
-              title="الحصص الفعلية"
+              title="٤. الحصص الفعلية"
               value={kpiStats.totalActualQuota}
               unit="شيكارة / يوم"
+              indicator="إجمالي التوزيع اليومي"
               icon={Wheat}
               theme="gold"
-              compact
               delay={0.09}
               onClick={() => handleNavSelect('quotas', 'quotas-actual')}
             />
             <AnimatedStatCard
-              title="الحصص التأمينية"
+              title="٥. الحصص التأمينية"
               value={kpiStats.totalInsuranceQuota}
               format="decimal"
               decimals={3}
               unit="شيكارة تأمينية"
+              indicator="الضمان التأميني"
               icon={ShieldCheck}
               theme="teal"
-              compact
               delay={0.12}
               onClick={() => handleNavSelect('quotas', 'quotas-insurance')}
             />
             <AnimatedStatCard
-              title="الإنتاج اليومي"
+              title="٦. الإنتاج اليومي"
               value={kpiStats.totalDailyLoaves}
               unit="رغيف مدعم / يوم"
+              indicator="المعادلات السبع"
               icon={Layers}
               theme="green"
-              compact
               delay={0.15}
               onClick={() => handleNavSelect('quotas', 'quotas-loaves')}
             />
             <AnimatedStatCard
-              title="متوسط الفرد ٢٠٢٣"
+              title="٧. متوسط الفرد ٢٠٢٣"
               value={kpiStats.avg2023}
               format="decimal"
-              decimals={3}
+              decimals={2}
               unit="رغيف / فرد"
+              indicator="مؤشر عام ٢٠٢٣"
               icon={TrendingUp}
               theme="purple"
-              compact
               delay={0.18}
-              onClick={() => handleNavSelect('averages', 'avg-all')}
+              onClick={() => handleNavSelect('averages', 'avg-percapita')}
             />
             <AnimatedStatCard
-              title="متوسط الفرد ٢٠٢٤"
+              title="٨. متوسط الفرد ٢٠٢٤"
               value={kpiStats.avg2024}
               format="decimal"
-              decimals={3}
+              decimals={2}
               unit="رغيف / فرد"
+              indicator="مؤشر عام ٢٠٢٤"
               icon={TrendingUp}
               theme="teal"
-              compact
               delay={0.21}
-              onClick={() => handleNavSelect('averages', 'avg-all')}
+              onClick={() => handleNavSelect('averages', 'avg-percapita')}
             />
             <AnimatedStatCard
-              title="متوسط الفرد ٢٠٢٥"
+              title="٩. متوسط الفرد ٢٠٢٥"
               value={kpiStats.avg2025}
               format="decimal"
-              decimals={3}
+              decimals={2}
               unit="رغيف / فرد"
+              indicator="مؤشر عام ٢٠٢٥"
               icon={TrendingUp}
               theme="navy"
-              compact
               delay={0.24}
-              onClick={() => handleNavSelect('averages', 'avg-all')}
+              onClick={() => handleNavSelect('averages', 'avg-percapita')}
             />
             <AnimatedStatCard
-              title="تراخيص منتهية"
+              title="١٠. التراخيص المنتهية"
               value={kpiStats.expiredLicenses}
               unit="رخصة منتهية"
+              indicator="تستوجب الإنذار"
               icon={FileWarning}
               theme="red"
-              compact
               delay={0.26}
               onClick={() => handleNavSelect('licenses', 'doc-licenses')}
             />
             <AnimatedStatCard
-              title="تراخيص قريبة الانتهاء"
+              title="١١. التراخيص قريبة الانتهاء"
               value={kpiStats.expiringLicenses}
               unit="خلال ٣٠ يوماً"
+              indicator="تنبيهات التجديد"
               icon={AlertTriangle}
               theme="gold"
-              compact
               delay={0.28}
               onClick={() => handleNavSelect('licenses', 'doc-licenses')}
             />
             <AnimatedStatCard
-              title="بطاقات ضريبية منتهية"
+              title="١٢. البطاقات الضريبية المنتهية"
               value={kpiStats.expiredTaxCards}
               unit="بطاقة ضريبية"
+              indicator="سجل الضرائب"
               icon={FileBadge}
               theme="red"
-              compact
               delay={0.3}
               onClick={() => handleNavSelect('licenses', 'doc-tax')}
             />
             <AnimatedStatCard
-              title="عقود إيجار منتهية"
+              title="١٣. عقود الإيجار المنتهية"
               value={kpiStats.expiredContracts}
               unit="عقد إيجار"
+              indicator="سجل العقود"
               icon={FileSignature}
               theme="purple"
-              compact
               delay={0.32}
               onClick={() => handleNavSelect('contracts', 'doc-contracts')}
             />
             <AnimatedStatCard
-              title="مستندات للتجديد"
+              title="١٤. إجمالي المستندات للتجديد"
               value={kpiStats.totalDocsToRenew}
-              unit="إجمالي التنبيهات"
+              unit="مستند للتجديد"
+              indicator="مركز التنبيهات الذكي"
               icon={BellRing}
               theme="gold"
-              compact
               delay={0.34}
               onClick={() => handleNavSelect('alerts', 'doc-alerts')}
             />
           </div>
 
-          {/* Visual Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* توزيع المخابز والحصص حسب قرى مركز المحلة الكبرى */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200">
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                <h3 className="text-[13px] font-black text-[#102A43]">توزيع الحصص الفعلية والإنتاج اليومي حسب القرى</h3>
-                <span className="text-[11px] font-bold text-slate-600">إدارة تموين مركز المحلة الكبرى</span>
+          {/* الرسوم البيانية واللوحات التحليلية بنمط قسم التجارة الداخلية (شبكة ٢×٢ متناسقة) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* ١. توزيع المخابز والحصص حسب القرى */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-100">
+                <h4 className="text-xs font-black text-[#102A43]">
+                  ١. توزيع الحصص الفعلية والإنتاج اليومي حسب القرى
+                </h4>
+                <span className="text-[10.5px] font-bold text-slate-500">
+                  {branchName || 'إدارة تموين مركز المحلة الكبرى'}
+                </span>
               </div>
-              <div className="space-y-3">
-                {activeBakeriesList.map((b) => {
+              <div className="space-y-2.5">
+                {activeBakeriesList.slice(0, 6).map((b) => {
                   const pct = Math.min(100, Math.round((b.actualQuota / Math.max(1, kpiStats.totalActualQuota)) * 100));
                   return (
-                    <div key={b.id} className="space-y-1">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="font-extrabold text-[#102A43]">
+                    <div key={b.id} className="space-y-1 text-xs">
+                      <div className="flex justify-between gap-2 font-black">
+                        <span className="text-[#102A43]">
                           {b.village} — {b.name}
                         </span>
-                        <span className="num-cell font-extrabold text-[#164E83]">
+                        <span className="num-cell text-[#164E83] shrink-0">
                           {formatArabicNumber(b.actualQuota)} شيكارة ({formatArabicNumber(b.dailyLoavesCount)} رغيف)
                         </span>
                       </div>
-                      <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-[#102A43] rounded-full"
                           style={{ width: `${Math.max(12, pct)}%` }}
-                        ></div>
+                        />
                       </div>
                     </div>
                   );
@@ -1736,43 +1754,109 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               </div>
             </div>
 
-            {/* مقارنة متوسطات السنوات الثلاث (2023 - 2024 - 2025) وموقف التراخيص */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                  <h3 className="text-[13px] font-black text-[#102A43]">مقارنة متوسط نصيب الفرد اليومي (٢٠٢٣ – ٢٠٢٤ – ٢٠٢٥)</h3>
-                  <span className="text-[11px] font-bold text-slate-600">٣ منازل عشرية</span>
-                </div>
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  {[
-                    { yr: 'عام ٢٠٢٣', val: kpiStats.avg2023 },
-                    { yr: 'عام ٢٠٢٤', val: kpiStats.avg2024 },
-                    { yr: 'عام ٢٠٢٥', val: kpiStats.avg2025 },
-                  ].map((item) => (
-                    <div key={item.yr} className="bg-[#F4F7FB] p-3.5 rounded-xl border border-slate-200 text-center">
-                      <span className="text-[11px] font-extrabold text-slate-700 block">{item.yr}</span>
-                      <span className="num-cell text-xl font-black text-[#102A43] block my-1">
-                        {formatArabicDecimal(item.val, 3)}
-                      </span>
-                      <span className="text-xs font-bold text-slate-600">رغيف / مستفيد يومياً</span>
-                    </div>
-                  ))}
+            {/* ٢. موقف التراخيص والبطاقات الضريبية والعقود */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-black text-[#102A43] pb-1.5 border-b border-slate-100">
+                  ٢. موقف التراخيص والبطاقات الضريبية والعقود والمستندات
+                </h4>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <span className="text-slate-600 font-bold block">مخابز نشطة</span>
+                    <span className="num-cell font-black text-emerald-800 text-base">
+                      {toArabicNumerals(kpiStats.active)}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                    <span className="text-slate-600 font-bold block">قاربت الانتهاء</span>
+                    <span className="num-cell font-black text-amber-800 text-base">
+                      {toArabicNumerals(kpiStats.expiringLicenses)}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200">
+                    <span className="text-slate-600 font-bold block">مستندات منتهية</span>
+                    <span className="num-cell font-black text-red-800 text-base">
+                      {toArabicNumerals(kpiStats.expiredLicenses + kpiStats.expiredTaxCards + kpiStats.expiredContracts)}
+                    </span>
+                  </div>
                 </div>
               </div>
-
-              <div className="bg-[#F4F7FB] p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-[11px] font-black text-[#102A43]">موقف التراخيص والعقود والمستندات</h4>
-                  <p className="text-xs font-bold text-slate-600 mt-0.5">
-                    يوجد حالياً ({formatArabicNumber(kpiStats.totalDocsToRenew)}) مستند بحاجة إلى مراجعة أو تجديد ضمن نطاق المركز.
-                  </p>
-                </div>
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-black text-slate-700">
+                  إجمالي التنبيهات النشطة: <span className="num-cell text-red-700">{formatArabicNumber(kpiStats.totalDocsToRenew)}</span> مستند
+                </span>
                 <button
                   type="button"
                   onClick={() => handleNavSelect('alerts', 'doc-alerts')}
-                  className="px-4 py-2 bg-[#102A43] hover:bg-[#164E83] text-white rounded-xl text-[11px] font-extrabold shrink-0 cursor-pointer"
+                  className="px-3.5 py-1.5 bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] rounded-xl text-[11px] font-black cursor-pointer"
                 >
                   فتح مركز التنبيهات ({formatArabicNumber(allAlerts.length)})
+                </button>
+              </div>
+            </div>
+
+            {/* ٣. مقارنة متوسطات نصيب الفرد للسنوات الثلاث */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                <h4 className="text-xs font-black text-[#102A43]">
+                  ٣. مقارنة متوسط نصيب الفرد اليومي (٢٠٢٣ – ٢٠٢٤ – ٢٠٢٥)
+                </h4>
+                <span className="text-[10.5px] font-bold text-slate-500">رقمان عشريان</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5 text-center">
+                {[
+                  { yr: 'عام ٢٠٢٣', val: kpiStats.avg2023 },
+                  { yr: 'عام ٢٠٢٤', val: kpiStats.avg2024 },
+                  { yr: 'عام ٢٠٢٥', val: kpiStats.avg2025 },
+                ].map((item) => (
+                  <div key={item.yr} className="bg-[#F4F7FB] p-3 rounded-xl border border-slate-200">
+                    <span className="text-[11px] font-extrabold text-slate-700 block">{item.yr}</span>
+                    <span className="num-cell text-lg font-black text-[#102A43] block my-1">
+                      {formatArabicDecimal(item.val, 2)}
+                    </span>
+                    <span className="text-[10.5px] font-bold text-slate-600">رغيف / فرد</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ٤. الموقف الرقابي والمالي للمخابز */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+              <h4 className="text-xs font-black text-[#102A43] pb-1.5 border-b border-slate-100">
+                ٤. الموقف الرقابي والمخالفات والمديونيات بالمخابز
+              </h4>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 font-black">
+                  <span className="text-slate-700">إجمالي الحملات والمحاضر الرقابية المسجلة:</span>
+                  <span className="num-cell text-[#164E83]">{toArabicNumerals(inspections.length)} سجل</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 font-black">
+                  <span className="text-slate-700">عدد المخابز التي عليها مديونيات قائمة:</span>
+                  <span className="num-cell text-red-700">
+                    {toArabicNumerals(activeBakeriesList.filter((b) => (b.remainingDebtEgp || 0) > 0).length)} مخبز
+                  </span>
+                </div>
+                <div className="flex items-center justify-between font-black">
+                  <span className="text-slate-700">إجمالي الحصص الفعلية / التأمينية اليومية:</span>
+                  <span className="num-cell text-emerald-700">
+                    {formatArabicNumber(kpiStats.totalActualQuota)} / {formatArabicDecimal(kpiStats.totalInsuranceQuota, 3)} شيكارة
+                  </span>
+                </div>
+              </div>
+              <div className="pt-1 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNavSelect('inspection', 'ins-campaigns')}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-[#102A43] border border-slate-200 text-[11px] font-black cursor-pointer"
+                >
+                  الرقابة والتفتيش
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavSelect('debts', 'dbt-all')}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-[#102A43] border border-slate-200 text-[11px] font-black cursor-pointer"
+                >
+                  المديونيات والغرامات
                 </button>
               </div>
             </div>
@@ -2038,7 +2122,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                       );
                     })}
                     <th className="bg-[#0B1F33] text-[#C6A15B] text-center sticky left-0 z-40 border-r border-white/20 w-[114px] min-w-[114px]">
-                      التحكم السريع
+                      الإجراءات والتحكم
                     </th>
                   </tr>
 
@@ -2258,7 +2342,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                                 </button>
                               );
                             } else if (isDecimalCol) {
-                              displayNode = formatArabicDecimal(rawVal as number, 3);
+                              displayNode = formatArabicDecimal(rawVal as number, 2);
                             } else if (isCurrencyCol) {
                               displayNode = `${formatArabicNumber(rawVal as number)} ج.م`;
                             } else if (isIntegerCol) {
@@ -3114,31 +3198,31 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   <div>
                     <span className="text-xs font-extrabold text-slate-600 block">متوسط ٢٠٢٣ (م٣)</span>
                     <span className="num-cell text-base font-black text-[#102A43]">
-                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2023, 3)}
+                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2023, 2)}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs font-extrabold text-slate-600 block">متوسط ٢٠٢٤ (م٤)</span>
                     <span className="num-cell text-base font-black text-[#102A43]">
-                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2024, 3)}
+                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2024, 2)}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs font-extrabold text-slate-600 block">متوسط ٢٠٢٥ (م٥)</span>
                     <span className="num-cell text-base font-black text-[#102A43]">
-                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2025, 3)}
+                      {formatArabicDecimal(liveWizardPreview.avgPerCapita2025, 2)}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs font-extrabold text-slate-600 block">الفرق التراكمي (م٦)</span>
                     <span className="num-cell text-base font-black text-amber-800">
-                      {formatArabicDecimal(liveWizardPreview.cumulativeAvgDifference, 3)}
+                      {formatArabicDecimal(liveWizardPreview.cumulativeAvgDifference, 2)}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs font-extrabold text-slate-600 block">نصيب الفرد الفعلي (م٧)</span>
                     <span className="num-cell text-base font-black text-emerald-800">
-                      {formatArabicDecimal(liveWizardPreview.dailyShareActual2025, 3)}
+                      {formatArabicDecimal(liveWizardPreview.dailyShareActual2025, 2)}
                     </span>
                   </div>
                 </div>
@@ -3310,36 +3394,36 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 num: 'المعادلة الثالثة (٣)',
                 title: 'متوسط نصيب الفرد لعام ٢٠٢٣',
                 formula: 'متوسط ٢٠٢٣ = عدد الأرغفة اليومية ÷ عدد المستفيدين لعام ٢٠٢٣',
-                source: 'ناتج المعادلة (٢) ÷ مدخل مستفيدي ٢٠٢٣ (مع منع القسمة على صفر)',
-                result: `${formatArabicDecimal(kpiStats.avg2023, 3)} رغيف / فرد`,
+                source: 'ناتج المعادلة (٢) ÷ مدخل مستفيدي ٢٠٢٣ (تقريب رقمين عشريين)',
+                result: `${formatArabicDecimal(kpiStats.avg2023, 2)} رغيف / فرد`,
               },
               {
                 num: 'المعادلة الرابعة (٤)',
                 title: 'متوسط نصيب الفرد لعام ٢٠٢٤',
                 formula: 'متوسط ٢٠٢٤ = عدد الأرغفة اليومية ÷ عدد المستفيدين لعام ٢٠٢٤',
-                source: 'ناتج المعادلة (٢) ÷ مدخل مستفيدي ٢٠٢٤ (تقريب ٣ منازل عشرية)',
-                result: `${formatArabicDecimal(kpiStats.avg2024, 3)} رغيف / فرد`,
+                source: 'ناتج المعادلة (٢) ÷ مدخل مستفيدي ٢٠٢٤ (تقريب رقمين عشريين)',
+                result: `${formatArabicDecimal(kpiStats.avg2024, 2)} رغيف / فرد`,
               },
               {
                 num: 'المعادلة الخامسة (٥)',
                 title: 'متوسط نصيب الفرد لعام ٢٠٢٥',
                 formula: 'متوسط ٢٠٢٥ = عدد الأرغفة اليومية ÷ عدد المستفيدين لعام ٢٠٢٥',
-                source: 'ناتج المعادلة (٢) ÷ مدخل مستفيدي ٢٠٢٥ (تقريب ٣ منازل عشرية)',
-                result: `${formatArabicDecimal(kpiStats.avg2025, 3)} رغيف / فرد`,
+                source: 'ناتج المعادلة (٢) ÷ مدخل مستفيدي ٢٠٢٥ (تقريب رقمين عشريين)',
+                result: `${formatArabicDecimal(kpiStats.avg2025, 2)} رغيف / فرد`,
               },
               {
                 num: 'المعادلة السادسة (٦)',
                 title: 'الفرق التراكمي بين المتوسطات',
                 formula: 'الفرق التراكمي = متوسط ٢٠٢٣ − متوسط ٢٠٢٤ − متوسط ٢٠٢٥',
                 source: 'معادلة فرق حسابية مجردة دون تصنيف تلقائي إلا بعد الاعتماد الإداري',
-                result: formatArabicDecimal(round3(kpiStats.avg2023 - kpiStats.avg2024 - kpiStats.avg2025), 3),
+                result: formatArabicDecimal(round3(kpiStats.avg2023 - kpiStats.avg2024 - kpiStats.avg2025), 2),
               },
               {
                 num: 'المعادلة السابعة (٧)',
                 title: 'نصيب الفرد وفق الحصة الفعلية ٢٠٢٥',
                 formula: 'نصيب الفرد اليومي ٢٠٢٥ = عدد الأرغفة اليومية ÷ مستفيدي ٢٠٢٥',
                 source: 'تعرض بصورة مستقلة في لوحة التحليل ولا تحتسب مرتين ضمن إجمالي الإنتاج',
-                result: `${formatArabicDecimal(kpiStats.avg2025, 3)} رغيف / مستفيد`,
+                result: `${formatArabicDecimal(kpiStats.avg2025, 2)} رغيف / مستفيد`,
               },
             ].map((eq, i) => (
               <div key={i} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
@@ -3365,7 +3449,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden p-4 space-y-3">
             <div className="p-3.5 bg-[#102A43] text-white rounded-xl flex items-center justify-between">
               <h3 className="text-[12px] font-black">جدول تدقيق الحصص والمعادلات السبع لكل مخبز (مدخل يدوي مقابل ناتج تلقائي)</h3>
-              <span className="text-[10.5px] text-[#C6A15B] font-bold">تقريب قياسي: ٣ منازل عشرية · انقر على أي عمود للفرز</span>
+              <span className="text-[10.5px] text-[#C6A15B] font-bold">تقريب المتوسطات: رقمان عشريان · انقر على أي عمود للفرز</span>
             </div>
 
             <SmartAutoFitTable
@@ -3445,8 +3529,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 95,
-                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
-                  render: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 2),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2023, 2),
                 },
                 {
                   key: 'avgPerCapita2024',
@@ -3455,8 +3539,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 95,
-                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
-                  render: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 2),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2024, 2),
                 },
                 {
                   key: 'avgPerCapita2025',
@@ -3465,8 +3549,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 95,
-                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
-                  render: (b) => <span className="font-extrabold">{formatArabicDecimal(b.avgPerCapita2025, 3)}</span>,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 2),
+                  render: (b) => <span className="font-extrabold">{formatArabicDecimal(b.avgPerCapita2025, 2)}</span>,
                 },
                 {
                   key: 'cumulativeAvgDifference',
@@ -3475,8 +3559,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 115,
-                  measureValue: (b) => formatArabicDecimal(b.cumulativeAvgDifference, 3),
-                  render: (b) => <span className="text-amber-800 font-extrabold">{formatArabicDecimal(b.cumulativeAvgDifference, 3)}</span>,
+                  measureValue: (b) => formatArabicDecimal(b.cumulativeAvgDifference, 2),
+                  render: (b) => <span className="text-amber-800 font-extrabold">{formatArabicDecimal(b.cumulativeAvgDifference, 2)}</span>,
                 },
                 {
                   key: 'dailyShareActual2025',
@@ -3485,8 +3569,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 105,
-                  measureValue: (b) => formatArabicDecimal(b.dailyShareActual2025, 3),
-                  render: (b) => <span className="text-emerald-800 font-extrabold">{formatArabicDecimal(b.dailyShareActual2025, 3)}</span>,
+                  measureValue: (b) => formatArabicDecimal(b.dailyShareActual2025, 2),
+                  render: (b) => <span className="text-emerald-800 font-extrabold">{formatArabicDecimal(b.dailyShareActual2025, 2)}</span>,
                 },
                 {
                   key: 'actions',
@@ -3587,8 +3671,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 type: 'numeric',
                 align: 'center',
                 defaultWidth: 95,
-                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
-                render: (b) => <span className="font-extrabold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2023, 3)}</span>,
+                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 2),
+                render: (b) => <span className="font-extrabold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2023, 2)}</span>,
               },
               {
                 key: 'beneficiaries2024',
@@ -3607,8 +3691,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 type: 'numeric',
                 align: 'center',
                 defaultWidth: 95,
-                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
-                render: (b) => <span className="font-extrabold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2024, 3)}</span>,
+                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 2),
+                render: (b) => <span className="font-extrabold text-[#164E83]">{formatArabicDecimal(b.avgPerCapita2024, 2)}</span>,
               },
               {
                 key: 'beneficiaries2025',
@@ -3627,8 +3711,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 type: 'numeric',
                 align: 'center',
                 defaultWidth: 95,
-                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
-                render: (b) => <span className="font-extrabold text-[#102A43]">{formatArabicDecimal(b.avgPerCapita2025, 3)}</span>,
+                measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 2),
+                render: (b) => <span className="font-extrabold text-[#102A43]">{formatArabicDecimal(b.avgPerCapita2025, 2)}</span>,
               },
               {
                 key: 'diff24_23',
@@ -3637,8 +3721,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 type: 'numeric',
                 align: 'center',
                 defaultWidth: 95,
-                measureValue: (b) => formatArabicDecimal(b.diff24_23, 3),
-                render: (b) => formatArabicDecimal(b.diff24_23, 3),
+                measureValue: (b) => formatArabicDecimal(b.diff24_23, 2),
+                render: (b) => formatArabicDecimal(b.diff24_23, 2),
               },
               {
                 key: 'diff25_24',
@@ -3647,8 +3731,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 type: 'numeric',
                 align: 'center',
                 defaultWidth: 95,
-                measureValue: (b) => formatArabicDecimal(b.diff25_24, 3),
-                render: (b) => formatArabicDecimal(b.diff25_24, 3),
+                measureValue: (b) => formatArabicDecimal(b.diff25_24, 2),
+                render: (b) => formatArabicDecimal(b.diff25_24, 2),
               },
               {
                 key: 'cumulativeAvgDifference',
@@ -3657,8 +3741,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 type: 'numeric',
                 align: 'center',
                 defaultWidth: 115,
-                measureValue: (b) => formatArabicDecimal(b.cumulativeAvgDifference, 3),
-                render: (b) => <span className="font-extrabold text-amber-800">{formatArabicDecimal(b.cumulativeAvgDifference, 3)}</span>,
+                measureValue: (b) => formatArabicDecimal(b.cumulativeAvgDifference, 2),
+                render: (b) => <span className="font-extrabold text-amber-800">{formatArabicDecimal(b.cumulativeAvgDifference, 2)}</span>,
               },
               {
                 key: 'dailyShareActual2025',
@@ -3667,8 +3751,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 type: 'numeric',
                 align: 'center',
                 defaultWidth: 115,
-                measureValue: (b) => formatArabicDecimal(b.dailyShareActual2025, 3),
-                render: (b) => <span className="font-extrabold text-emerald-800">{formatArabicDecimal(b.dailyShareActual2025, 3)}</span>,
+                measureValue: (b) => formatArabicDecimal(b.dailyShareActual2025, 2),
+                render: (b) => <span className="font-extrabold text-emerald-800">{formatArabicDecimal(b.dailyShareActual2025, 2)}</span>,
               },
               {
                 key: 'actions',
@@ -4440,7 +4524,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
               </div>
               <div>
                 <span className="text-slate-600 font-bold block">متوسط نصيب الفرد ٢٠٢٥:</span>
-                <strong className="num-cell text-[13px] font-black text-[#102A43]">{formatArabicDecimal(kpiStats.avg2025, 3)} رغيف/فرد</strong>
+                <strong className="num-cell text-[13px] font-black text-[#102A43]">{formatArabicDecimal(kpiStats.avg2025, 2)} رغيف/فرد</strong>
               </div>
             </div>
 
@@ -4533,8 +4617,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 95,
-                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
-                  render: (b) => formatArabicDecimal(b.avgPerCapita2023, 3),
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2023, 2),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2023, 2),
                 },
                 {
                   key: 'avgPerCapita2024',
@@ -4543,8 +4627,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 95,
-                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
-                  render: (b) => formatArabicDecimal(b.avgPerCapita2024, 3),
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2024, 2),
+                  render: (b) => formatArabicDecimal(b.avgPerCapita2024, 2),
                 },
                 {
                   key: 'avgPerCapita2025',
@@ -4553,8 +4637,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                   type: 'numeric',
                   align: 'center',
                   defaultWidth: 95,
-                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
-                  render: (b) => <span className="font-extrabold">{formatArabicDecimal(b.avgPerCapita2025, 3)}</span>,
+                  measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 2),
+                  render: (b) => <span className="font-extrabold">{formatArabicDecimal(b.avgPerCapita2025, 2)}</span>,
                 },
                 {
                   key: 'combinedDocStatus',
@@ -4736,7 +4820,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                       <div><span className="text-slate-600">الحصة التأمينية (م١):</span> <strong className="num-cell">{formatArabicDecimal(b.insuranceQuota, 3)} شيكارة</strong></div>
                       <div><span className="text-slate-600">{getColLabel('actualQuota', 'الحصة الفعلية')}:</span> <strong className="num-cell">{formatArabicNumber(b.actualQuota)} شيكارة</strong></div>
                       <div><span className="text-slate-600">الأرغفة اليومية (م٢):</span> <strong className="num-cell">{formatArabicNumber(b.dailyLoavesCount)} رغيف</strong></div>
-                      <div><span className="text-slate-600">متوسط ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong className="num-cell">{formatArabicDecimal(b.avgPerCapita2023, 3)} / {formatArabicDecimal(b.avgPerCapita2024, 3)} / {formatArabicDecimal(b.avgPerCapita2025, 3)}</strong></div>
+                      <div><span className="text-slate-600">متوسط ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong className="num-cell">{formatArabicDecimal(b.avgPerCapita2023, 2)} / {formatArabicDecimal(b.avgPerCapita2024, 2)} / {formatArabicDecimal(b.avgPerCapita2025, 2)}</strong></div>
                       <div><span className="text-slate-600">رقم الرخصة وانتهاؤها:</span> <strong className="num-cell">{toArabicNumerals(b.licenseNumber)} ({formatDateArabic(b.licenseExpiryDate)})</strong></div>
                       <div><span className="text-slate-600">عقد الإيجار وانتهاؤه:</span> <strong className="num-cell">{toArabicNumerals(b.leaseContractNumber)} ({formatDateArabic(b.leaseExpiryDate)})</strong></div>
                     </div>
@@ -4826,8 +4910,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                     type: 'numeric',
                     align: 'center',
                     defaultWidth: 95,
-                    measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
-                    render: (b) => formatArabicDecimal(b.avgPerCapita2025, 3),
+                    measureValue: (b) => formatArabicDecimal(b.avgPerCapita2025, 2),
+                    render: (b) => formatArabicDecimal(b.avgPerCapita2025, 2),
                   },
                   {
                     key: 'licenseExpiryDate',
@@ -4935,6 +5019,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                     <th className="text-center">العرض (بكسل)</th>
                     <th className="text-center">إظهار</th>
                     <th className="text-center">تثبيت</th>
+                    <th className="text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -5017,6 +5102,21 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                             }}
                             className="w-4 h-4 accent-[#164E83] cursor-pointer"
                           />
+                        </td>
+                        <td className="text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = columns.map((c) =>
+                                c.key === col.key ? { ...c, customLabel: c.defaultLabel, visible: true, pinned: false } : c
+                              );
+                              setColumns(updated);
+                              showToast(`تمت استعادة الإعداد الافتراضي للعمود (${col.defaultLabel}).`);
+                            }}
+                            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[#102A43] text-[10px] font-black cursor-pointer"
+                          >
+                            افتراضي
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -5103,8 +5203,8 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <div><span className="text-slate-600">الحصة التأمينية (م١):</span> <strong className="num-cell text-[#164E83]">{formatArabicDecimal(selectedBakery.insuranceQuota, 3)} شيكارة</strong></div>
                 <div><span className="text-slate-600">الحصة الفعلية:</span> <strong className="num-cell">{formatArabicNumber(selectedBakery.actualQuota)} شيكارة</strong></div>
                 <div><span className="text-slate-600">الأرغفة اليومية (م٢):</span> <strong className="num-cell text-emerald-800">{formatArabicNumber(selectedBakery.dailyLoavesCount)} رغيف</strong></div>
-                <div><span className="text-slate-600">متوسطات ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)} / {formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)} / {formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</strong></div>
-                <div><span className="text-slate-600">الفرق التراكمي (م٦):</span> <strong className="num-cell">{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 3)}</strong></div>
+                <div><span className="text-slate-600">متوسطات ٢٠٢٣ / ٢٠٢٤ / ٢٠٢٥:</span> <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 2)} / {formatArabicDecimal(selectedBakery.avgPerCapita2024, 2)} / {formatArabicDecimal(selectedBakery.avgPerCapita2025, 2)}</strong></div>
+                <div><span className="text-slate-600">الفرق التراكمي (م٦):</span> <strong className="num-cell">{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 2)}</strong></div>
                 <div><span className="text-slate-600">رخصة المخبز:</span> <strong>{toArabicNumerals(selectedBakery.licenseNumber)} (تنتهي: <span className="num-cell">{formatDateArabic(selectedBakery.licenseExpiryDate)}</span>)</strong></div>
                 <div><span className="text-slate-600">عقد الإيجار:</span> <strong>{toArabicNumerals(selectedBakery.leaseContractNumber)} (ينتهي: <span className="num-cell">{formatDateArabic(selectedBakery.leaseExpiryDate)}</span>)</strong></div>
               </div>
@@ -5115,11 +5215,11 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                 <div className="p-3.5 bg-[#F4F7FB] rounded-xl border border-slate-200 space-y-2">
                   <div>١. الحصة التأمينية = <span className="num-cell">{formatArabicNumber(selectedBakery.insuranceAmountEgp)}</span> ÷ ٢٣٥ ÷ ٣ = <strong className="num-cell">{formatArabicDecimal(selectedBakery.insuranceQuota, 3)} شيكارة</strong></div>
                   <div>٢. الأرغفة اليومية = <span className="num-cell">{formatArabicNumber(selectedBakery.actualQuota)}</span> × <span className="num-cell">{formatArabicNumber(selectedBakery.productionFactor)}</span> = <strong className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)} رغيف</strong></div>
-                  <div>٣. متوسط ٢٠٢٣ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2023)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)}</strong></div>
-                  <div>٤. متوسط ٢٠٢٤ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2024)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)}</strong></div>
-                  <div>٥. متوسط ٢٠٢٥ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2025)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</strong></div>
-                  <div>٦. الفرق التراكمي = <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 3)}</span> − <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2024, 3)}</span> − <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2025, 3)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 3)}</strong></div>
-                  <div>٧. نصيب الفرد اليومي الفعلي ٢٠٢٥ = <strong className="num-cell">{formatArabicDecimal(selectedBakery.dailyShareActual2025, 3)} رغيف/مستفيد</strong></div>
+                  <div>٣. متوسط ٢٠٢٣ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2023)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 2)}</strong></div>
+                  <div>٤. متوسط ٢٠٢٤ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2024)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2024, 2)}</strong></div>
+                  <div>٥. متوسط ٢٠٢٥ = <span className="num-cell">{formatArabicNumber(selectedBakery.dailyLoavesCount)}</span> ÷ <span className="num-cell">{formatArabicNumber(selectedBakery.beneficiaries2025)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2025, 2)}</strong></div>
+                  <div>٦. الفرق التراكمي = <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2023, 2)}</span> − <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2024, 2)}</span> − <span className="num-cell">{formatArabicDecimal(selectedBakery.avgPerCapita2025, 2)}</span> = <strong className="num-cell">{formatArabicDecimal(selectedBakery.cumulativeAvgDifference, 2)}</strong></div>
+                  <div>٧. نصيب الفرد اليومي الفعلي ٢٠٢٥ = <strong className="num-cell">{formatArabicDecimal(selectedBakery.dailyShareActual2025, 2)} رغيف/مستفيد</strong></div>
                 </div>
               </div>
             )}
@@ -5133,6 +5233,7 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                       <th className="px-3 py-2">العملية</th>
                       <th className="px-3 py-2">القيمة الجديدة</th>
                       <th className="px-3 py-2">المسؤول</th>
+                      <th className="text-center px-3 py-2">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-[11px] font-bold">
@@ -5144,6 +5245,15 @@ export default function BakeryManagementSystem({ currentUser, branchName }: Bake
                           <td className="font-extrabold px-3 py-2">{a.actionType}</td>
                           <td className="text-emerald-800 px-3 py-2">{toArabicNumerals(a.newValue)}</td>
                           <td className="px-3 py-2">{a.performedBy}</td>
+                          <td className="text-center px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setActionModalType('details')}
+                              className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                            >
+                              ملف المخبز
+                            </button>
+                          </td>
                         </tr>
                       ))}
                   </tbody>

@@ -96,7 +96,7 @@ export default function AnimatedStatCard({
   subtitle,
   unit,
   format = 'integer',
-  decimals = 3,
+  decimals = 2,
   icon: Icon,
   theme,
   indicator,

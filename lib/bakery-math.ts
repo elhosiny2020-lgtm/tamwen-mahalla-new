@@ -31,7 +31,15 @@ export const MAHALLA_VILLAGES = Object.keys(MAHALLA_VILLAGE_TO_LOCAL_UNIT);
 export const MAHALLA_LOCAL_UNITS = Array.from(new Set(Object.values(MAHALLA_VILLAGE_TO_LOCAL_UNIT)));
 
 /**
- * تقريب آمن إلى 3 منازل عشرية للمتوسطات والحصص
+ * تقريب آمن إلى منزلتين عشريتين للمتوسطات
+ */
+export function round2(val: number): number {
+  if (!Number.isFinite(val) || Number.isNaN(val)) return 0;
+  return Math.round(val * 100) / 100;
+}
+
+/**
+ * تقريب آمن إلى 3 منازل عشرية للحصص
  */
 export function round3(val: number): number {
   if (!Number.isFinite(val) || Number.isNaN(val)) return 0;
@@ -60,25 +68,25 @@ export function calculateDailyLoaves(actualQuota: number, productionFactor: 660 
 }
 
 /**
- * المعادلات الثالثة والرابعة والخامسة والسابعة: متوسط نصيب الفرد اليومي للسنة
+ * المعادلات الثالثة والرابعة والخامسة والسابعة: متوسط نصيب الفرد اليومي للسنة (رقمان عشريان)
  * متوسط السنة = عدد الأرغفة اليومية ÷ عدد المستفيدين للسنة (مع منع القسمة على صفر)
  */
 export function calculatePerCapitaAverage(dailyLoaves: number, beneficiaries: number): number {
   const loaves = Number(dailyLoaves) || 0;
   const ben = Number(beneficiaries) || 0;
   if (loaves <= 0 || ben <= 0) return 0;
-  return round3(loaves / ben);
+  return round2(loaves / ben);
 }
 
 /**
- * المعادلة السادسة: الفرق التراكمي بين متوسطات 2023 و2024 و2025
+ * المعادلة السادسة: الفرق التراكمي بين متوسطات 2023 و2024 و2025 (رقمان عشريان)
  * الفرق التراكمي = متوسط 2023 − متوسط 2024 − متوسط 2025
  */
 export function calculateCumulativeAvgDifference(avg2023: number, avg2024: number, avg2025: number): number {
   const a23 = Number(avg2023) || 0;
   const a24 = Number(avg2024) || 0;
   const a25 = Number(avg2025) || 0;
-  return round3(a23 - a24 - a25);
+  return round2(a23 - a24 - a25);
 }
 
 /**

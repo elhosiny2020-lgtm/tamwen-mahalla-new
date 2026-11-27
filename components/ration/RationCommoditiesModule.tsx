@@ -1152,6 +1152,7 @@ export default function RationCommoditiesModule({ currentUserName }: RationCommo
                     <th className="p-2 border border-slate-700 text-center">تاريخ السريان</th>
                     <th className="p-2 border border-slate-700">المصدر ورقم القرار</th>
                     <th className="p-2 border border-slate-700">المستخدم والاعتماد</th>
+                    <th className="p-2 border border-slate-700 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1163,6 +1164,15 @@ export default function RationCommoditiesModule({ currentUserName }: RationCommo
                       <td className="p-2 text-center num-cell font-bold">{formatDateArabic(p.effectiveDate)}</td>
                       <td className="p-2 font-bold text-slate-700">{p.priceSource} — {p.decreeNumber}</td>
                       <td className="p-2 font-black text-[#164E83]">{p.updatedBy} ({p.approvalStatus})</td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => notify(`سجل تسعير موثق (${p.commodityName}) — القرار: ${p.decreeNumber}`)}
+                          className="px-2 py-1 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          معاينة القرار
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1362,6 +1372,7 @@ export default function RationCommoditiesModule({ currentUserName }: RationCommo
                     <th className="p-2 border border-slate-700">نوع الحدث</th>
                     <th className="p-2 border border-slate-700">الملخص</th>
                     <th className="p-2 border border-slate-700 text-center">الحالة</th>
+                    <th className="p-2 border border-slate-700 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1372,6 +1383,32 @@ export default function RationCommoditiesModule({ currentUserName }: RationCommo
                       <td className="p-2 font-bold text-[#164E83]">{f.eventType}</td>
                       <td className="p-2 font-bold text-slate-700">{f.summary}</td>
                       <td className="p-2 text-center font-black">{f.status}</td>
+                      <td className="p-2 text-center">
+                        <div className="inline-flex items-center gap-1">
+                          {f.status !== 'تمت المعالجة' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFollowups(followups.map((x) => (x.id === f.id ? { ...x, status: 'تمت المعالجة' } : x)));
+                                notify('تم تحديث حالة قيد المتابعة إلى تمت المعالجة.');
+                              }}
+                              className="px-2 py-0.5 rounded bg-emerald-700 text-white text-[10px] font-black cursor-pointer"
+                            >
+                              إتمام
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFollowups(followups.filter((x) => x.id !== f.id));
+                              notify('تم حذف قيد المتابعة.');
+                            }}
+                            className="px-2 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-black cursor-pointer"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

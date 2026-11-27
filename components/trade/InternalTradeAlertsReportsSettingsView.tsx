@@ -930,6 +930,7 @@ export default function InternalTradeAlertsReportsSettingsView({
                     {reportData.headers.map((h) => (
                       <th key={h} className="p-2 border">{h}</th>
                     ))}
+                    <th className="p-2 border print:hidden">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -940,6 +941,15 @@ export default function InternalTradeAlertsReportsSettingsView({
                           {typeof cell === 'number' ? formatArabicNumber(cell) : toArabicNumerals(String(cell))}
                         </td>
                       ))}
+                      <td className="p-2 border print:hidden">
+                        <button
+                          type="button"
+                          onClick={() => setShowPrintReportModal(false)}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          معاينة
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

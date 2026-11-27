@@ -389,6 +389,7 @@ export default function BakeryFinancialProfileModal({
                     <th className="p-2">المتبقي</th>
                     <th className="p-2">الاستحقاق</th>
                     <th className="p-2">الحالة</th>
+                    <th className="p-2 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -401,6 +402,15 @@ export default function BakeryFinancialProfileModal({
                       <td className="p-2 num-cell text-red-700 font-black">{formatArabicCurrency(d.remainingAmount)}</td>
                       <td className="p-2 num-cell">{formatDateArabic(d.dueDate)}</td>
                       <td className="p-2"><DebtPaymentBadge status={d.paymentStatus} /></td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('statement')}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          كشف الحساب
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -418,6 +428,7 @@ export default function BakeryFinancialProfileModal({
                     <th className="p-2">البيان</th>
                     <th className="p-2">المبلغ</th>
                     <th className="p-2">الحالة</th>
+                    <th className="p-2 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -428,6 +439,15 @@ export default function BakeryFinancialProfileModal({
                       <td className="p-2 font-bold">{i.description}</td>
                       <td className="p-2 num-cell font-black">{formatArabicCurrency(i.amount)}</td>
                       <td className="p-2 font-bold">{i.status}</td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('debts')}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          المديونية
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -461,6 +481,7 @@ export default function BakeryFinancialProfileModal({
                     <th className="p-2">المبلغ</th>
                     <th className="p-2">المحصل</th>
                     <th className="p-2">الحالة</th>
+                    <th className="p-2 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -472,6 +493,15 @@ export default function BakeryFinancialProfileModal({
                       <td className="p-2 num-cell font-black text-emerald-700">{formatArabicCurrency(p.amount)}</td>
                       <td className="p-2 font-bold">{p.collectorName}</td>
                       <td className="p-2 font-black">{p.status}</td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowPrintStatement(true)}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          طباعة إيصال
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -497,6 +527,7 @@ export default function BakeryFinancialProfileModal({
                       <th className="p-2">المسدد</th>
                       <th className="p-2">المتبقي</th>
                       <th className="p-2">الحالة</th>
+                      <th className="p-2 text-center">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -508,6 +539,15 @@ export default function BakeryFinancialProfileModal({
                         <td className="p-2 num-cell text-emerald-700">{formatArabicCurrency(i.paidAmount)}</td>
                         <td className="p-2 num-cell text-red-700 font-black">{formatArabicCurrency(i.remainingAmount)}</td>
                         <td className="p-2"><InstallmentStatusBadge status={i.status} /></td>
+                        <td className="p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('payments')}
+                            className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                          >
+                            الدفعات
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -581,6 +621,7 @@ export default function BakeryFinancialProfileModal({
                       <th className="p-2">مدين (مستحق)</th>
                       <th className="p-2">دائن (سداد/تسوية)</th>
                       <th className="p-2">الرصيد التراكمي</th>
+                      <th className="p-2 text-center">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -594,6 +635,15 @@ export default function BakeryFinancialProfileModal({
                         <td className="p-2 num-cell font-black text-red-700">{r.debit > 0 ? formatArabicCurrency(r.debit) : '—'}</td>
                         <td className="p-2 num-cell font-black text-emerald-700">{r.credit > 0 ? formatArabicCurrency(r.credit) : '—'}</td>
                         <td className="p-2 num-cell font-black text-[#102A43]">{formatArabicCurrency(r.runningBalance)}</td>
+                        <td className="p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setShowPrintStatement(true)}
+                            className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                          >
+                            طباعة
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -663,6 +713,7 @@ export default function BakeryFinancialProfileModal({
                     <th className="p-2">النقص</th>
                     <th className="p-2">الغرامة النهائية</th>
                     <th className="p-2">الحالة</th>
+                    <th className="p-2 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -675,6 +726,15 @@ export default function BakeryFinancialProfileModal({
                       <td className="p-2 num-cell">{v.shortageGrams ? `${formatArabicDecimal(v.shortageGrams, 2)} جم` : '—'}</td>
                       <td className="p-2 num-cell font-black text-red-700">{formatArabicCurrency(v.finalFineAmount)}</td>
                       <td className="p-2 font-black">{v.status}</td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('debts')}
+                          className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        >
+                          عرض المديونية
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -709,6 +769,7 @@ export default function BakeryFinancialProfileModal({
               <th className="border border-slate-400 p-1.5">مدين</th>
               <th className="border border-slate-400 p-1.5">دائن</th>
               <th className="border border-slate-400 p-1.5">الرصيد</th>
+              <th className="border border-slate-400 p-1.5 print:hidden">الإجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -721,6 +782,15 @@ export default function BakeryFinancialProfileModal({
                 <td className="border border-slate-300 p-1.5 num-cell text-red-800">{r.debit > 0 ? formatArabicCurrency(r.debit) : '—'}</td>
                 <td className="border border-slate-300 p-1.5 num-cell text-emerald-800">{r.credit > 0 ? formatArabicCurrency(r.credit) : '—'}</td>
                 <td className="border border-slate-300 p-1.5 num-cell font-black">{formatArabicCurrency(r.runningBalance)}</td>
+                <td className="border border-slate-300 p-1.5 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintStatement(false)}
+                    className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[9.5px] font-black cursor-pointer"
+                  >
+                    عودة
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

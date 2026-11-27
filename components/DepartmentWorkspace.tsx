@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ShoppingBag,
   Package,
@@ -45,6 +45,40 @@ import {
 import AnimatedStatCard, { StatColorTheme } from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 
+export type GrainSubTabCode = 'GRAIN' | 'SILOS' | 'MILLS' | 'COLD';
+
+const GRAIN_INTERNAL_TABS: {
+  code: GrainSubTabCode;
+  label: string;
+  subtitle: string;
+  icon: React.ElementType;
+}[] = [
+  {
+    code: 'GRAIN',
+    label: '١. صيانة الحبوب والأقماح',
+    subtitle: 'متابعة الأقماح المحلية والمستوردة ومؤشرات التخزين والتوريد',
+    icon: Wheat,
+  },
+  {
+    code: 'SILOS',
+    label: '٢. الشون والصوامع الهندسية',
+    subtitle: 'السعات التخزينية وحركة توريد الأقماح بالصوامع والشون',
+    icon: Warehouse,
+  },
+  {
+    code: 'MILLS',
+    label: '٣. المطاحن التموينية',
+    subtitle: 'متابعة طحن الدقيق التمويني استخراج ٨٧٫٥٪ وحصص التشغيل اليومية',
+    icon: Factory,
+  },
+  {
+    code: 'COLD',
+    label: '٤. الثلاجات وحفظ الأغذية',
+    subtitle: 'رقابة السلع الغذائية المجمدة والمبردة وسلامة التبريد والتخزين',
+    icon: ThermometerSnowflake,
+  },
+];
+
 interface DepartmentWorkspaceProps {
   userId?: string;
   dept: Department;
@@ -55,6 +89,7 @@ interface DepartmentWorkspaceProps {
   inspections: InspectionRecord[];
   debtTransactions: DebtTransactionRecord[];
   auditLogs: AuditLog[];
+  initialGrainSubTab?: GrainSubTabCode;
   onOpenBakeries: () => void;
 }
 
@@ -81,14 +116,36 @@ export default function DepartmentWorkspace({
   inspections,
   debtTransactions,
   auditLogs,
+  initialGrainSubTab = 'GRAIN',
   onOpenBakeries,
 }: DepartmentWorkspaceProps) {
+  const isGrainDepartment =
+    dept.code === 'GRAIN' ||
+    dept.code === 'SILOS' ||
+    dept.code === 'MILLS' ||
+    dept.code === 'COLD';
+
+  const [activeGrainSubTab, setActiveGrainSubTab] = useState<GrainSubTabCode>(
+    isGrainDepartment ? initialGrainSubTab : 'GRAIN'
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [sortKey, setSortKey] = useState<string>('metricValue');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pinnedCols, setPinnedCols] = useState<string[]>(['code']);
   const [toastMsg, setToastMsg] = useState<string>('');
+
+  useEffect(() => {
+    if (isGrainDepartment) {
+      const frame = requestAnimationFrame(() => {
+        setActiveGrainSubTab(initialGrainSubTab);
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [isGrainDepartment, initialGrainSubTab]);
+
+  const effectiveCode = isGrainDepartment ? activeGrainSubTab : dept.code;
+  const activeGrainTabMeta = GRAIN_INTERNAL_TABS.find((t) => t.code === activeGrainSubTab) || GRAIN_INTERNAL_TABS[0];
 
   const handleSort = (key: string) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -129,7 +186,7 @@ export default function DepartmentWorkspace({
     let metricColLabel = 'الكمية / المؤشر';
     let financialColLabel = 'القيمة المالية (ج.م)';
 
-    switch (dept.code) {
+    switch (effectiveCode) {
       case 'TRADE': {
         metricColLabel = 'المستفيدون بالمنطقة';
         financialColLabel = 'التأمين التجاري (ج.م)';
@@ -178,29 +235,102 @@ export default function DepartmentWorkspace({
         break;
       }
 
-      case 'GRAIN':
-      case 'SILOS':
-      case 'MILLS': {
-        metricColLabel = 'الحصة اليومية (شيكارة)';
+      case 'GRAIN': {
+        metricColLabel = 'رصيد الأقماح والحصص (شيكارة)';
         financialColLabel = 'قيمة الدقيق التأمينية (ج.م)';
         const monthlyTons = Math.round((totalActualQuota * 30 * 50) / 1000);
         cards = [
-          { title: 'الرصيد اليومي الموجه للدقيق', value: totalActualQuota, unit: 'شيكارة / يوم', icon: Wheat, theme: 'navy', indicator: 'استخراج ٨٧٫٥٪' },
-          { title: 'الكمية الشهرية المكافئة', value: monthlyTons, unit: 'طن دقيق شهرياً', icon: Warehouse, theme: 'teal', indicator: 'توريد المطاحن' },
+          { title: 'الرصيد اليومي الموجه للدقيق', value: totalActualQuota, unit: 'شيكارة / يوم', icon: Wheat, theme: 'navy', indicator: 'صيانة الحبوب والأقماح' },
+          { title: 'الكمية الشهرية المكافئة', value: monthlyTons, unit: 'طن دقيق شهرياً', icon: Warehouse, theme: 'teal', indicator: 'توريد الأقماح والمطاحن' },
           { title: 'الطاقة الاستيعابية القصوى', value: activeBakeries.reduce((s, b) => s + b.dailyCapacitySacks, 0), unit: 'شيكارة / يوم', icon: Factory, theme: 'green', indicator: 'جاهزية التشغيل' },
           { title: 'إجمالي القيمة التأمينية للدقيق', value: totalInsurance, format: 'currency', icon: Coins, theme: 'gold', indicator: 'تغطية كاملة' },
         ];
         rows = activeBakeries.map((b) => ({
           id: b.id,
-          code: `طحن-${b.bakeryNumber}`,
-          title: b.name,
+          code: `حبوب-${b.bakeryNumber}`,
+          title: `متابعة حبوب ودقيق — ${b.name}`,
+          location: `${b.village} — ${b.localUnit}`,
+          metricValue: b.actualQuota,
+          metricUnit: 'شيكارة / يوم',
+          financialValue: b.insuranceAmountEgp,
+          date: b.startDate,
+          status: b.operationStatus,
+          notes: `استخراج ٨٧٫٥٪ · خط الإنتاج: ${b.productionLineType}`,
+        }));
+        break;
+      }
+
+      case 'SILOS': {
+        metricColLabel = 'السعة التخزينية (طن)';
+        financialColLabel = 'قيمة المخزون التأميني (ج.م)';
+        const totalSiloCapacityTons = Math.max(12000, Math.round((totalActualQuota * 45 * 50) / 1000) * 10);
+        const monthlySuppliedTons = Math.round((totalActualQuota * 30 * 50) / 1000);
+        cards = [
+          { title: 'السعة التخزينية للصوامع والشون', value: totalSiloCapacityTons, unit: 'طن قمح', icon: Warehouse, theme: 'navy', indicator: 'الصوامع والشون الهندسية' },
+          { title: 'الكمية الموردة شهرياً', value: monthlySuppliedTons, unit: 'طن قمح / شهر', icon: TrendingUp, theme: 'green', indicator: 'انتظام التوريد' },
+          { title: 'عدد مواقع التخزين والتوزيع', value: Math.max(4, activeBakeries.length), unit: 'موقع ونطاق', icon: Building2, theme: 'teal', indicator: 'تغطية مركز المحلة' },
+          { title: 'القيمة التأمينية للمخزون', value: totalInsurance, format: 'currency', icon: Coins, theme: 'gold', indicator: 'مخزون استراتيجي' },
+        ];
+        rows = activeBakeries.map((b, idx) => ({
+          id: `silo-${b.id}`,
+          code: `صومعة-${toArabicNumerals(idx + 1).padStart(2, '٠')}`,
+          title: `نطاق توريد شونة وصومعة ${b.village}`,
+          location: `${b.village} — ${b.localUnit}`,
+          metricValue: Math.max(15, Math.round((b.dailyCapacitySacks * 30 * 50) / 1000)),
+          metricUnit: 'طن / شهر',
+          financialValue: b.insuranceAmountEgp,
+          date: b.updatedAt?.slice(0, 10) || b.startDate,
+          status: b.activityStatus === 'نشط' ? 'سعة متاحة ومؤمنة' : 'قيد المراجعة الفنية',
+          notes: `المخبز المرتبط: ${b.name} · الطاقة: ${toArabicNumerals(b.dailyCapacitySacks)} شيكارة/يوم`,
+        }));
+        break;
+      }
+
+      case 'MILLS': {
+        metricColLabel = 'حصة الطحن اليومية (شيكارة)';
+        financialColLabel = 'قيمة الدقيق المطحون (ج.م)';
+        const totalDailyCapacity = activeBakeries.reduce((s, b) => s + b.dailyCapacitySacks, 0);
+        cards = [
+          { title: 'إجمالي حصص الطحن اليومية', value: totalActualQuota, unit: 'شيكارة / يوم', icon: Factory, theme: 'navy', indicator: 'استخراج ٨٧٫٥٪' },
+          { title: 'الطاقة التشغيلية للمطاحن', value: totalDailyCapacity, unit: 'شيكارة / يوم', icon: CheckCircle2, theme: 'green', indicator: 'جاهزية الطحن' },
+          { title: 'الأرغفة المنتجة من الدقيق', value: totalDailyLoaves, unit: 'رغيف / يوم', icon: Wheat, theme: 'teal', indicator: 'مؤشر الإنتاج' },
+          { title: 'القيمة التأمينية للدقيق', value: totalInsurance, format: 'currency', icon: Coins, theme: 'gold', indicator: 'تسوية المطاحن' },
+        ];
+        rows = activeBakeries.map((b) => ({
+          id: `mill-${b.id}`,
+          code: `مطحن-${b.bakeryNumber}`,
+          title: `توريد مطحن — ${b.name}`,
           location: b.village,
           metricValue: b.actualQuota,
           metricUnit: 'شيكارة / يوم',
           financialValue: b.insuranceAmountEgp,
           date: b.startDate,
           status: b.operationStatus,
-          notes: `الوقود: ${b.fuelType} · الخط: ${b.productionLineType}`,
+          notes: `الوقود: ${b.fuelType} · معامل الإنتاج: ${toArabicNumerals(b.productionFactor)} رغيف/شيكارة`,
+        }));
+        break;
+      }
+
+      case 'COLD': {
+        metricColLabel = 'سعة التبريد / الحفظ';
+        financialColLabel = 'القيمة الرقابية (ج.م)';
+        cards = [
+          { title: 'الثلاجات ومنافذ التبريد الخاضعة للرقابة', value: activeBakeries.length, unit: 'ثلاجة / منفذ حفظ', icon: ThermometerSnowflake, theme: 'navy', indicator: 'رقابة الأغذية المجمدة' },
+          { title: 'العمليات والحملات المطابقة', value: inspections.filter((i) => i.status === 'مطابق').length + activeBakeries.filter((b) => b.activityStatus === 'نشط').length, unit: 'فحص مطابق', icon: CheckCircle2, theme: 'green', indicator: 'سلامة التبريد' },
+          { title: 'إجمالي المستفيدين بالمنطقة', value: totalBeneficiaries, unit: 'مواطن', icon: Users, theme: 'teal', indicator: 'تغطية غذائية' },
+          { title: 'محاضر ومخالفات الصلاحية والتخزين', value: inspections.filter((i) => i.type !== 'حملة تموينية').length, unit: 'محضر رقابي', icon: AlertTriangle, theme: 'red', indicator: 'متابعة التبريد' },
+        ];
+        rows = activeBakeries.map((b, idx) => ({
+          id: `cold-${b.id}`,
+          code: `ثلاجة-${toArabicNumerals(idx + 101)}`,
+          title: `ثلاجة وحفظ أغذية نطاق ${b.village}`,
+          location: `${b.village} — ${b.localUnit}`,
+          metricValue: Math.max(10, Math.round(b.dailyCapacitySacks * 1.5)),
+          metricUnit: 'طن تبريد',
+          financialValue: b.insuranceAmountEgp,
+          date: b.updatedAt?.slice(0, 10) || b.createdAt.slice(0, 10),
+          status: b.activityStatus === 'نشط' ? 'درجات التبريد مطابقة' : 'تحت الفحص الفني',
+          notes: `التصنيف الرقابي: ${b.bakeryCategory} · مراجعة تواريخ الصلاحية والتخزين المبرد`,
         }));
         break;
       }
@@ -248,7 +378,7 @@ export default function DepartmentWorkspace({
           financialValue: b.remainingDebtEgp,
           date: b.licenseExpiryDate,
           status: b.activityStatus,
-          notes: `متوسط الفرد ٢٠٢٥: ${toArabicNumerals(b.avgPerCapita2025.toFixed(3))}`,
+          notes: `متوسط الفرد ٢٠٢٥: ${toArabicNumerals(b.avgPerCapita2025.toFixed(2))}`,
         }));
         break;
       }
@@ -264,7 +394,7 @@ export default function DepartmentWorkspace({
           SETT: Settings,
           BACK: Database,
         };
-        const DeptIcon = iconMap[dept.code] || Building2;
+        const DeptIcon = iconMap[effectiveCode] || Building2;
         metricColLabel = 'الحصة / الطاقة اليومية';
         financialColLabel = 'القيمة المالية (ج.م)';
         cards = [
@@ -290,7 +420,7 @@ export default function DepartmentWorkspace({
     }
 
     return { cards, rows, metricColLabel, financialColLabel };
-  }, [dept.code, activeBakeries, users, branches, inspections, debtTransactions, auditLogs, currentBranch]);
+  }, [effectiveCode, activeBakeries, users, branches, inspections, debtTransactions, auditLogs, currentBranch]);
 
   const filteredRows = useMemo(() => {
     const q = normalizeSearchText(searchTerm);
@@ -311,7 +441,7 @@ export default function DepartmentWorkspace({
         headerText: 'الكود / الرقم',
         type: 'numeric',
         align: 'center',
-        defaultWidth: 112,
+        defaultWidth: 118,
         measureValue: (r) => toArabicNumerals(r.code),
         render: (r) => <span className="font-black text-[#164E83]">{toArabicNumerals(r.code)}</span>,
       },
@@ -337,7 +467,7 @@ export default function DepartmentWorkspace({
         headerText: config.metricColLabel,
         type: 'numeric',
         align: 'center',
-        defaultWidth: 135,
+        defaultWidth: 145,
         measureValue: (r) => `${formatArabicNumber(r.metricValue)} ${r.metricUnit}`,
         render: (r) => (
           <span className="font-black text-[#102A43]">
@@ -349,16 +479,16 @@ export default function DepartmentWorkspace({
         key: 'financialValue',
         label: config.financialColLabel,
         headerText: config.financialColLabel,
-        type: dept.code === 'HR' ? 'numeric' : 'currency',
+        type: effectiveCode === 'HR' ? 'numeric' : 'currency',
         align: 'center',
-        defaultWidth: 145,
+        defaultWidth: 150,
         measureValue: (r) =>
-          dept.code === 'HR'
+          effectiveCode === 'HR'
             ? `${formatArabicNumber(r.financialValue)} قسم`
             : `${formatArabicNumber(r.financialValue)} ج.م`,
         render: (r) => (
           <span className="font-black text-emerald-800">
-            {dept.code === 'HR'
+            {effectiveCode === 'HR'
               ? `${formatArabicNumber(r.financialValue)} قسم`
               : `${formatArabicNumber(r.financialValue)} ج.م`}
           </span>
@@ -370,7 +500,7 @@ export default function DepartmentWorkspace({
         headerText: 'التاريخ',
         type: 'date',
         align: 'center',
-        defaultWidth: 110,
+        defaultWidth: 112,
         measureValue: (r) => formatDateArabic(r.date),
         render: (r) => <span className="text-slate-600">{formatDateArabic(r.date)}</span>,
       },
@@ -380,7 +510,7 @@ export default function DepartmentWorkspace({
         headerText: 'الحالة',
         type: 'badge',
         align: 'center',
-        defaultWidth: 120,
+        defaultWidth: 130,
         render: (r) => (
           <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold whitespace-nowrap">
             {r.status}
@@ -392,12 +522,38 @@ export default function DepartmentWorkspace({
         label: 'ملاحظات تفصيلية',
         headerText: 'ملاحظات تفصيلية',
         type: 'longText',
-        defaultWidth: 225,
+        defaultWidth: 235,
         measureValue: (r) => toArabicNumerals(r.notes),
         render: (r) => <span className="text-slate-700">{toArabicNumerals(r.notes)}</span>,
       },
+      {
+        key: 'actions',
+        label: 'الإجراءات',
+        headerText: 'الإجراءات',
+        type: 'actions',
+        align: 'center',
+        defaultWidth: 165,
+        render: (r) => (
+          <div className="flex items-center justify-center gap-1">
+            <button
+              type="button"
+              onClick={() => notify(`معاينة السجل: ${r.title} (${r.code}) — الحالة: ${r.status}`)}
+              className="px-2 py-1 rounded bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+            >
+              معاينة
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[#102A43] text-[10px] font-black cursor-pointer"
+            >
+              طباعة
+            </button>
+          </div>
+        ),
+      },
     ],
-    [config.metricColLabel, config.financialColLabel, dept.code]
+    [config.metricColLabel, config.financialColLabel, effectiveCode]
   );
 
   return (
@@ -415,8 +571,12 @@ export default function DepartmentWorkspace({
           <span className="text-xs font-black text-[#C6A15B] block mb-0.5">
             {currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'} · مديرية التموين بالغربية
           </span>
-          <h2 className="text-xl font-black text-white">{dept.arabicName}</h2>
-          <p className="text-[11px] text-slate-300 font-bold mt-0.5">{dept.description}</p>
+          <h2 className="text-xl font-black text-white">
+            {isGrainDepartment ? 'قسم صيانة الحبوب' : dept.arabicName}
+          </h2>
+          <p className="text-[11px] text-slate-300 font-bold mt-0.5">
+            {isGrainDepartment ? activeGrainTabMeta.subtitle : dept.description}
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -437,11 +597,74 @@ export default function DepartmentWorkspace({
         </div>
       </div>
 
+      {/* التبويبات الداخلية المدمجة داخل قسم صيانة الحبوب (الحبوب + الصوامع + المطاحن + الثلاجات) */}
+      {isGrainDepartment && (
+        <nav
+          aria-label="تبويبات قسم صيانة الحبوب"
+          className="bg-white rounded-2xl border-2 border-[#102A43]/15 p-3.5 space-y-2.5 shadow-xs print:hidden"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+            <div className="flex items-center gap-2">
+              <Wheat className="w-4 h-4 text-[#164E83] shrink-0" />
+              <span className="text-xs font-black text-[#102A43]">
+                شاشات وتبويبات قسم صيانة الحبوب ({toArabicNumerals(GRAIN_INTERNAL_TABS.length)} أقسام فرعية مدمجة)
+              </span>
+            </div>
+            <span className="text-[11px] font-extrabold text-[#164E83]">
+              التبويب النشط: {activeGrainTabMeta.label}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            {GRAIN_INTERNAL_TABS.map((tab) => {
+              const TabIcon = tab.icon;
+              const isSelected = activeGrainSubTab === tab.code;
+              return (
+                <button
+                  key={tab.code}
+                  type="button"
+                  onClick={() => {
+                    setActiveGrainSubTab(tab.code);
+                    setSearchTerm('');
+                    setSelectedIds([]);
+                  }}
+                  className={`w-full text-right px-3 py-2.5 rounded-xl text-xs font-black flex items-start gap-2.5 transition-all cursor-pointer border ${
+                    isSelected
+                      ? 'bg-[#102A43] text-[#C6A15B] border-[#C6A15B]/70 shadow-sm'
+                      : 'bg-slate-50/80 text-[#102A43] border-slate-200 hover:bg-blue-50 hover:border-[#164E83]/40'
+                  }`}
+                >
+                  <span
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      isSelected ? 'bg-[#164E83] text-[#C6A15B]' : 'bg-[#102A43]/10 text-[#164E83]'
+                    }`}
+                  >
+                    <TabIcon className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="block leading-snug break-words whitespace-normal">
+                      {tab.label}
+                    </span>
+                    <span
+                      className={`block text-[10px] font-bold mt-0.5 leading-snug break-words whitespace-normal ${
+                        isSelected ? 'text-slate-200' : 'text-slate-500'
+                      }`}
+                    >
+                      {tab.subtitle}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
       {/* Animated Colored KPI Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {config.cards.map((card, i) => (
           <AnimatedStatCard
-            key={`${dept.code}-card-${i}`}
+            key={`${effectiveCode}-card-${i}`}
             title={card.title}
             value={card.value}
             unit={card.unit}
@@ -473,7 +696,7 @@ export default function DepartmentWorkspace({
 
       {/* Unified Smart Auto-Fit Table */}
       <SmartAutoFitTable
-        tableId={`dept_${dept.code}`}
+        tableId={`dept_${effectiveCode}`}
         userId={userId}
         rows={filteredRows}
         totalCount={config.rows.length}

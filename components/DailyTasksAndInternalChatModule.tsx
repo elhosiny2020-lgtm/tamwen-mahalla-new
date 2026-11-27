@@ -66,18 +66,7 @@ import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import { OfficialPrintModal } from './debts/DebtsSharedUi';
 
-interface DailyTasksAndInternalChatModuleProps {
-  currentUser: User;
-  allUsers: User[];
-  departments: Department[];
-  bakeries: BakeryRecord[];
-  inspections: InspectionRecord[];
-  todayRef: string;
-  onNavigateToDepartment: (deptId: string, focusRecordId?: string) => void;
-  onSelectBakeryDetails: (bakery: BakeryRecord) => void;
-}
-
-type TasksModuleSubTab =
+export type TasksModuleSubTab =
   | 'dashboard'
   | 'tasks_list'
   | 'cross_followup'
@@ -85,6 +74,18 @@ type TasksModuleSubTab =
   | 'notifications'
   | 'reports_center'
   | 'supabase_arch';
+
+interface DailyTasksAndInternalChatModuleProps {
+  currentUser: User;
+  allUsers: User[];
+  departments: Department[];
+  bakeries: BakeryRecord[];
+  inspections: InspectionRecord[];
+  todayRef: string;
+  initialSubTab?: TasksModuleSubTab;
+  onNavigateToDepartment: (deptId: string, focusRecordId?: string) => void;
+  onSelectBakeryDetails: (bakery: BakeryRecord) => void;
+}
 
 const TASK_TYPES_LIST: DailyTaskType[] = [
   'مهمة يومية',
@@ -127,10 +128,11 @@ export default function DailyTasksAndInternalChatModule({
   bakeries,
   inspections,
   todayRef,
+  initialSubTab = 'dashboard',
   onNavigateToDepartment,
   onSelectBakeryDetails,
 }: DailyTasksAndInternalChatModuleProps) {
-  const [activeSubTab, setActiveSubTab] = useState<TasksModuleSubTab>('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState<TasksModuleSubTab>(initialSubTab);
   const [tasks, setTasks] = useState<DailyTaskRecord[]>(() => loadDailyTasks());
   const [conversations, setConversations] = useState<InternalChatConversation[]>(() =>
     loadChatConversations()
@@ -148,8 +150,18 @@ export default function DailyTasksAndInternalChatModule({
       setMessages(loadChatMessages());
       setNotifications(loadUnifiedNotifications());
     };
+    const onOpenSubTab = (ev: Event) => {
+      const custom = ev as CustomEvent<{ subTab?: TasksModuleSubTab }>;
+      if (custom.detail?.subTab) {
+        setActiveSubTab(custom.detail.subTab);
+      }
+    };
     window.addEventListener('storage', onStorageSync);
-    return () => window.removeEventListener('storage', onStorageSync);
+    window.addEventListener('gharbia-open-tasks-subtab', onOpenSubTab);
+    return () => {
+      window.removeEventListener('storage', onStorageSync);
+      window.removeEventListener('gharbia-open-tasks-subtab', onOpenSubTab);
+    };
   }, []);
 
   const [toast, setToast] = useState<string>('');
@@ -303,6 +315,7 @@ export default function DailyTasksAndInternalChatModule({
     const next = [rec, ...notifications];
     setNotifications(next);
     saveUnifiedNotifications(next);
+    window.dispatchEvent(new CustomEvent('gharbia-chat-updated'));
   };
 
   // إنشاء مهمة يومية جديدة + إنشاء محادثة مرتبطة برقم المهمة تلقائياً
@@ -553,6 +566,7 @@ export default function DailyTasksAndInternalChatModule({
     if (changed) {
       setMessages(next);
       saveChatMessages(next);
+      window.dispatchEvent(new CustomEvent('gharbia-chat-updated'));
     }
   };
 
@@ -972,13 +986,13 @@ export default function DailyTasksAndInternalChatModule({
             <button
               type="button"
               onClick={() => setActiveSubTab('internal_chat')}
-              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer border border-white/15"
+              className="px-5 py-3 rounded-xl bg-gradient-to-l from-[#C6A15B] to-[#d9b672] hover:from-[#b58f48] hover:to-[#C6A15B] text-[#102A43] text-sm font-black flex items-center gap-2 cursor-pointer border-2 border-white/40 shadow-md"
             >
-              <MessageSquare className="w-4 h-4 text-[#C6A15B]" />
-              <span>المحادثات الداخلية</span>
-              {unreadChatCount > 0 && (
-                <span className="num-cell px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px]">
-                  {toArabicNumerals(unreadChatCount)}
+              <MessageSquare className="w-5 h-5 text-[#102A43]" />
+              <span>المحادثات الداخلية والإشعارات</span>
+              {(unreadChatCount + unreadNotifsCount) > 0 && (
+                <span className="num-cell px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px]">
+                  {toArabicNumerals(unreadChatCount + unreadNotifsCount)}
                 </span>
               )}
             </button>
@@ -986,10 +1000,10 @@ export default function DailyTasksAndInternalChatModule({
             <button
               type="button"
               onClick={() => setActiveSubTab('notifications')}
-              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer border border-white/15"
+              className="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer border border-[#C6A15B]/50"
             >
               <Bell className="w-4 h-4 text-[#C6A15B]" />
-              <span>الإشعارات</span>
+              <span>مركز التنبيهات</span>
               {unreadNotifsCount > 0 && (
                 <span className="num-cell px-1.5 py-0.5 rounded-full bg-amber-500 text-[#102A43] text-[10px]">
                   {toArabicNumerals(unreadNotifsCount)}
@@ -999,8 +1013,17 @@ export default function DailyTasksAndInternalChatModule({
 
             <button
               type="button"
+              onClick={() => setActiveSubTab('reports_center')}
+              className="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer border border-white/25"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-[#C6A15B]" />
+              <span>مركز التقارير</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowCreateTaskModal(true)}
-              className="px-4 py-2 rounded-xl bg-[#C6A15B] hover:bg-[#b58f48] text-[#102A43] text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
               <PlusCircle className="w-4 h-4" />
               <span>إنشاء مهمة جديدة</span>
@@ -1009,7 +1032,7 @@ export default function DailyTasksAndInternalChatModule({
         </div>
 
         {/* شريط التبويبات الفرعية للقسم */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-white/15 pb-1">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/15 pb-1">
           {[
             { id: 'dashboard', label: '١. لوحة متابعة المهام اليومية', icon: ClipboardList },
             {
@@ -1026,20 +1049,23 @@ export default function DailyTasksAndInternalChatModule({
             },
             {
               id: 'internal_chat',
-              label: '٤. المحادثات الداخلية بين الموظفين',
+              label: '٤. المحادثات الداخلية والإشعارات بين الموظفين',
               icon: MessageSquare,
-              badge: unreadChatCount,
+              badge: unreadChatCount + unreadNotifsCount,
+              prominent: true,
             },
             {
               id: 'notifications',
               label: '٥. مركز التنبيهات والإشعارات',
               icon: Bell,
               badge: unreadNotifsCount,
+              prominent: true,
             },
             {
               id: 'reports_center',
               label: '٦. مركز التقارير والطباعة والتصدير (١٥)',
               icon: FileSpreadsheet,
+              prominent: true,
             },
             {
               id: 'supabase_arch',
@@ -1049,18 +1075,25 @@ export default function DailyTasksAndInternalChatModule({
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeSubTab === tab.id;
+            const isProminent = Boolean((tab as { prominent?: boolean }).prominent);
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveSubTab(tab.id as TasksModuleSubTab)}
-                className={`px-3 py-1.5 rounded-xl font-black text-[11px] whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition-all ${
+                className={`rounded-xl font-black whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition-all ${
+                  isProminent
+                    ? 'px-4 py-2.5 text-xs sm:text-[13px] border border-[#C6A15B]/60'
+                    : 'px-3 py-1.5 text-[11px]'
+                } ${
                   active
-                    ? 'bg-[#C6A15B] text-[#102A43] shadow-xs'
+                    ? 'bg-[#C6A15B] text-[#102A43] shadow-md'
+                    : isProminent
+                    ? 'bg-[#164E83] text-white hover:bg-[#1e609e]'
                     : 'bg-white/10 text-white hover:bg-white/20'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className={isProminent ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
                 <span>{tab.label}</span>
                 {tab.badge && tab.badge > 0 ? (
                   <span
@@ -2334,6 +2367,7 @@ export default function DailyTasksAndInternalChatModule({
               <th className="border border-slate-300 p-1.5">الموعد النهائي</th>
               <th className="border border-slate-300 p-1.5">نسبة الإنجاز</th>
               <th className="border border-slate-300 p-1.5">الحالة</th>
+              <th className="border border-slate-300 p-1.5 print:hidden">الإجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -2346,6 +2380,21 @@ export default function DailyTasksAndInternalChatModule({
                 <td className="border border-slate-300 p-1.5 num-cell">{formatDateArabic(t.dueDate)}</td>
                 <td className="border border-slate-300 p-1.5 num-cell">{toArabicNumerals(t.progressPercent)}٪</td>
                 <td className="border border-slate-300 p-1.5 font-bold">{t.status}</td>
+                <td className="border border-slate-300 p-1.5 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRepPrintOpen(false);
+                      setSelectedTask(t);
+                      setUpdateProgressVal(t.progressPercent);
+                      setUpdateCompletionReport(t.completionReportText || '');
+                      setTaskModalView('details');
+                    }}
+                    className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] font-black cursor-pointer"
+                  >
+                    متابعة وإنجاز
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
