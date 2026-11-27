@@ -22,11 +22,13 @@ import {
   toArabicNumerals,
 } from '@/lib/utils';
 import { loadDebtsStore, saveDebtsStore } from '@/lib/debts-data';
+import { saveStoredInspections } from '@/lib/mock-db';
 import { buildInitialDebtItems, computeDebtFinancials } from '@/lib/debts-engine';
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import ViolationCalculator, { WeightShortageCalculationOutput } from './ViolationCalculator';
 import OfficialViolationReportBuilder from './OfficialViolationReportBuilder';
+import FactoryResetButton from './FactoryResetButton';
 
 interface BakeryInspectionModuleProps {
   bakeries: BakeryRecord[];
@@ -37,6 +39,7 @@ interface BakeryInspectionModuleProps {
   onAddInspection: (record: Omit<InspectionRecord, 'id'>) => void;
   onUpdateStatus: (id: string, status: InspectionRecord['status']) => void;
   onSelectBakeryDetails: (bakery: BakeryRecord) => void;
+  onResetInspections?: () => void;
 }
 
 type EnrichedInspectionRecord = InspectionRecord & {
@@ -53,6 +56,7 @@ export default function BakeryInspectionModule({
   onAddInspection,
   onUpdateStatus,
   onSelectBakeryDetails,
+  onResetInspections,
 }: BakeryInspectionModuleProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -653,6 +657,26 @@ export default function BakeryInspectionModule({
               <Printer className="w-4 h-4 text-[#C6A15B]" />
               <span>طباعة التقرير الرقابي</span>
             </button>
+            <FactoryResetButton
+              sectionName={`التفتيش والرقابة والمخالفات — ${currentMeta.title}`}
+              sectionKey="INSPECTIONS_VIOLATIONS"
+              currentUser={currentUser}
+              description="تصفير كافة سجلات الحملات التموينية والمخالفات والمحاضر فوراً وإعادة الإعدادات للوضع الافتراضي بدون طلب نسخة احتياطية."
+              getTableSummary={() => [
+                { tableName: 'الحملات التموينية الميدانية', count: stats.campaigns },
+                { tableName: 'المخالفات والمحاضر المحررة', count: stats.violations },
+                { tableName: 'إجمالي السجلات الرقابية', count: stats.total },
+              ]}
+              onConfirmReset={() => {
+                saveStoredInspections([]);
+                if (onResetInspections) {
+                  onResetInspections();
+                } else {
+                  window.dispatchEvent(new CustomEvent('gharbia-inspections-reset'));
+                }
+                notify('تم تنفيذ التصفير الفوري واستعادة ضبط المصنع لسجلات التفتيش والمخالفات.');
+              }}
+            />
           </div>
         </div>
 

@@ -4,25 +4,18 @@ import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
-  DatabaseBackup,
-  Download,
-  KeyRound,
-  Lock,
   RotateCcw,
   ShieldAlert,
   Trash2,
   X,
+  Zap,
 } from 'lucide-react';
 import { User } from '@/types';
 import { getCurrentSessionUser } from '@/lib/mock-db';
 import {
-  FactoryResetBackupRecord,
   TableResetCountItem,
   canUserExecuteFactoryReset,
-  createVerifiedSectionBackup,
-  downloadBackupJsonFile,
   recordFactoryResetAudit,
-  verifyAdminResetCredential,
 } from '@/lib/factory-reset-engine';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
 import { toArabicNumerals } from '@/lib/utils';
@@ -37,49 +30,40 @@ interface FactoryResetButtonProps {
   tableSummary?: TableResetCountItem[];
   /** دالة اختيارية لجمع ملخص الجداول لحظياً عند فتح النافذة */
   getTableSummary?: (includeCustom: boolean) => TableResetCountItem[];
-  /** دالة اختيارية لالتقاط نسخة احتياطية كاملة قابلة للاسترجاع من بيانات القسم */
+  /** خصائص اختيارية للتوافق مع الاستدعاءات السابقة (تم إلغاء مطالبة النسخة الاحتياطية وتنفيذ التصفير فوراً) */
   onCaptureBackup?: () => Record<string, unknown>;
-  /** دالة اختيارية لاسترجاع النسخة الاحتياطية عند الحاجة */
   onRestoreBackup?: (snapshot: Record<string, unknown>) => void;
   /** دعم خيار مسح القوائم والإعدادات المخصصة داخل القسم */
   allowClearCustomLists?: boolean;
   onConfirmReset: (options?: { clearCustomLists: boolean }) => void;
   compact?: boolean;
+  /** تنفيذ التصفير الفوري بمجرد الضغط دون نافذة تفصيلية عند الحاجة */
+  instantMode?: boolean;
 }
 
 /**
- * زر إعادة ضبط المصنع المؤسسي المحمي:
- * - مقصور على مدير النظام وأصحاب الصلاحيات الإدارية العليا فقط
- * - يعرض اسم القسم وملخص الجداول وعدد السجلات التي سيتم حذفها
- * - ينشئ نسخة احتياطية قابلة للاسترجاع ويتحقق من سلامتها قبل التنفيذ (مع إمكانية تنزيلها)
- * - يطلب كتابة عبارة التأكيد (تأكيد إعادة ضبط المصنع) + التحقق الإداري بكلمة المرور
- * - يسجل العملية في سجل التدقيق الأمني العام ويحمي باقي الأقسام والحسابات
+ * زر استعادة ضبط المصنع الفوري (بدون طلب نسخة احتياطية أو تنزيل ملفات):
+ * - يمسح كافة البيانات التشغيلية والمعاملات للقسم المحدد فوراً ويعيد الإعدادات للوضع الافتراضي
+ * - مقصور على مدير النظام وأصحاب الصلاحيات الإدارية المعتمدة
+ * - يسجل العملية تلقائياً في سجل التدقيق الأمني العام (Audit Log)
  */
 export default function FactoryResetButton({
   sectionName,
-  sectionKey,
   description,
   currentUser,
   tableSummary,
   getTableSummary,
-  onCaptureBackup,
-  onRestoreBackup,
-  allowClearCustomLists = false,
+  allowClearCustomLists = true,
   onConfirmReset,
   compact = false,
+  instantMode = false,
 }: FactoryResetButtonProps) {
   const { isRtl, t } = useSystemPreferences();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [includeCustomLists, setIncludeCustomLists] = useState(false);
-  const [confirmPhrase, setConfirmPhrase] = useState('');
-  const [adminCredential, setAdminCredential] = useState('');
-  const [confirmAdminCredential, setConfirmAdminCredential] = useState('');
-  const [passcodeConfigured, setPasscodeConfigured] = useState<boolean | null>(null);
-  const [verifying, setVerifying] = useState(false);
-  const [createdBackup, setCreatedBackup] = useState<FactoryResetBackupRecord | null>(null);
+  const [includeCustomLists, setIncludeCustomLists] = useState(true);
+  const [executing, setExecuting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [resetDone, setResetDone] = useState(false);
-  const [restoredMsg, setRestoredMsg] = useState<string | null>(null);
 
   const effectiveUser = useMemo<User | null>(
     () => currentUser ?? getCurrentSessionUser(),
@@ -88,17 +72,9 @@ export default function FactoryResetButton({
 
   const isAuthorized = canUserExecuteFactoryReset(effectiveUser);
 
-  // عدم السماح لموظف عادي برؤية أو تنفيذ إعادة ضبط المصنع
   if (!isAuthorized) {
     return null;
   }
-
-  const expectedPhrase = t('factoryResetPhraseExpected');
-  const resolvedKey =
-    sectionKey ||
-    sectionName
-      .replace(/\s+/g, '_')
-      .slice(0, 18);
 
   const computedSummary: TableResetCountItem[] = getTableSummary
     ? getTableSummary(includeCustomLists)
@@ -110,161 +86,22 @@ export default function FactoryResetButton({
 
   const fmtNum = (n: number) => (isRtl ? toArabicNumerals(n) : String(n));
 
-  const checkServerPasscodeStatus = async () => {
-    try {
-      const res = await fetch('/api/auth/verify-admin', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { configured?: boolean };
-        setPasscodeConfigured(Boolean(data.configured));
-      } else if (res.status === 401) {
-        setPasscodeConfigured(true);
-      }
-    } catch {
-      setPasscodeConfigured(true);
-    }
-  };
-
-  const openModal = () => {
-    setConfirmPhrase('');
-    setAdminCredential('');
-    setConfirmAdminCredential('');
-    setPasscodeConfigured(null);
-    setVerifying(false);
-    setCreatedBackup(null);
-    setErrorMsg(null);
-    setResetDone(false);
-    setRestoredMsg(null);
-    setIncludeCustomLists(false);
-    setConfirmOpen(true);
-    void checkServerPasscodeStatus();
-  };
-
-  const handleCreateBackup = () => {
-    setErrorMsg(null);
-    if (!effectiveUser) {
-      setErrorMsg('تعذر التحقق من جلسة المستخدم الحالية.');
-      return;
-    }
-    const payload = onCaptureBackup
-      ? onCaptureBackup()
-      : {
-          sectionName,
-          capturedAt: new Date().toISOString(),
-          tableSummary: computedSummary,
-        };
-    const res = createVerifiedSectionBackup({
-      sectionKey: resolvedKey,
-      sectionName,
-      user: effectiveUser,
-      tableSummary: computedSummary,
-      snapshotPayload: payload,
-    });
-    if (!res.ok) {
-      setCreatedBackup(null);
-      setErrorMsg(res.error);
-      return;
-    }
-    setCreatedBackup(res.backup);
-  };
-
-  const phraseMatches =
-    confirmPhrase.trim() === 'تأكيد إعادة ضبط المصنع' ||
-    confirmPhrase.trim().toUpperCase() === 'CONFIRM FACTORY RESET';
-
-  const needsInitialClaim = passcodeConfigured === false;
-  const credentialValid = verifyAdminResetCredential(effectiveUser, adminCredential) &&
-    (!needsInitialClaim || confirmAdminCredential.trim() === adminCredential.trim());
-  const canExecute = Boolean(createdBackup && phraseMatches && credentialValid && !verifying);
-
-  const handleExecuteReset = async () => {
+  const executeImmediateWipe = (clearCustom = includeCustomLists) => {
     setErrorMsg(null);
     if (!effectiveUser || !isAuthorized) {
       setErrorMsg(t('factoryResetAdminOnly'));
       return;
     }
-    if (!createdBackup) {
-      setErrorMsg(t('factoryResetBackupRequired'));
-      return;
-    }
-    if (!phraseMatches) {
-      setErrorMsg(
-        isRtl
-          ? 'يرجى كتابة عبارة التأكيد بالضبط: تأكيد إعادة ضبط المصنع'
-          : 'Please type the exact phrase: CONFIRM FACTORY RESET'
-      );
-      return;
-    }
-    if (!credentialValid) {
-      setErrorMsg(
-        needsInitialClaim
-          ? isRtl
-            ? 'يرجى إدخال وتأكيد كلمة المرور الإدارية (٤ أحرف على الأقل) بشكل متطابق.'
-            : 'Please enter and confirm a matching admin password (at least 4 characters).'
-          : isRtl
-          ? 'فشل التحقق الإداري: يرجى إدخال كلمة المرور الإدارية الصحيحة.'
-          : 'Administrative verification failed: please enter your valid admin credential.'
-      );
-      return;
-    }
 
-    setVerifying(true);
+    setExecuting(true);
     try {
-      const verifyRes = await fetch('/api/auth/verify-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: needsInitialClaim ? 'claim' : 'verify',
-          password: adminCredential.trim(),
-        }),
-      });
-      if (!verifyRes.ok) {
-        const verifyData = (await verifyRes.json().catch(() => ({}))) as {
-          error?: string;
-          needsSetup?: boolean;
-        };
-        if (verifyData.needsSetup) {
-          setPasscodeConfigured(false);
-          setErrorMsg(
-            isRtl
-              ? 'يرجى تعيين وتأكيد كلمة المرور الإدارية لأول مرة في الحقلين أدناه ثم الضغط على تنفيذ.'
-              : 'Please set and confirm your initial admin password below, then click execute.'
-          );
-          setVerifying(false);
-          return;
-        }
-        if (verifyRes.status === 401) {
-          setErrorMsg(
-            isRtl
-              ? 'انتهت جلسة الخادم الحالية. يرجى تسجيل الخروج ثم إعادة تسجيل الدخول بكلمة مرور مدير النظام.'
-              : 'Your server session expired. Please sign out and sign in again with your admin password.'
-          );
-          setVerifying(false);
-          return;
-        }
-        setErrorMsg(
-          verifyData.error ||
-            (isRtl
-              ? 'فشل التحقق الإداري على الخادم — تم إيقاف عملية إعادة الضبط.'
-              : 'Server administrative verification failed.')
-        );
-        setVerifying(false);
-        return;
-      }
-
-      if (needsInitialClaim) {
-        setPasscodeConfigured(true);
-      }
-
-      onConfirmReset({ clearCustomLists: includeCustomLists });
+      onConfirmReset({ clearCustomLists: clearCustom });
       recordFactoryResetAudit({
         user: effectiveUser,
         sectionName,
-        backupId: createdBackup.backupId,
+        backupId: 'DIRECT-WIPE-NO-BACKUP',
         tableSummary: computedSummary,
-        clearCustomSettings: includeCustomLists,
+        clearCustomSettings: clearCustom,
         status: 'success',
       });
       setResetDone(true);
@@ -272,34 +109,46 @@ export default function FactoryResetButton({
       const msg =
         err instanceof Error
           ? err.message
-          : 'حدث خطأ غير متوقع أثناء مسح جداول القسم — تم إيقاف العملية.';
+          : 'حدث خطأ غير متوقع أثناء تصفير بيانات القسم.';
       recordFactoryResetAudit({
         user: effectiveUser,
         sectionName,
-        backupId: createdBackup.backupId,
+        backupId: 'DIRECT-WIPE-NO-BACKUP',
         tableSummary: computedSummary,
-        clearCustomSettings: includeCustomLists,
+        clearCustomSettings: clearCustom,
         status: 'failed',
         errorMessage: msg,
       });
       setErrorMsg(msg);
     } finally {
-      setVerifying(false);
+      setExecuting(false);
     }
+  };
+
+  const handleButtonClick = () => {
+    setErrorMsg(null);
+    setResetDone(false);
+    setIncludeCustomLists(true);
+    if (instantMode) {
+      setConfirmOpen(true);
+      executeImmediateWipe(true);
+      return;
+    }
+    setConfirmOpen(true);
   };
 
   return (
     <RoleGuard user={effectiveUser} requireAdmin>
       <button
         type="button"
-        onClick={openModal}
+        onClick={handleButtonClick}
         className={`${
           compact ? 'px-2.5 py-1.5 text-[11px]' : 'px-3.5 py-2 text-xs'
         } rounded-xl bg-red-700 hover:bg-red-800 text-white font-black flex items-center gap-1.5 cursor-pointer border border-red-400/50 shadow-xs transition-colors whitespace-nowrap shrink-0`}
-        title={`${t('factoryResetTitle')} — ${sectionName}`}
+        title={`استعادة ضبط المصنع وتصفير البيانات فوراً — ${sectionName}`}
       >
         <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-        <span>{t('factoryResetBtn')}</span>
+        <span>{isRtl ? 'استعادة ضبط المصنع (تصفير فوري)' : t('factoryResetBtn')}</span>
       </button>
 
       {confirmOpen && (
@@ -309,10 +158,10 @@ export default function FactoryResetButton({
           onClick={() => setConfirmOpen(false)}
         >
           <div
-            className="bg-white text-[#102A43] rounded-2xl border-2 border-red-700 max-w-2xl w-full p-5 space-y-4 shadow-2xl my-auto max-h-[92vh] overflow-y-auto"
+            className="bg-white text-[#102A43] rounded-2xl border-2 border-red-700 max-w-xl w-full p-5 space-y-4 shadow-2xl my-auto max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* الترويسة الأمنية */}
+            {/* الترويسة */}
             <div className="flex items-start justify-between gap-3 border-b border-red-100 pb-3">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
@@ -320,7 +169,9 @@ export default function FactoryResetButton({
                 </div>
                 <div>
                   <span className="text-[10.5px] font-black text-red-700 block">
-                    {t('factoryResetTitle')} · {t('factoryResetAdminOnly')}
+                    {isRtl
+                      ? 'استعادة ضبط المصنع والتصفير الفوري (بدون نسخة احتياطية)'
+                      : 'Immediate Factory Reset (No Backup Prompt)'}
                   </span>
                   <h4 className="text-base font-black text-[#102A43]">{sectionName}</h4>
                 </div>
@@ -339,61 +190,20 @@ export default function FactoryResetButton({
                 <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 space-y-2">
                   <div className="flex items-center gap-2 text-emerald-800 font-black text-sm">
                     <CheckCircle2 className="w-5 h-5 shrink-0" />
-                    <span>{t('factoryResetSuccessTitle')}</span>
+                    <span>
+                      {isRtl
+                        ? 'تم تنفيذ التصفير الفوري واستعادة ضبط المصنع بنجاح'
+                        : 'Immediate Factory Reset Completed Successfully'}
+                    </span>
                   </div>
                   <p className="text-xs font-bold text-emerald-900 leading-relaxed">
-                    {t('factoryResetSuccessDesc')}
+                    {isRtl
+                      ? `تم مسح كافة السجلات والبيانات التشغيلية لقسم (${sectionName}) وإعادة الإعدادات إلى الوضع الافتراضي فوراً دون إصدار أو تنزيل أي ملفات نسخ احتياطي، وتم توثيق العملية في سجل التدقيق الأمني.`
+                      : `All transactional data for (${sectionName}) has been immediately wiped and settings reset to default without any backup download prompt.`}
                   </p>
-                  {createdBackup && (
-                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 text-[11px] font-bold text-slate-700 space-y-1">
-                      <div>
-                        <span className="font-black text-[#102A43]">معرف النسخة الاحتياطية: </span>
-                        <span className="font-mono">{createdBackup.backupId}</span>
-                      </div>
-                      <div>
-                        <span className="font-black text-[#102A43]">موقع الحفظ: </span>
-                        <span>{createdBackup.storageLocation}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {restoredMsg && (
-                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs font-black text-[#164E83]">
-                    {restoredMsg}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {createdBackup && (
-                      <button
-                        type="button"
-                        onClick={() => downloadBackupJsonFile(createdBackup)}
-                        className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#102A43] text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>{t('factoryResetDownloadBackupBtn')}</span>
-                      </button>
-                    )}
-                    {createdBackup && onRestoreBackup && !restoredMsg && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onRestoreBackup(createdBackup.snapshotPayload);
-                          setRestoredMsg(
-                            isRtl
-                              ? `تم استرجاع النسخة الاحتياطية (${createdBackup.backupId}) بنجاح وإعادة البيانات فوراً.`
-                              : `Backup (${createdBackup.backupId}) restored successfully.`
-                          );
-                        }}
-                        className="px-3.5 py-2 rounded-xl bg-[#164E83] hover:bg-[#102A43] text-white text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <DatabaseBackup className="w-3.5 h-3.5" />
-                        <span>{t('factoryResetRestoreBackupBtn')}</span>
-                      </button>
-                    )}
-                  </div>
+                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setConfirmOpen(false)}
@@ -405,16 +215,20 @@ export default function FactoryResetButton({
               </div>
             ) : (
               <>
-                {/* نطاق الحماية الأمني */}
+                {/* تنبيه التصفير الفوري */}
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-xs font-bold text-red-900 leading-relaxed space-y-1.5">
                   <p className="font-black flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-red-700" />
-                    <span>{t('factoryResetScopeWarn')}</span>
+                    <span>
+                      {isRtl
+                        ? 'تحذير: سيتم مسح وتصفير كافة البيانات والسجلات التشغيلية لهذا القسم فوراً وإعادة الإعدادات للوضع الافتراضي بدون إنشاء نسخة احتياطية.'
+                        : 'Warning: All transactional records for this module will be wiped immediately and settings reset to default without a backup prompt.'}
+                    </span>
                   </p>
                   {description && <p className="text-red-800">{description}</p>}
                 </div>
 
-                {/* ملخص الجداول وعدد السجلات التي سيتم مسحها */}
+                {/* ملخص الجداول وعدد السجلات التي سيتم تصفيرها فوراً */}
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                   <div className="bg-slate-100 px-3.5 py-2 text-xs font-black text-[#102A43] flex items-center justify-between">
                     <span>{t('factoryResetTableSummary')}</span>
@@ -438,8 +252,8 @@ export default function FactoryResetButton({
                             {fmtNum(row.count)}
                           </td>
                           <td className="p-2 text-center">
-                            <span className="px-2 py-0.5 rounded bg-red-50 text-red-800 text-[10px] font-black">
-                              نسخ احتياطي + تصفير
+                            <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-black">
+                              {isRtl ? 'تصفير فوري مباشر' : 'Immediate Wipe'}
                             </span>
                           </td>
                         </tr>
@@ -456,140 +270,13 @@ export default function FactoryResetButton({
                       onChange={(e) => setIncludeCustomLists(e.target.checked)}
                       className="w-4 h-4 accent-red-700 cursor-pointer"
                     />
-                    <span>{t('factoryResetIncludeCustomLists')}</span>
+                    <span>
+                      {isRtl
+                        ? 'إعادة ضبط الإعدادات والقوائم المخصصة إلى الوضع الافتراضي أيضاً'
+                        : t('factoryResetIncludeCustomLists')}
+                    </span>
                   </label>
                 )}
-
-                {/* الخطوة ١: النسخة الاحتياطية الإلزامية قبل التنفيذ */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-                  <div className="text-xs font-black text-[#102A43] flex items-center gap-1.5">
-                    <DatabaseBackup className="w-4 h-4 text-[#164E83]" />
-                    <span>{t('factoryResetBackupStep')}</span>
-                  </div>
-                  {!createdBackup ? (
-                    <button
-                      type="button"
-                      onClick={handleCreateBackup}
-                      className="px-4 py-2 rounded-xl bg-[#164E83] hover:bg-[#102A43] text-white text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <DatabaseBackup className="w-4 h-4 text-[#C6A15B]" />
-                      <span>{t('factoryResetCreateBackupBtn')}</span>
-                    </button>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-black text-emerald-800 flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
-                          <span>{t('factoryResetBackupSuccess')}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => downloadBackupJsonFile(createdBackup)}
-                          className="px-3 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-900 text-[11px] font-black flex items-center gap-1 cursor-pointer hover:bg-emerald-100"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>{t('factoryResetDownloadBackupBtn')}</span>
-                        </button>
-                      </div>
-                      <p className="text-[11px] font-bold text-emerald-900 break-words">
-                        {createdBackup.storageLocation}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* الخطوة ٢: عبارة التأكيد الحرفية */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-black text-[#102A43] block">
-                    {t('factoryResetPhraseLabel')}{' '}
-                    <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-black select-all">
-                      {expectedPhrase}
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={confirmPhrase}
-                    onChange={(e) => setConfirmPhrase(e.target.value)}
-                    placeholder={expectedPhrase}
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-black outline-none ${
-                      phraseMatches
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                        : 'border-slate-300 bg-white text-[#102A43]'
-                    }`}
-                  />
-                </div>
-
-                {/* الخطوة ٣: التحقق الإداري بكلمة المرور */}
-                <div className="space-y-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="text-xs font-black text-[#102A43] flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5 text-[#164E83]" />
-                    <span>
-                      {needsInitialClaim
-                        ? isRtl
-                          ? 'الخطوة ٣: تعيين كلمة مرور مدير النظام لأول مرة (للتحقق الإداري)'
-                          : 'Step 3: First-Run Admin Password Setup'
-                        : t('factoryResetPasswordLabel')}
-                    </span>
-                  </label>
-
-                  {needsInitialClaim && (
-                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] font-bold text-amber-950">
-                      {isRtl
-                        ? 'لم يتم تسجيل كلمة مرور التحقق الإداري على الخادم بعد. أدخل كلمة المرور الإدارية التي ترغب في اعتمادها وأكّدها أدناه ليتم تشفيرها وحفظها على الخادم وتنفيذ العملية فوراً.'
-                        : 'No server admin passcode is set yet. Enter and confirm your chosen admin password below to securely hash and lock it on the server and execute the reset.'}
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 right-3" />
-                    <input
-                      type="password"
-                      value={adminCredential}
-                      onChange={(e) => setAdminCredential(e.target.value)}
-                      placeholder={
-                        needsInitialClaim
-                          ? isRtl
-                            ? 'أدخل كلمة المرور الإدارية الجديدة (٤ أحرف فأكثر)...'
-                            : 'Enter new admin password (4+ chars)...'
-                          : isRtl
-                          ? 'أدخل كلمة مرور مدير النظام...'
-                          : t('factoryResetPasswordPlaceholder')
-                      }
-                      className={`w-full pr-9 pl-3 py-2 rounded-xl border text-xs font-bold outline-none ${
-                        credentialValid
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                          : 'border-slate-300 bg-white text-[#102A43]'
-                      }`}
-                    />
-                  </div>
-
-                  {needsInitialClaim && (
-                    <div className="relative">
-                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 right-3" />
-                      <input
-                        type="password"
-                        value={confirmAdminCredential}
-                        onChange={(e) => setConfirmAdminCredential(e.target.value)}
-                        placeholder={
-                          isRtl
-                            ? 'أعد إدخال كلمة المرور الإدارية للتأكيد...'
-                            : 'Re-enter admin password to confirm...'
-                        }
-                        className={`w-full pr-9 pl-3 py-2 rounded-xl border text-xs font-bold outline-none ${
-                          credentialValid
-                            ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                            : 'border-slate-300 bg-white text-[#102A43]'
-                        }`}
-                      />
-                    </div>
-                  )}
-
-                  <p className="text-[10.5px] font-bold text-slate-500">
-                    {isRtl
-                      ? `حساب المسؤول الحالي: ${effectiveUser?.username || 'admin'} — يتم التحقق من كلمة مرور مدير النظام بأمان على الخادم قبل تنفيذ إعادة ضبط المصنع.`
-                      : `Active Admin: ${effectiveUser?.username || 'admin'} — admin password is verified securely on the server before executing reset.`}
-                  </p>
-                </div>
 
                 {errorMsg && (
                   <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-xs font-black text-red-800 flex items-center gap-2">
@@ -608,17 +295,20 @@ export default function FactoryResetButton({
                   </button>
                   <button
                     type="button"
-                    disabled={!canExecute}
-                    onClick={handleExecuteReset}
-                    className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                    disabled={executing}
+                    onClick={() => executeImmediateWipe(includeCustomLists)}
+                    className="px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 disabled:bg-slate-300 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
                   >
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>
-                      {verifying
+                      {executing
                         ? isRtl
-                          ? 'جاري التحقق الإداري والتنفيذ...'
-                          : 'Verifying...'
-                        : t('factoryResetExecuteBtn')}
+                          ? 'جاري التصفير الفوري...'
+                          : 'Wiping data...'
+                        : isRtl
+                        ? 'تنفيذ التصفير واستعادة ضبط المصنع فوراً'
+                        : 'Execute Immediate Factory Reset'}
                     </span>
                   </button>
                 </div>

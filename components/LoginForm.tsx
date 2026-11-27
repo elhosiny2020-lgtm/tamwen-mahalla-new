@@ -2,31 +2,77 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Eye, EyeOff, Lock, User, KeyRound, ArrowRight, AlertCircle, CheckCircle2, Building2, UserPlus, Sparkles } from 'lucide-react';
-import { INITIAL_BRANCHES, getStoredUsers, getStoredBranches, setCurrentSessionUser, setSelectedBranchSession, addAuditLog } from '@/lib/mock-db';
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  User,
+  KeyRound,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
+  Building2,
+  UserPlus,
+  Sparkles,
+  Mail,
+  ExternalLink,
+  Copy,
+  ShieldCheck,
+  RefreshCw,
+} from 'lucide-react';
+import {
+  INITIAL_BRANCHES,
+  getStoredUsers,
+  getStoredBranches,
+  setCurrentSessionUser,
+  setSelectedBranchSession,
+  addAuditLog,
+} from '@/lib/mock-db';
 import { Branch, User as UserType } from '@/types';
 import { getRoleArabicLabel } from '@/lib/utils';
-
-import {
-  loginFormSchema,
-  forgotPasswordStep1Schema,
-  forgotPasswordStep2Schema,
-  forgotPasswordStep3Schema,
-} from '@/lib/zod-schemas';
-import {
-  setClientSessionExpiryTimestamp,
-} from '@/hooks/useSessionExpiryMonitor';
+import { loginFormSchema } from '@/lib/zod-schemas';
+import { setClientSessionExpiryTimestamp } from '@/hooks/useSessionExpiryMonitor';
 
 interface LoginFormProps {
   onLoginSuccess: (user: UserType) => void;
   onOpenRegister: () => void;
 }
 
+interface PasswordResetDeliveryInfo {
+  recipientEmail: string;
+  username: string;
+  fullName: string;
+  resetToken: string;
+  resetUrl: string;
+  tempPassword: string;
+  expiresAt: string;
+  supabaseAuthSent?: boolean;
+  emailProviderSent?: boolean;
+}
+
 export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormProps) {
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedBranchId, setSelectedBranchId] = useState('b-03'); // إدارة تموين مركز المحلة الكبرى افتراضياً
+  const [selectedBranchId, setSelectedBranchId] = useState('b-03');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  // Automated Password Reset & Email Recovery State (elhosiny2020@gmail.com)
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetViewMode, setResetViewMode] = useState<'request' | 'email_dispatched' | 'update_view' | 'completed'>('request');
+  const [fpIdentifier, setFpIdentifier] = useState('admin');
+  const [fpEmail, setFpEmail] = useState('elhosiny2020@gmail.com');
+  const [fpToken, setFpToken] = useState('');
+  const [fpNewPassword, setFpNewPassword] = useState('');
+  const [fpConfirmNewPassword, setFpConfirmNewPassword] = useState('');
+  const [fpLoading, setFpLoading] = useState(false);
+  const [fpError, setFpError] = useState('');
+  const [fpNotice, setFpNotice] = useState('');
+  const [deliveryInfo, setDeliveryInfo] = useState<PasswordResetDeliveryInfo | null>(null);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -34,21 +80,43 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     });
     return () => cancelAnimationFrame(frameId);
   }, []);
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
-  // Forgot password modal state
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [fpStep, setFpStep] = useState<1 | 2 | 3>(1);
-  const [fpIdentifier, setFpIdentifier] = useState('');
-  const [fpOtp, setFpOtp] = useState('');
-  const [fpNewPassword, setFpNewPassword] = useState('');
-  const [fpConfirmNewPassword, setFpConfirmNewPassword] = useState('');
-  const [fpError, setFpError] = useState('');
-  const [fpSuccess, setFpSuccess] = useState(false);
+  // Automatically open dedicated Password Update View if URL contains ?reset_token=...
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('reset_token')?.trim();
+    if (urlToken && urlToken.length >= 16) {
+      setFpToken(urlToken);
+      setShowForgotPassword(true);
+      setResetViewMode('update_view');
+      void (async () => {
+        try {
+          const res = await fetch('/api/auth/password-reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'verify-token', token: urlToken }),
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            username?: string;
+            fullName?: string;
+            email?: string;
+            error?: string;
+          };
+          if (res.ok && data.ok) {
+            setFpIdentifier(data.username || 'admin');
+            setFpEmail(data.email || 'elhosiny2020@gmail.com');
+            setFpNotice(`تم التحقق من رابط البريد الإلكتروني المرسل إلى (${data.email || 'elhosiny2020@gmail.com'}) لحساب (${data.username}). أدخل كلمة المرور الجديدة أدناه.`);
+          } else {
+            setFpError(data.error || 'رابط استعادة كلمة المرور غير صالح أو منتهي الصلاحية.');
+          }
+        } catch {
+          setFpError('تعذر التحقق من رابط استعادة كلمة المرور.');
+        }
+      })();
+    }
+  }, []);
 
   const toggleShowPassword = () => {
     setShowPassword(!showPassword);
@@ -149,65 +217,145 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     }
   };
 
-  const handleForgotPasswordSubmit = (e: React.FormEvent) => {
+  // ١. طلب استعادة كلمة المرور وإرسال كلمة سر + رابط تغيير على elhosiny2020@gmail.com
+  const handleRequestPasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setFpError('');
-    if (fpStep === 1) {
-      const res = forgotPasswordStep1Schema.safeParse({ identifier: fpIdentifier });
-      if (!res.success) {
-        setFpError(res.error.issues[0]?.message || 'يرجى إدخال اسم المستخدم أو الرقم القومي');
-        return;
-      }
-      setFpIdentifier(res.data.identifier);
-      setFpStep(2);
-    } else if (fpStep === 2) {
-      const res = forgotPasswordStep2Schema.safeParse({ otp: fpOtp });
-      if (!res.success) {
-        setFpError(res.error.issues[0]?.message || 'يرجى إدخال رمز التحقق المرسل');
-        return;
-      }
-      setFpStep(3);
-    } else if (fpStep === 3) {
-      const res = forgotPasswordStep3Schema.safeParse({
-        newPassword: fpNewPassword,
-        confirmNewPassword: fpConfirmNewPassword,
+    setFpNotice('');
+    setFpLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'request',
+          identifier: fpIdentifier.trim() || 'admin',
+          email: 'elhosiny2020@gmail.com',
+        }),
       });
-      if (!res.success) {
-        setFpError(res.error.issues[0]?.message || 'يرجى التحقق من كلمة المرور الجديدة');
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        delivery?: PasswordResetDeliveryInfo;
+      };
+
+      if (!res.ok || !data.ok || !data.delivery) {
+        setFpError(data.error || 'تعذر تنفيذ طلب استعادة كلمة المرور.');
+        setFpLoading(false);
         return;
       }
+
+      setDeliveryInfo(data.delivery);
+      setFpToken(data.delivery.resetToken);
+      setFpIdentifier(data.delivery.username);
+      setFpEmail(data.delivery.recipientEmail);
+      setFpNotice(data.message || 'تم إرسال كلمة المرور ورابط التغيير إلى elhosiny2020@gmail.com');
+      setResetViewMode('email_dispatched');
+
       addAuditLog({
-        userId: fpIdentifier,
-        username: fpIdentifier,
-        fullName: fpIdentifier,
-        action: 'إعادة تعيين كلمة المرور',
-        module: 'بوابة المصادقة الموحدة',
-        details: 'تم تحديث كلمة المرور بنجاح عبر رمز التحقق المؤقت',
+        userId: data.delivery.username,
+        username: data.delivery.username,
+        fullName: data.delivery.fullName,
+        action: 'إرسال كلمة مرور ورابط استعادة للبريد الإلكتروني',
+        module: 'استعادة كلمة المرور (Supabase Auth)',
+        details: `تم إرسال كلمة المرور المؤقتة ورابط التغيير الآمن إلى البريد الإلكتروني (${data.delivery.recipientEmail})`,
         ipAddress: '10.20.30.50',
         deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
         status: 'success',
       });
-      setFpSuccess(true);
-      setTimeout(() => {
-        setShowForgotPassword(false);
-        setFpStep(1);
-        setFpIdentifier('');
-        setFpOtp('');
-        setFpNewPassword('');
-        setFpConfirmNewPassword('');
-        setFpSuccess(false);
-      }, 1800);
+    } catch {
+      setFpError('تعذر الاتصال بخادم استعادة كلمات المرور.');
+    } finally {
+      setFpLoading(false);
     }
+  };
+
+  // ٢. حفظ وتغيير كلمة المرور الجديدة من واجهة رابط البريد الإلكتروني (Dedicated Password Update View)
+  const handleConfirmNewPasswordFromEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFpError('');
+    if (fpNewPassword.trim().length < 4) {
+      setFpError('يجب أن تتكون كلمة المرور الجديدة من ٤ أحرف أو أرقام على الأقل.');
+      return;
+    }
+    if (fpNewPassword.trim() !== fpConfirmNewPassword.trim()) {
+      setFpError('كلمة المرور الجديدة وتأكيدها غير متطابقين.');
+      return;
+    }
+
+    setFpLoading(true);
+    try {
+      const res = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm',
+          token: fpToken.trim(),
+          newPassword: fpNewPassword.trim(),
+          confirmPassword: fpConfirmNewPassword.trim(),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        username?: string;
+        fullName?: string;
+        email?: string;
+        message?: string;
+      };
+
+      if (!res.ok || !data.ok) {
+        setFpError(data.error || 'تعذر تحديث كلمة المرور. يرجى طلب رابط استعادة جديد.');
+        setFpLoading(false);
+        return;
+      }
+
+      const targetUsername = data.username || fpIdentifier || 'admin';
+      setUsername(targetUsername);
+      setPassword(fpNewPassword.trim());
+      setResetViewMode('completed');
+
+      // Clear URL query parameter if present
+      if (typeof window !== 'undefined' && window.location.search.includes('reset_token')) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+
+      addAuditLog({
+        userId: targetUsername,
+        username: targetUsername,
+        fullName: data.fullName || targetUsername,
+        action: 'تغيير كلمة المرور من رابط البريد الإلكتروني',
+        module: 'استعادة كلمة المرور (Supabase Auth)',
+        details: `تم تغيير وحفظ كلمة المرور الجديدة بنجاح عبر البريد (${data.email || 'elhosiny2020@gmail.com'})`,
+        ipAddress: '10.20.30.50',
+        deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
+        status: 'success',
+      });
+    } catch {
+      setFpError('تعذر الاتصال بالخادم لتحديث كلمة المرور.');
+    } finally {
+      setFpLoading(false);
+    }
+  };
+
+  const openPasswordResetModal = () => {
+    setFpError('');
+    setFpNotice('');
+    setFpIdentifier(username.trim() || 'admin');
+    setFpEmail('elhosiny2020@gmail.com');
+    setFpNewPassword('');
+    setFpConfirmNewPassword('');
+    setResetViewMode('request');
+    setShowForgotPassword(true);
   };
 
   return (
     <div className="w-full max-w-7xl mx-auto min-h-[90vh] flex items-center justify-center p-2 sm:p-4 lg:p-6 font-sans">
-      {/* Ultra Premium Split Screen Glassmorphism Container */}
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 bg-white/95 backdrop-blur-2xl rounded-3xl shadow-[0_25px_70px_rgba(16,42,67,0.18)] border border-white/80 overflow-hidden relative">
-        
         {/* Right Side: Luxury Login Form (7 Cols) */}
         <div className="lg:col-span-7 p-6 sm:p-10 lg:p-14 flex flex-col justify-between relative bg-gradient-to-b from-white via-[#FAFBFD] to-[#F4F7FB]">
-          {/* Subtle Decorative Golden Accent Line at Top */}
           <div className="absolute top-0 right-0 left-0 h-2 bg-gradient-to-r from-[#102A43] via-[#C6A15B] to-[#102A43]"></div>
 
           <div>
@@ -299,13 +447,13 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="أدخل اسم المستخدم المعتمد"
+                    placeholder="أدخل اسم المستخدم المعتمد (مثال: admin)"
                     className="w-full pr-12 pl-4 py-3 sm:py-3.5 bg-white border border-slate-300 rounded-2xl text-[11px] sm:text-[13px] text-[#243447] focus:outline-none focus:ring-2 focus:ring-[#164E83] focus:border-transparent transition-all shadow-sm font-extrabold"
                   />
                 </div>
               </div>
 
-              {/* Password Input (No mention of 'الباسورد') */}
+              {/* Password Input */}
               <div>
                 <label className="block text-[11px] sm:text-[13px] font-black text-[#102A43] mb-2">
                   كلمة المرور السرية
@@ -332,7 +480,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                   </button>
                 </div>
 
-                <div className="flex justify-between items-center mt-3 text-[11px] sm:text-[13px]">
+                <div className="flex flex-wrap justify-between items-center gap-2 mt-3 text-[11px] sm:text-[13px]">
                   <label className="flex items-center gap-2 cursor-pointer text-[#243447] font-extrabold">
                     <input
                       type="checkbox"
@@ -344,10 +492,11 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                   </label>
                   <button
                     type="button"
-                    onClick={() => setShowForgotPassword(true)}
-                    className="text-[#164E83] font-black hover:underline cursor-pointer"
+                    onClick={openPasswordResetModal}
+                    className="text-[#164E83] font-black hover:underline cursor-pointer flex items-center gap-1"
                   >
-                    استعادة كلمة المرور؟
+                    <Mail className="w-3.5 h-3.5 text-[#C6A15B]" />
+                    <span>استعادة كلمة المرور على البريد (elhosiny2020@gmail.com)؟</span>
                   </button>
                 </div>
               </div>
@@ -383,7 +532,9 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
 
           {/* Footer Signature */}
           <div className="mt-8 pt-4 border-t border-slate-200/60 flex items-center justify-center text-[11px] text-slate-600 font-bold">
-            <span className="text-[#C6A15B] font-black" dir="ltr">Designed &amp; Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038</span>
+            <span className="text-[#C6A15B] font-black" dir="ltr">
+              Designed &amp; Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038
+            </span>
           </div>
         </div>
 
@@ -398,9 +549,8 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
             referrerPolicy="no-referrer"
             priority
           />
-          {/* Cinematic Golden-Navy Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#102A43]/90 via-[#102A43]/40 to-transparent"></div>
-          
+
           <div className="absolute inset-0 p-8 sm:p-12 flex flex-col justify-end text-white z-10 space-y-3">
             <div className="w-12 h-1.5 bg-[#C6A15B] rounded-full"></div>
             <span className="text-[11px] font-black text-[#C6A15B] tracking-widest uppercase">
@@ -416,121 +566,312 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
+      {/* نافذة استعادة وتغيير كلمة المرور عبر البريد الإلكتروني (elhosiny2020@gmail.com) و Supabase Auth */}
       {showForgotPassword && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 font-sans">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-md z-50 flex items-center justify-center p-4 font-sans overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border-2 border-[#102A43]/20 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-[#102A43] text-[#C6A15B] flex items-center justify-center font-bold">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#102A43] text-[#C6A15B] flex items-center justify-center font-bold shrink-0">
                   <KeyRound className="w-5 h-5" />
                 </div>
-                <h3 className="text-lg font-black text-[#102A43]">استعادة كلمة المرور الرسمية</h3>
+                <div>
+                  <span className="text-[10.5px] font-black text-[#164E83] block">
+                    نظام الاستعادة المؤمن عبر البريد الإلكتروني · Supabase Auth
+                  </span>
+                  <h3 className="text-base sm:text-lg font-black text-[#102A43]">
+                    {resetViewMode === 'update_view'
+                      ? 'تغيير كلمة المرور من رابط البريد الإلكتروني'
+                      : 'استعادة وإرسال كلمة المرور على البريد الإلكتروني'}
+                  </h3>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowForgotPassword(false)}
-                className="text-slate-400 hover:text-slate-700 text-lg font-bold p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-lg font-bold p-1.5 rounded-xl bg-slate-100 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {fpError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-[11px] font-extrabold">
-                {fpError}
+              <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs font-extrabold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{fpError}</span>
               </div>
             )}
 
-            {fpSuccess ? (
-              <div className="py-8 text-center space-y-3">
-                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                <h4 className="text-lg font-black text-[#102A43]">تم تحديث كلمة المرور بنجاح</h4>
-                <p className="text-[11px] text-slate-600 font-bold">يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.</p>
+            {fpNotice && !fpError && (
+              <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-extrabold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{fpNotice}</span>
               </div>
-            ) : (
-              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
-                {fpStep === 1 && (
-                  <>
-                    <p className="text-[11px] text-slate-700 font-bold leading-relaxed">
-                      أدخل اسم المستخدم أو الرقم القومي المكون من ١٤ رقماً لإرسال رمز التحقق المؤقت المعتمد.
-                    </p>
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-700 mb-1.5">اسم المستخدم / الرقم القومي</label>
-                      <input
-                        type="text"
-                        required
-                        value={fpIdentifier}
-                        onChange={(e) => setFpIdentifier(e.target.value)}
-                        placeholder="أدخل البيان الرسمي"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#164E83]"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-[#102A43] hover:bg-[#164E83] text-white font-black rounded-xl text-[11px] shadow-sm cursor-pointer"
-                    >
-                      إرسال رمز التحقق
-                    </button>
-                  </>
-                )}
+            )}
 
-                {fpStep === 2 && (
-                  <>
-                    <p className="text-[11px] text-slate-700 font-bold">أدخل رمز التحقق المؤقت المكون من ٦ أرقام المرسل لهاتفك المسجل.</p>
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-700 mb-1.5">رمز التحقق</label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        value={fpOtp}
-                        onChange={(e) => setFpOtp(e.target.value)}
-                        placeholder="٠٠٠٠٠٠"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-center tracking-widest font-mono font-black text-lg"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-[#102A43] hover:bg-[#164E83] text-white font-black rounded-xl text-[11px] shadow-sm cursor-pointer"
-                    >
-                      تأكيد الرمز
-                    </button>
-                  </>
-                )}
+            {/* ١. شاشة طلب استعادة كلمة المرور وإرسالها إلى elhosiny2020@gmail.com */}
+            {resetViewMode === 'request' && (
+              <form onSubmit={handleRequestPasswordReset} className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-xs font-bold text-[#102A43] space-y-1">
+                  <div className="font-black text-[#164E83] flex items-center gap-1.5">
+                    <Mail className="w-4 h-4" />
+                    <span>البريد الإلكتروني المعتمد للاستعادة: elhosiny2020@gmail.com</span>
+                  </div>
+                  <p className="text-[11px] text-slate-700 leading-relaxed">
+                    عند الضغط على زر الإرسال، سيقوم النظام بتوليد كلمة مرور جديدة ورمز استعادة مشفر (Reset Token) وإرسالها إلى البريد الإلكتروني <strong>elhosiny2020@gmail.com</strong> مع إمكانية تغيير كلمة المرور مباشرة من رابط البريد.
+                  </p>
+                </div>
 
-                {fpStep === 3 && (
-                  <>
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-700 mb-1.5">كلمة المرور الجديدة</label>
-                      <input
-                        type="password"
-                        required
-                        value={fpNewPassword}
-                        onChange={(e) => setFpNewPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-mono font-bold text-slate-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-700 mb-1.5">تأكيد كلمة المرور الجديدة</label>
-                      <input
-                        type="password"
-                        required
-                        value={fpConfirmNewPassword}
-                        onChange={(e) => setFpConfirmNewPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-[11px] font-mono font-bold text-slate-800"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl text-[11px] shadow-sm cursor-pointer"
-                    >
-                      حفظ كلمة المرور الجديدة
-                    </button>
-                  </>
-                )}
+                <div>
+                  <label className="block text-xs font-black text-[#102A43] mb-1.5">
+                    اسم المستخدم أو الرقم القومي للحساب المراد استعادته
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={fpIdentifier}
+                    onChange={(e) => setFpIdentifier(e.target.value)}
+                    placeholder="admin"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-[#102A43] focus:outline-none focus:ring-2 focus:ring-[#164E83]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#102A43] mb-1.5">
+                    البريد الإلكتروني المستلم لكلمة المرور ورابط التغيير
+                  </label>
+                  <input
+                    type="email"
+                    readOnly
+                    value={fpEmail}
+                    dir="ltr"
+                    className="w-full px-4 py-3 bg-emerald-50/70 border border-emerald-300 rounded-xl text-xs font-black text-emerald-950"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (fpToken) {
+                        setResetViewMode('update_view');
+                      } else {
+                        setResetViewMode('update_view');
+                      }
+                    }}
+                    className="text-xs font-black text-[#164E83] hover:underline cursor-pointer"
+                  >
+                    لديك رمز استعادة بالفعل؟ انتقل لشاشة تغيير كلمة المرور
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={fpLoading}
+                    className="w-full py-3.5 bg-gradient-to-r from-[#102A43] to-[#164E83] hover:from-[#164E83] hover:to-[#102A43] text-white font-black rounded-xl text-xs shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Mail className="w-4 h-4 text-[#C6A15B]" />
+                    <span>
+                      {fpLoading
+                        ? 'جاري توليد كلمة المرور وإرسالها إلى elhosiny2020@gmail.com...'
+                        : 'إرسال كلمة المرور ورابط التغيير إلى elhosiny2020@gmail.com'}
+                    </span>
+                  </button>
+                </div>
               </form>
+            )}
+
+            {/* ٢. شاشة رسالة البريد الإلكتروني المرسلة إلى elhosiny2020@gmail.com */}
+            {resetViewMode === 'email_dispatched' && deliveryInfo && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border-2 border-[#C6A15B] bg-[#FAFBFD] p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-5 h-5 text-[#164E83]" />
+                      <div>
+                        <span className="text-[10.5px] font-black text-slate-500 block">
+                          رسالة البريد الإلكتروني الصادرة من المنظومة
+                        </span>
+                        <span className="text-xs font-black text-[#102A43]" dir="ltr">
+                          To: {deliveryInfo.recipientEmail}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-black">
+                      تم الإرسال والتفعيل
+                    </span>
+                  </div>
+
+                  <div className="text-xs font-bold text-slate-700 space-y-2 leading-relaxed">
+                    <p>
+                      مرحباً <strong className="text-[#102A43]">{deliveryInfo.fullName}</strong> (اسم المستخدم:{' '}
+                      <strong className="font-mono text-[#164E83]">{deliveryInfo.username}</strong>)،
+                    </p>
+                    <p>
+                      بناءً على طلبك لاستعادة كلمة المرور، تم إرسال كلمة المرور الجديدة الخاصة بك على البريد الإلكتروني{' '}
+                      <strong dir="ltr">{deliveryInfo.recipientEmail}</strong> وتفعيلها فوراً:
+                    </p>
+                  </div>
+
+                  {/* كلمة المرور المرسلة على الإيميل */}
+                  <div className="p-3.5 rounded-xl bg-white border-2 border-[#164E83]/30 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10.5px] font-black text-slate-500 block">
+                        كلمة المرور المرسلة على الإيميل (elhosiny2020@gmail.com):
+                      </span>
+                      <span className="text-lg font-mono font-black text-[#102A43] tracking-wider select-all">
+                        {deliveryInfo.tempPassword}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                          void navigator.clipboard.writeText(deliveryInfo.tempPassword);
+                          setFpNotice('تم نسخ كلمة المرور المرسلة للبريد الإلكتروني.');
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[#102A43] text-[11px] font-black flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>نسخ</span>
+                    </button>
+                  </div>
+
+                  {/* خياران للمستخدم: إما تغيير الباسورد من رابط الميل الآن أو الدخول بكلمة المرور المرسلة */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFpError('');
+                        setFpNotice('أدخل كلمة المرور الجديدة التي ترغب في تعيينها لحسابك عبر رابط البريد الإلكتروني.');
+                        setResetViewMode('update_view');
+                      }}
+                      className="py-3 px-4 rounded-xl bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>تغيير كلمة المرور من رابط الميل الآن</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsername(deliveryInfo.username);
+                        setPassword(deliveryInfo.tempPassword);
+                        setShowForgotPassword(false);
+                        setSuccessMsg(
+                          `تم تعبئة كلمة المرور المرسلة إلى (${deliveryInfo.recipientEmail}) — اضغط على دخول المنظومة.`
+                        );
+                      }}
+                      className="py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>استخدام كلمة المرور المرسلة للدخول</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ٣. الواجهة المخصصة لتغيير وتحديث كلمة المرور عبر رابط البريد الإلكتروني (Dedicated Password Update View) */}
+            {resetViewMode === 'update_view' && (
+              <form onSubmit={handleConfirmNewPasswordFromEmail} className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 space-y-1">
+                  <div className="font-black text-[#102A43] flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                    <span>تحديث كلمة المرور عبر رابط البريد ({fpEmail})</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    الحساب المستهدف: <strong className="text-[#164E83] font-mono">{fpIdentifier}</strong> — سيتم تشفير وحفظ كلمة المرور الجديدة في قاعدة البيانات فوراً.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#102A43] mb-1.5">
+                    رمز الاستعادة المرسل للبريد (Reset Token)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={fpToken}
+                    onChange={(e) => setFpToken(e.target.value)}
+                    placeholder="أدخل رمز الاستعادة المرسل للبريد"
+                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-[11px] font-mono font-bold text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#102A43] mb-1.5">
+                    كلمة المرور الجديدة
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={fpNewPassword}
+                    onChange={(e) => setFpNewPassword(e.target.value)}
+                    placeholder="أدخل كلمة المرور الجديدة (٤ أحرف أو أرقام على الأقل)"
+                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-[#102A43] focus:outline-none focus:ring-2 focus:ring-[#164E83]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#102A43] mb-1.5">
+                    تأكيد كلمة المرور الجديدة
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={fpConfirmNewPassword}
+                    onChange={(e) => setFpConfirmNewPassword(e.target.value)}
+                    placeholder="أعد كتابة كلمة المرور الجديدة للتأكيد"
+                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-[#102A43] focus:outline-none focus:ring-2 focus:ring-[#164E83]"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetViewMode('request')}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>طلب رمز جديد</span>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={fpLoading}
+                    className="px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{fpLoading ? 'جاري حفظ كلمة المرور الجديدة...' : 'اعتماد وتغيير كلمة المرور الآن'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* ٤. شاشة اكتمال تغيير كلمة المرور بنجاح */}
+            {resetViewMode === 'completed' && (
+              <div className="py-6 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-lg font-black text-[#102A43]">
+                    تم تغيير كلمة المرور من البريد الإلكتروني بنجاح
+                  </h4>
+                  <p className="text-xs text-slate-600 font-bold">
+                    تم حفظ كلمة المرور الجديدة لحساب (<strong className="font-mono">{fpIdentifier}</strong>) المرتبط بالبريد (<strong dir="ltr">{fpEmail}</strong>) في قاعدة البيانات.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setSuccessMsg('تم تحديث كلمة المرور وتعبئة بيانات الدخول — اضغط على دخول المنظومة.');
+                  }}
+                  className="px-6 py-3 rounded-xl bg-[#102A43] text-[#C6A15B] text-xs font-black cursor-pointer shadow-md"
+                >
+                  العودة لشاشة الدخول بكلمة المرور الجديدة
+                </button>
+              </div>
             )}
           </div>
         </div>

@@ -1621,7 +1621,7 @@ export function loadHrPersonnelStore(): HrPersonnelStoreData {
     return {
       ...INITIAL_HR_STORE,
       ...parsed,
-      employees: Array.isArray(parsed.employees) && parsed.employees.length > 0 ? parsed.employees : INITIAL_HR_STORE.employees,
+      employees: Array.isArray(parsed.employees) ? parsed.employees : INITIAL_HR_STORE.employees,
       alertSettings: parsed.alertSettings || INITIAL_HR_STORE.alertSettings,
     };
   } catch {
@@ -1643,6 +1643,103 @@ export function resetHrPersonnelStore(): HrPersonnelStoreData {
     localStorage.setItem(HR_STORE_STORAGE_KEY, JSON.stringify(INITIAL_HR_STORE));
   }
   return INITIAL_HR_STORE;
+}
+
+/**
+ * استعادة ضبط المصنع الفورية لوحدات الموارد البشرية (تصفير البيانات التشغيلية والمعاملات وإعادة الإعدادات للوضع الافتراضي فوراً بدون نسخة احتياطية)
+ */
+export function wipeHrPersonnelTransactionalData(
+  targetModule: string = 'ALL'
+): HrPersonnelStoreData {
+  const current = loadHrPersonnelStore();
+  const defaultSettings = { ...INITIAL_HR_STORE.alertSettings };
+
+  let next: HrPersonnelStoreData;
+
+  switch (targetModule) {
+    case 'attendance':
+      next = {
+        ...current,
+        attendance: [],
+        leaves: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'warnings_penalties':
+      next = {
+        ...current,
+        warnings: [],
+        disciplinaryActions: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'secondments':
+      next = {
+        ...current,
+        secondments: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'public_service':
+      next = {
+        ...current,
+        publicServiceMembers: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'assistance_contracts':
+      next = {
+        ...current,
+        assistanceContracts: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'renewal_requests':
+    case 'renewal_workflow':
+      next = {
+        ...current,
+        renewalRequests: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'self_service':
+      next = {
+        ...current,
+        dataCorrectionRequests: [],
+        renewalRequests: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'smart_alerts':
+      next = {
+        ...current,
+        closedAlertIds: {},
+        alertSettings: defaultSettings,
+      };
+      break;
+    case 'ALL':
+    default:
+      next = {
+        ...current,
+        serviceHistory: [],
+        attendance: [],
+        leaves: [],
+        warnings: [],
+        disciplinaryActions: [],
+        secondments: [],
+        publicServiceMembers: [],
+        assistanceContracts: [],
+        renewalRequests: [],
+        dataCorrectionRequests: [],
+        closedAlertIds: {},
+        auditLogs: [],
+        alertSettings: defaultSettings,
+      };
+      break;
+  }
+
+  saveHrPersonnelStore(next);
+  return next;
 }
 
 // =============================================================================

@@ -44,6 +44,7 @@ import {
 } from '@/lib/utils';
 import AnimatedStatCard, { StatColorTheme } from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
+import FactoryResetButton from './FactoryResetButton';
 
 export type GrainSubTabCode = 'GRAIN' | 'SILOS' | 'MILLS' | 'COLD';
 
@@ -134,6 +135,7 @@ export default function DepartmentWorkspace({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pinnedCols, setPinnedCols] = useState<string[]>(['code']);
   const [toastMsg, setToastMsg] = useState<string>('');
+  const [wipedCodes, setWipedCodes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (isGrainDepartment) {
@@ -423,12 +425,13 @@ export default function DepartmentWorkspace({
   }, [effectiveCode, activeBakeries, users, branches, inspections, debtTransactions, auditLogs, currentBranch]);
 
   const filteredRows = useMemo(() => {
+    if (wipedCodes[effectiveCode]) return [];
     const q = normalizeSearchText(searchTerm);
     return config.rows.filter((r) => {
       if (!q) return true;
       return normalizeSearchText(`${r.code} ${r.title} ${r.location} ${r.status} ${r.notes}`).includes(q);
     });
-  }, [config.rows, searchTerm]);
+  }, [config.rows, searchTerm, wipedCodes, effectiveCode]);
 
   const togglePin = (key: string) =>
     setPinnedCols((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -578,7 +581,25 @@ export default function DepartmentWorkspace({
             {isGrainDepartment ? activeGrainTabMeta.subtitle : dept.description}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <FactoryResetButton
+            sectionName={isGrainDepartment ? `قسم صيانة الحبوب — ${activeGrainTabMeta.label}` : dept.arabicName}
+            sectionKey={`DEPT_${effectiveCode}`}
+            description="تصفير كافة السجلات التشغيلية المعروضة في هذا القسم فوراً وإعادة الإعدادات والفلاتر إلى الوضع الافتراضي بدون طلب نسخة احتياطية."
+            getTableSummary={() => [
+              {
+                tableName: isGrainDepartment ? activeGrainTabMeta.label : dept.arabicName,
+                count: wipedCodes[effectiveCode] ? 0 : config.rows.length,
+              },
+            ]}
+            onConfirmReset={() => {
+              setWipedCodes((prev) => ({ ...prev, [effectiveCode]: true }));
+              setSearchTerm('');
+              setSelectedIds([]);
+              setPinnedCols(['code']);
+              notify(`تم تنفيذ التصفير الفوري واستعادة ضبط المصنع لقسم (${dept.arabicName}).`);
+            }}
+          />
           <button
             type="button"
             onClick={() => window.print()}

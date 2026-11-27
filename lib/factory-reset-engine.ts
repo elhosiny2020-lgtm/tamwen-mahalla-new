@@ -141,12 +141,12 @@ export function recordFactoryResetAudit(params: {
     userId: params.user.id,
     username: params.user.username,
     fullName: params.user.fullName,
-    action: params.status === 'success' ? 'تنفيذ إعادة ضبط المصنع لقسم' : 'فشل محاولة إعادة ضبط المصنع',
+    action: params.status === 'success' ? 'تنفيذ استعادة ضبط المصنع الفوري لقسم' : 'فشل محاولة إعادة ضبط المصنع',
     module: params.sectionName,
     branchId: params.user.primaryBranchId,
     details:
       params.status === 'success'
-        ? `تم مسح (${totalCleared}) سجل من قسم [${params.sectionName}] فقط — الجداول: ${summaryText || 'جميع الجداول'} · مسح القوائم المخصصة: ${params.clearCustomSettings ? 'نعم' : 'لا'} · النسخة الاحتياطية: ${params.backupId}`
+        ? `تم التصفير الفوري ومسح (${totalCleared}) سجل من قسم [${params.sectionName}] بدون نسخة احتياطية — الجداول: ${summaryText || 'جميع الجداول'} · إعادة ضبط الإعدادات الافتراضية: ${params.clearCustomSettings ? 'نعم' : 'لا'}`
         : `توقفت عملية إعادة ضبط المصنع لقسم [${params.sectionName}] — السبب: ${params.errorMessage || 'خطأ تقني'}`,
     ipAddress: '10.20.30.50',
     deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',

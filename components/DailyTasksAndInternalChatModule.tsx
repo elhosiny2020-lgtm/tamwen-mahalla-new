@@ -63,6 +63,7 @@ import {
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import { OfficialPrintModal } from './debts/DebtsSharedUi';
+import FactoryResetButton from './FactoryResetButton';
 
 export type TasksModuleSubTab =
   | 'dashboard'
@@ -1025,6 +1026,27 @@ export default function DailyTasksAndInternalChatModule({
               <PlusCircle className="w-4 h-4" />
               <span>إنشاء مهمة جديدة</span>
             </button>
+
+            <FactoryResetButton
+              sectionName="إدارة المهام اليومية والمتابعة والشات الداخلي"
+              sectionKey="TASKS_CHAT"
+              currentUser={currentUser}
+              description="تصفير كافة المهام اليومية وسجلات المحادثات الداخلية والإشعارات فوراً وإعادة الإعدادات للوضع الافتراضي بدون طلب نسخة احتياطية."
+              getTableSummary={() => [
+                { tableName: 'المهام اليومية والتكليفات', count: tasks.length },
+                { tableName: 'المحادثات الداخلية والرسائل', count: messages.length },
+                { tableName: 'مركز التنبيهات والإشعارات', count: notifications.length },
+              ]}
+              onConfirmReset={() => {
+                saveDailyTasks([]);
+                saveChatMessages([]);
+                saveUnifiedNotifications([]);
+                setTasks([]);
+                setMessages([]);
+                setNotifications([]);
+                notify('تم تنفيذ التصفير الفوري واستعادة ضبط المصنع لقسم المهام اليومية والمحادثات الداخلية.');
+              }}
+            />
           </div>
         </div>
 

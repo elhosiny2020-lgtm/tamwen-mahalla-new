@@ -43,10 +43,19 @@ export default function Home() {
 
   useEffect(() => {
     const hydrateSession = () => {
-      const sessionUser = getCurrentSessionUser();
-      setCurrentUser(sessionUser);
-      setActiveUserId(sessionUser?.id || 'guest');
-      setSelectedBranchId(getSelectedBranchSession());
+      const hasResetToken =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).has('reset_token');
+      if (hasResetToken) {
+        setCurrentSessionUser(null);
+        setCurrentUser(null);
+        setActiveUserId('guest');
+      } else {
+        const sessionUser = getCurrentSessionUser();
+        setCurrentUser(sessionUser);
+        setActiveUserId(sessionUser?.id || 'guest');
+        setSelectedBranchId(getSelectedBranchSession());
+      }
       setBranches(getStoredBranches());
       setHydrated(true);
     };
@@ -83,15 +92,37 @@ export default function Home() {
     }
   };
 
-  const handleSelectBranch = (branchId: string) => {
-    setSelectedBranchId(branchId);
-    setSelectedBranchSession(branchId);
-    if (currentUser) {
-      const updated = { ...currentUser, primaryBranchId: branchId };
-      setCurrentUser(updated);
-      setCurrentSessionUser(updated);
-    }
-  };
+  const handleSelectBranch = useCallback(
+    (branchId: string) => {
+      setSelectedBranchId(branchId);
+      setSelectedBranchSession(branchId);
+      if (currentUser) {
+        const updated = { ...currentUser, primaryBranchId: branchId };
+        setCurrentUser(updated);
+        setCurrentSessionUser(updated);
+      }
+    },
+    [currentUser]
+  );
+
+  useEffect(() => {
+    const onGlobalNavigate = (e: Event) => {
+      const custom = e as CustomEvent<{
+        branchId?: string;
+        departmentId?: string;
+        departmentCode?: string;
+        recordId?: string;
+      }>;
+      const detail = custom.detail || {};
+      if (detail.branchId) {
+        handleSelectBranch(detail.branchId);
+      } else if (!selectedBranchId && currentUser) {
+        handleSelectBranch(currentUser.primaryBranchId || 'b-03');
+      }
+    };
+    window.addEventListener('gharbia-global-navigate', onGlobalNavigate);
+    return () => window.removeEventListener('gharbia-global-navigate', onGlobalNavigate);
+  }, [handleSelectBranch, selectedBranchId, currentUser]);
 
   if (!hydrated) {
     return (

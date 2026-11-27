@@ -124,7 +124,25 @@ function getSqliteDb(): SqliteDatabase {
         created_by TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_system_users_username ON system_users(username);
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        username TEXT NOT NULL,
+        email TEXT NOT NULL,
+        token_hash TEXT NOT NULL,
+        temp_password_hash TEXT NOT NULL,
+        temp_password_salt TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash);
     `);
+
+    // Ensure admin default email is elhosiny2020@gmail.com
+    db.prepare(
+      `UPDATE system_users SET email = 'elhosiny2020@gmail.com' WHERE id = 'usr-001' AND (email = 'admin.gharbia@supply.gov.eg' OR email = '')`
+    ).run();
 
     const countRow = db.prepare('SELECT COUNT(*) as cnt FROM system_users').get();
     const total = Number(countRow?.cnt ?? 0);
@@ -598,3 +616,170 @@ export async function deleteDbUsersByIds(
 
   return { deletedIds, skippedCount };
 }
+
+function hashResetTokenSha256(rawToken: string): string {
+  return crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
+}
+
+export function findDbUserForPasswordReset(identifier: string): StoredSystemUser | null {
+  const db = getSqliteDb();
+  const clean = identifier.trim();
+  if (!clean) return null;
+
+  const row = db
+    .prepare(
+      `SELECT * FROM system_users
+       WHERE LOWER(username) = LOWER(?)
+          OR LOWER(email) = LOWER(?)
+          OR national_id = ?
+          OR phone = ?
+       LIMIT 1`
+    )
+    .get(clean, clean, clean, clean) as unknown as DbUserRow | undefined;
+
+  if (row) return rowToStoredUser(row);
+
+  // Fallback to primary super_admin if target is elhosiny2020@gmail.com
+  if (clean.toLowerCase() === 'elhosiny2020@gmail.com') {
+    const adminRow = db
+      .prepare(`SELECT * FROM system_users WHERE LOWER(username) = 'admin' OR role = 'super_admin' LIMIT 1`)
+      .get() as unknown as DbUserRow | undefined;
+    if (adminRow) return rowToStoredUser(adminRow);
+  }
+
+  return null;
+}
+
+export async function createPasswordResetToken(params: {
+  userId: string;
+  username: string;
+  email: string;
+}): Promise<{
+  resetId: string;
+  rawToken: string;
+  tempPassword: string;
+  expiresAt: string;
+}> {
+  const db = getSqliteDb();
+  const resetId = `rst-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+  const rawToken = crypto.randomBytes(24).toString('hex');
+  const tokenHash = hashResetTokenSha256(rawToken);
+
+  // Generate a temporary recovery password and apply it immediately so the user can log in with the emailed password OR change it via the link
+  const tempPassword = `Gh#${crypto.randomBytes(3).toString('hex').toUpperCase()}26`;
+  const tempHashed = hashPasswordScrypt(tempPassword);
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); // 30 minutes
+
+  // Invalidate previous unused tokens for this user
+  db.prepare(`UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0`).run(
+    params.userId
+  );
+
+  db.prepare(
+    `INSERT INTO password_reset_tokens (
+      id, user_id, username, email, token_hash, temp_password_hash, temp_password_salt, expires_at, used, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`
+  ).run(
+    resetId,
+    params.userId,
+    params.username,
+    params.email,
+    tokenHash,
+    tempHashed.hashHex,
+    tempHashed.saltHex,
+    expiresAt,
+    now.toISOString()
+  );
+
+  // Apply the temporary password to the user in SQLite + Supabase so the emailed password works immediately
+  await setDbUserPasswordByUsername(params.username, tempPassword);
+
+  return {
+    resetId,
+    rawToken,
+    tempPassword,
+    expiresAt,
+  };
+}
+
+interface DbResetTokenRow {
+  id: string;
+  user_id: string;
+  username: string;
+  email: string;
+  token_hash: string;
+  temp_password_hash: string;
+  temp_password_salt: string;
+  expires_at: string;
+  used: number;
+  created_at: string;
+}
+
+export function verifyPasswordResetToken(rawToken: string): {
+  valid: boolean;
+  user?: StoredSystemUser;
+  email?: string;
+  expiresAt?: string;
+  error?: string;
+} {
+  const clean = rawToken.trim();
+  if (!clean || clean.length < 16) {
+    return { valid: false, error: 'رمز استعادة كلمة المرور غير صالح.' };
+  }
+  const db = getSqliteDb();
+  const tokenHash = hashResetTokenSha256(clean);
+  const row = db
+    .prepare(`SELECT * FROM password_reset_tokens WHERE token_hash = ? LIMIT 1`)
+    .get(tokenHash) as unknown as DbResetTokenRow | undefined;
+
+  if (!row) {
+    return { valid: false, error: 'رابط أو رمز استعادة كلمة المرور غير موجود أو غير صحيح.' };
+  }
+  if (row.used) {
+    return { valid: false, error: 'تم استخدام رابط استعادة كلمة المرور هذا مسبقاً.' };
+  }
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    return { valid: false, error: 'انتهت صلاحية رابط استعادة كلمة المرور (الصلاحية ٣٠ دقيقة).' };
+  }
+
+  const user = getDbUserById(row.user_id) || getDbUserByUsername(row.username);
+  if (!user) {
+    return { valid: false, error: 'حساب المستخدم المرتبط بالرمز غير موجود.' };
+  }
+
+  return {
+    valid: true,
+    user,
+    email: row.email,
+    expiresAt: row.expires_at,
+  };
+}
+
+export async function consumePasswordResetTokenAndSetPassword(
+  rawToken: string,
+  newPassword: string
+): Promise<{ ok: true; user: StoredSystemUser; email: string } | { ok: false; error: string }> {
+  const check = verifyPasswordResetToken(rawToken);
+  if (!check.valid || !check.user) {
+    return { ok: false, error: check.error || 'رمز الاستعادة غير صالح.' };
+  }
+
+  const db = getSqliteDb();
+  const tokenHash = hashResetTokenSha256(rawToken);
+
+  const updated = await setDbUserPasswordByUsername(check.user.username, newPassword.trim());
+  if (!updated) {
+    return { ok: false, error: 'تعذر تحديث كلمة المرور في قاعدة البيانات.' };
+  }
+
+  db.prepare(`UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ?`).run(tokenHash);
+  const refreshedUser = getDbUserById(check.user.id) || check.user;
+  return {
+    ok: true,
+    user: refreshedUser,
+    email: check.email || 'elhosiny2020@gmail.com',
+  };
+}
+

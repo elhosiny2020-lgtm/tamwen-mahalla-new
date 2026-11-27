@@ -62,7 +62,7 @@ export const INITIAL_USERS: User[] = [
     fullName: 'Eng. Ahmed El-Hosseiny — Designed & Developed by Eng. Ahmed El-Hosseiny (Tel: 01004414038)',
     nationalId: '28510121601234',
     phone: '01004414038',
-    email: 'admin.gharbia@supply.gov.eg',
+    email: 'elhosiny2020@gmail.com',
     username: 'admin',
     jobTitle: 'Designed & Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038',
     jobGrade: 'درجة أولى أ',
@@ -684,7 +684,13 @@ export function getStoredUsers(): User[] {
   if (typeof window === 'undefined') return INITIAL_USERS;
   try {
     const data = localStorage.getItem(STORAGE_KEYS.USERS);
-    return data ? JSON.parse(data) : INITIAL_USERS;
+    if (!data) return INITIAL_USERS;
+    const parsed: User[] = JSON.parse(data);
+    return parsed.map((u) =>
+      u.id === 'usr-001' && (!u.email || u.email === 'admin.gharbia@supply.gov.eg')
+        ? { ...u, email: 'elhosiny2020@gmail.com' }
+        : u
+    );
   } catch {
     return INITIAL_USERS;
   }
@@ -800,6 +806,7 @@ export function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>) {
     timestamp: new Date().toISOString()
   };
   localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([newLog, ...logs].slice(0, 500)));
+  window.dispatchEvent(new CustomEvent('gharbia-audit-log-added', { detail: newLog }));
 
   // Mirror sensitive user actions to server-side audit store (best-effort when authenticated)
   void fetch('/api/audit-logs', {
