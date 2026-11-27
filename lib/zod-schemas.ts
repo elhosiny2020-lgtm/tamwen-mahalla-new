@@ -81,6 +81,14 @@ export const loginFormSchema = z.object({
       fullName: sanitizedString({ min: 2, max: 140 }),
       role: sanitizedString({ min: 2, max: 60 }),
       primaryBranchId: sanitizedString({ min: 1, max: 40 }),
+      nationalId: sanitizedString({ min: 0, max: 20 }).optional(),
+      phone: sanitizedString({ min: 0, max: 20 }).optional(),
+      email: sanitizedString({ min: 0, max: 140 }).optional(),
+      jobTitle: sanitizedString({ min: 0, max: 120 }).optional(),
+      jobGrade: sanitizedString({ min: 0, max: 80 }).optional(),
+      workplace: sanitizedString({ min: 0, max: 160 }).optional(),
+      branchIds: z.array(sanitizedString({ min: 1, max: 40 })).optional(),
+      departmentIds: z.array(sanitizedString({ min: 1, max: 40 })).optional(),
     })
     .optional(),
 });

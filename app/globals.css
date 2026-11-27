@@ -11,15 +11,57 @@
   --ui-row-pad-x: 7px;
   --ui-sidebar-width: 276px;
 
-  /* Default Official Government Navy & White Tokens (Untouched Default) */
+  /* Default Frosted Slate-Mist & Deep-Teal Dashboard Tokens */
+  --app-canvas-bg: #BDC9D4;
+  --app-surface-bg: #EEF3F7;
+  --app-surface-alt: #DCE5EC;
+  --app-text: #1E3346;
+  --app-text-muted: #556C80;
+  --app-border: #C4D2DE;
+  --app-header-bg: #253B4F;
+  --app-header-border: #355068;
+  --app-header-text: #FFFFFF;
+  --app-accent: #94C9CE;
+  --app-primary: #253B4F;
+  --app-primary-soft: #3B717E;
+  --app-table-head-bg: #253B4F;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #EEF3F7;
+  --app-table-row-hover: #DCECEF;
+}
+
+/* 0. Frosted Slate & Teal */
+html[data-theme="frosted_teal"] {
+  --app-canvas-bg: #BDC9D4;
+  --app-surface-bg: #EEF3F7;
+  --app-surface-alt: #DCE5EC;
+  --app-text: #1E3346;
+  --app-text-muted: #556C80;
+  --app-border: #C4D2DE;
+  --app-header-bg: #253B4F;
+  --app-header-border: #355068;
+  --app-header-text: #FFFFFF;
+  --app-accent: #94C9CE;
+  --app-primary: #253B4F;
+  --app-primary-soft: #3B717E;
+  --app-table-head-bg: #253B4F;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FFFFFF;
+  --app-table-row-alt: #EEF3F7;
+  --app-table-row-hover: #DCECEF;
+}
+
+/* 0b. Official Government Navy & Gold */
+html[data-theme="gov_navy"] {
   --app-canvas-bg: #F4F7FB;
   --app-surface-bg: #FFFFFF;
-  --app-surface-alt: #F4F7FB;
+  --app-surface-alt: #E9EFF7;
   --app-text: #102A43;
   --app-text-muted: #475569;
   --app-border: #CBD5E1;
   --app-header-bg: #102A43;
-  --app-header-border: #164E83;
+  --app-header-border: #1E3A5F;
   --app-header-text: #FFFFFF;
   --app-accent: #C6A15B;
   --app-primary: #102A43;
@@ -28,7 +70,7 @@
   --app-table-head-text: #FFFFFF;
   --app-table-row-bg: #FFFFFF;
   --app-table-row-alt: #F4F7FB;
-  --app-table-row-hover: #EFF6FF;
+  --app-table-row-hover: #E6EFFA;
 }
 
 /* 1. Comfort White */
@@ -115,6 +157,69 @@ html[data-theme="calm_green"] {
   --app-table-row-hover: #DCF0E4;
 }
 
+/* 4b. Royal Emerald & Gold */
+html[data-theme="royal_emerald"] {
+  --app-canvas-bg: #EAF3EE;
+  --app-surface-bg: #FAFCFB;
+  --app-surface-alt: #DCEBE3;
+  --app-text: #0B2B21;
+  --app-text-muted: #2A5748;
+  --app-border: #B9D8C8;
+  --app-header-bg: #0F3D2E;
+  --app-header-border: #1A5743;
+  --app-header-text: #FFFFFF;
+  --app-accent: #D4AF37;
+  --app-primary: #0F3D2E;
+  --app-primary-soft: #1D6850;
+  --app-table-head-bg: #0F3D2E;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FAFCFB;
+  --app-table-row-alt: #EEF6F1;
+  --app-table-row-hover: #DFEDE5;
+}
+
+/* 4c. Modern Indigo Horizon */
+html[data-theme="indigo_horizon"] {
+  --app-canvas-bg: #EBEEF8;
+  --app-surface-bg: #FAFBFD;
+  --app-surface-alt: #DEE3F5;
+  --app-text: #1A1F47;
+  --app-text-muted: #454D7A;
+  --app-border: #C4CBEB;
+  --app-header-bg: #242B5E;
+  --app-header-border: #374082;
+  --app-header-text: #FFFFFF;
+  --app-accent: #7D8BFF;
+  --app-primary: #242B5E;
+  --app-primary-soft: #4B57B8;
+  --app-table-head-bg: #242B5E;
+  --app-table-head-text: #FFFFFF;
+  --app-table-row-bg: #FAFBFD;
+  --app-table-row-alt: #EFF1FA;
+  --app-table-row-hover: #E0E4F7;
+}
+
+/* 4d. Sovereign Burgundy & Gold */
+html[data-theme="burgundy_gold"] {
+  --app-canvas-bg: #F6EFF1;
+  --app-surface-bg: #FFFDFD;
+  --app-surface-alt: #EDE0E4;
+  --app-text: #3A0E19;
+  --app-text-muted: #6C3845;
+  --app-border: #DDC3CB;
+  --app-header-bg: #5B1829;
+  --app-header-border: #782339;
+  --app-header-text: #FFFDFB;
+  --app-accent: #D4A955;
+  --app-primary: #5B1829;
+  --app-primary-soft: #7E263D;
+  --app-table-head-bg: #5B1829;
+  --app-table-head-text: #FFFDFB;
+  --app-table-row-bg: #FFFDFD;
+  --app-table-row-alt: #F9F2F4;
+  --app-table-row-hover: #F1E4E8;
+}
+
 /* 5. Warm Beige */
 html[data-theme="warm_beige"] {
   --app-canvas-bg: #F5EFE6;
@@ -134,6 +239,27 @@ html[data-theme="warm_beige"] {
   --app-table-row-bg: #FCF9F4;
   --app-table-row-alt: #F3ECE0;
   --app-table-row-hover: #EAE0CF;
+}
+
+/* 5b. Desert Sand & Olive */
+html[data-theme="desert_sand"] {
+  --app-canvas-bg: #F3EEE3;
+  --app-surface-bg: #FBF9F4;
+  --app-surface-alt: #E7E1D2;
+  --app-text: #2A3024;
+  --app-text-muted: #565F4D;
+  --app-border: #D2CBB8;
+  --app-header-bg: #3E4735;
+  --app-header-border: #556149;
+  --app-header-text: #FDFBF5;
+  --app-accent: #C28E42;
+  --app-primary: #3E4735;
+  --app-primary-soft: #5B674E;
+  --app-table-head-bg: #3E4735;
+  --app-table-head-text: #FDFBF5;
+  --app-table-row-bg: #FBF9F4;
+  --app-table-row-alt: #F1ECE1;
+  --app-table-row-hover: #E6DFCF;
 }
 
 /* 6. Eye Comfort Mode (Low Blue Light Warm Paper) */
@@ -178,21 +304,42 @@ html[data-theme="dark_mode"] {
   --app-table-row-hover: #213454;
 }
 
+/* 7b. Midnight Aurora Dark */
+html[data-theme="midnight_aurora"] {
+  --app-canvas-bg: #070E1A;
+  --app-surface-bg: #0E1B2E;
+  --app-surface-alt: #142640;
+  --app-text: #E2E8F0;
+  --app-text-muted: #94A3B8;
+  --app-border: #223B5C;
+  --app-header-bg: #091526;
+  --app-header-border: #1C3554;
+  --app-header-text: #F8FAFC;
+  --app-accent: #38BDF8;
+  --app-primary: #12263A;
+  --app-primary-soft: #0EA5E9;
+  --app-table-head-bg: #0B192C;
+  --app-table-head-text: #F8FAFC;
+  --app-table-row-bg: #0E1B2E;
+  --app-table-row-alt: #13233B;
+  --app-table-row-hover: #1A3152;
+}
+
 /* 8. Custom User Theme */
 html[data-theme="custom"] {
-  --app-canvas-bg: var(--custom-bg, #F4F7FB);
+  --app-canvas-bg: var(--custom-bg, #BDC9D4);
   --app-surface-bg: var(--custom-surface, #FFFFFF);
   --app-surface-alt: var(--custom-surface-alt, #EEF2F7);
   --app-text: var(--custom-text, #102A43);
   --app-text-muted: var(--custom-text-muted, #475569);
   --app-border: var(--custom-border, #CBD5E1);
-  --app-header-bg: var(--custom-primary, #102A43);
-  --app-header-border: var(--custom-primary, #164E83);
+  --app-header-bg: var(--custom-primary, #253B4F);
+  --app-header-border: var(--custom-primary, #355068);
   --app-header-text: var(--custom-primary-text, #FFFFFF);
-  --app-accent: var(--custom-accent, #C6A15B);
-  --app-primary: var(--custom-primary, #102A43);
-  --app-primary-soft: var(--custom-primary, #164E83);
-  --app-table-head-bg: var(--custom-primary, #102A43);
+  --app-accent: var(--custom-accent, #94C9CE);
+  --app-primary: var(--custom-primary, #253B4F);
+  --app-primary-soft: var(--custom-primary, #3B717E);
+  --app-table-head-bg: var(--custom-primary, #253B4F);
   --app-table-head-text: var(--custom-primary-text, #FFFFFF);
   --app-table-row-bg: var(--custom-surface, #FFFFFF);
   --app-table-row-alt: var(--custom-surface-alt, #F4F7FB);
@@ -300,53 +447,58 @@ html[data-font-scaled="true"] .text-\[14px\] {
   font-size: calc(14px * var(--font-scale, 1)) !important;
 }
 
-/* Semantic Theme Application across All Modules (Leaves default gov_navy 100% intact) */
-html:not([data-theme="gov_navy"]) .app-shell {
-  background-color: var(--app-canvas-bg);
+/* Semantic Theme Application across All Modules (frosted_teal keeps default frosted look; all other themes adapt seamlessly) */
+html:not([data-theme="frosted_teal"]) .app-shell {
+  background: var(--app-canvas-bg);
   color: var(--app-text);
 }
 
-html:not([data-theme="gov_navy"]) header.app-header {
+html:not([data-theme="frosted_teal"]) header.app-header {
   background-color: var(--app-header-bg);
   border-color: var(--app-header-border);
   color: var(--app-header-text);
 }
 
-html:not([data-theme="gov_navy"]) footer.app-footer {
+html:not([data-theme="frosted_teal"]) footer.app-footer {
   background-color: var(--app-header-bg);
   border-color: var(--app-header-border);
   color: var(--app-header-text);
 }
 
-html:not([data-theme="gov_navy"]) aside.app-sidebar {
+html:not([data-theme="frosted_teal"]) aside.app-sidebar {
   background: var(--app-header-bg);
   border-color: var(--app-header-border);
   color: var(--app-header-text);
 }
 
-html:not([data-theme="gov_navy"]) main .bg-white,
-html:not([data-theme="gov_navy"]) .app-popover,
-html:not([data-theme="gov_navy"]) .fixed .bg-white {
-  background-color: var(--app-surface-bg);
-}
-
-html:not([data-theme="gov_navy"]) main .bg-\[\#F4F7FB\],
-html:not([data-theme="gov_navy"]) main .bg-slate-50,
-html:not([data-theme="gov_navy"]) .app-popover .bg-slate-50,
-html:not([data-theme="gov_navy"]) .fixed .bg-slate-50,
-html:not([data-theme="gov_navy"]) .fixed .bg-\[\#F4F7FB\] {
+html:not([data-theme="frosted_teal"]) main .app-workspace-frame {
   background-color: var(--app-surface-alt);
-}
-
-html:not([data-theme="gov_navy"]) main .border-slate-200,
-html:not([data-theme="gov_navy"]) main .border-slate-300,
-html:not([data-theme="gov_navy"]) .app-popover,
-html:not([data-theme="gov_navy"]) .app-popover .border-slate-200,
-html:not([data-theme="gov_navy"]) .fixed .border-slate-200 {
   border-color: var(--app-border);
 }
 
-html:not([data-theme="gov_navy"]) main table thead tr {
+html:not([data-theme="frosted_teal"]) main .bg-white,
+html:not([data-theme="frosted_teal"]) .app-popover,
+html:not([data-theme="frosted_teal"]) .fixed .bg-white {
+  background-color: var(--app-surface-bg);
+}
+
+html:not([data-theme="frosted_teal"]) main .bg-\[\#F4F7FB\],
+html:not([data-theme="frosted_teal"]) main .bg-slate-50,
+html:not([data-theme="frosted_teal"]) .app-popover .bg-slate-50,
+html:not([data-theme="frosted_teal"]) .fixed .bg-slate-50,
+html:not([data-theme="frosted_teal"]) .fixed .bg-\[\#F4F7FB\] {
+  background-color: var(--app-surface-alt);
+}
+
+html:not([data-theme="frosted_teal"]) main .border-slate-200,
+html:not([data-theme="frosted_teal"]) main .border-slate-300,
+html:not([data-theme="frosted_teal"]) .app-popover,
+html:not([data-theme="frosted_teal"]) .app-popover .border-slate-200,
+html:not([data-theme="frosted_teal"]) .fixed .border-slate-200 {
+  border-color: var(--app-border);
+}
+
+html:not([data-theme="frosted_teal"]) main table thead tr {
   background-color: var(--app-table-head-bg);
   color: var(--app-table-head-text);
 }

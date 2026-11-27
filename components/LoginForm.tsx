@@ -75,80 +75,50 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     setLoading(true);
 
     try {
-      const users = getStoredUsers();
+      const storedUsers = getStoredUsers();
       const trimmedUser = validated.data.username.toLowerCase();
+      const localMatch =
+        storedUsers.find((u) => u.username.toLowerCase() === trimmedUser) ||
+        (trimmedUser === 'admin' ? storedUsers[0] : undefined);
 
-      let found = users.find((u) => u.username.toLowerCase() === trimmedUser);
-
-      if (!found && trimmedUser === 'admin') {
-        found = users[0];
-      }
-
-      if (!found) {
-        setLoading(false);
-        setErrorMsg('اسم المستخدم غير مسجل في المنظومة. يرجى التأكد من البيانات أو تقديم طلب إنشاء حساب جديد.');
-        addAuditLog({
-          userId: 'anonymous',
-          username: validated.data.username || 'unknown',
-          fullName: 'مستخدم غير مسجل',
-          action: 'محاولة دخول فاشلة',
-          module: 'بوابة المصادقة الموحدة',
-          details: 'اسم مستخدم غير موجود',
-          ipAddress: '10.20.30.50',
-          deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
-          status: 'failed',
-        });
-        return;
-      }
-
-      if (found.status === 'suspended' || found.status === 'inactive') {
-        setLoading(false);
-        setErrorMsg('عذراً، هذا الحساب موقوف إدارياً. يرجى مراجعة مدير النظام بالمديرية.');
-        return;
-      }
-
-      if (found.passwordDisabled) {
-        setLoading(false);
-        setErrorMsg('تم حذف كلمة المرور الخاصة بهذا الحساب من قبل مدير النظام. يرجى مراجعة الإدارة لتعيين كلمة مرور جديدة.');
-        return;
-      }
-
-      if (typeof found.password === 'string' && found.password.length > 0 && found.password !== validated.data.password) {
-        setLoading(false);
-        setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة.');
-        return;
-      }
-
-      const activeBranchId = selectedBranchId || found.primaryBranchId || 'b-03';
+      const activeBranchId = selectedBranchId || localMatch?.primaryBranchId || 'b-03';
       const authRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: found.username,
+          username: localMatch?.username || validated.data.username,
           password: validated.data.password,
           branchId: activeBranchId,
-          registeredUser: {
-            id: found.id,
-            fullName: found.fullName,
-            role: found.role,
-            primaryBranchId: activeBranchId,
-          },
+          registeredUser: localMatch
+            ? {
+                id: localMatch.id,
+                fullName: localMatch.fullName,
+                role: localMatch.role,
+                primaryBranchId: activeBranchId,
+              }
+            : undefined,
         }),
       });
 
-      // Enforce 401/403/429 server auth checks whenever server bootstrap auth is active
-      if (!authRes.ok && authRes.status !== 503) {
-        const authErr = (await authRes.json().catch(() => ({}))) as { error?: string };
+      const authPayload = (await authRes.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        user?: UserType;
+      };
+
+      if (!authRes.ok || !authPayload.ok || !authPayload.user) {
         setLoading(false);
-        setErrorMsg(authErr.error || 'بيانات الدخول غير صحيحة.');
+        setErrorMsg(authPayload.error || 'اسم المستخدم أو كلمة المرور غير صحيحة.');
         return;
       }
 
+      const serverUser = authPayload.user;
       const updatedUser: UserType = {
-        ...found,
+        ...localMatch,
+        ...serverUser,
         primaryBranchId: activeBranchId,
         failedLoginAttempts: 0,
-        lastLogin: new Date().toISOString(),
+        lastLogin: serverUser.lastLogin || new Date().toISOString(),
       };
 
       setLoading(false);
@@ -172,7 +142,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
 
       setTimeout(() => {
         onLoginSuccess(updatedUser);
-      }, 400);
+      }, 300);
     } catch {
       setLoading(false);
       setErrorMsg('تعذر الاتصال بخدمة المصادقة. يرجى المحاولة مرة أخرى.');

@@ -46,11 +46,16 @@ import {
   MessageSquare,
   Bell,
   FileSpreadsheet,
+  Sparkles,
+  TrendingUp,
+  Crown,
+  Play,
 } from 'lucide-react';
 import {
   AuditLog,
   BakeryRecord,
   Branch,
+  DailyTaskRecord,
   DebtTransactionRecord,
   Department,
   InspectionRecord,
@@ -123,7 +128,7 @@ import {
 } from '@/lib/ration-commodities-store';
 import { loadGrainMaintenanceStore } from '@/lib/grain-maintenance-store';
 import { loadHrPersonnelStore } from '@/lib/hr-personnel-store';
-import { loadChatMessages, loadUnifiedNotifications } from '@/lib/major-debts-tasks-chat-store';
+import { loadChatMessages, loadDailyTasks, loadUnifiedNotifications } from '@/lib/major-debts-tasks-chat-store';
 import { loadMasterDocExpiries, subscribeDropdownLists } from '@/lib/dropdown-lists-store';
 import { useSystemPreferences } from '@/lib/user-preferences-store';
 import { getLocalizedDepartmentDesc, getLocalizedDepartmentName } from '@/lib/i18n';
@@ -168,6 +173,13 @@ const ACTIVE_TAB_STORAGE_KEY = 'gharbia_supply_active_dept_tab_v1';
 
 export default function UserPortal({ currentUser, activeBranchId }: UserPortalProps) {
   const { prefs, effectiveDensity, isRtl, t } = useSystemPreferences();
+  const isDarkTheme = prefs.themeId === 'dark_mode' || prefs.themeId === 'midnight_aurora';
+  const uiLayout = prefs.uiLayout;
+  const isTopRibbonLayout = uiLayout === 'executive_command';
+  const isCompactRailLayout = uiLayout === 'bento_mosaic';
+  const isMinimalLayout = uiLayout === 'ultra_minimal';
+  const isRoyalLayout = uiLayout === 'royal_heritage';
+  const isCockpitLayout = uiLayout === 'operations_cockpit';
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
   const [allDepartments, setAllDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
   const [bakeries, setBakeries] = useState<BakeryRecord[]>(INITIAL_BAKERIES);
@@ -178,7 +190,9 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   const [debtTransactions, setDebtTransactions] = useState<DebtTransactionRecord[]>(INITIAL_DEBT_TRANSACTIONS);
   const [todayRef, setTodayRef] = useState<string>('2026-11-25');
 
-  const [activeDeptId, setActiveDeptId] = useState<string>('d-02');
+  const [activeDeptId, setActiveDeptId] = useState<string>('d-01');
+  const [chartViewMode, setChartViewMode] = useState<'week' | 'month'>('week');
+  const [recentTasks, setRecentTasks] = useState<DailyTaskRecord[]>([]);
   const [tradeInitialScreen, setTradeInitialScreen] = useState<InternalTradeScreenId>('dashboard');
   const [grainInitialSubTab, setGrainInitialSubTab] = useState<GrainSubTabCode>('GRAIN');
   const [tasksInitialSubTab, setTasksInitialSubTab] = useState<TasksModuleSubTab>('dashboard');
@@ -240,6 +254,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         const unreadNotifs = sysNotifs.filter(
           (n) => !n.isRead && (n.recipientUserId === 'ALL' || n.recipientUserId === currentUser.id)
         ).length;
+        setRecentTasks(loadDailyTasks().slice(0, 4));
         setLiveExtraCounts({
           tradeMerchants: loadCommercialEstablishments().length,
           gasEntities: loadButaneWarehouses().length + loadFuelStations().length,
@@ -648,88 +663,130 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     saveStoredBakeries(updatedBakeries);
   };
 
+  const firstName = currentUser.fullName.split(' ')[0] || currentUser.fullName;
+
+  const weeklyBarSeries = useMemo(() => {
+    const mult = chartViewMode === 'month' ? 3 : 1;
+    const items = [
+      { label: 'المخابز', value: Math.max(12, ultraMetrics.totalBakeries * mult), grad: 'from-[#DCECEF] to-[#94C9CE]' },
+      { label: 'التجارة', value: Math.max(18, (liveExtraCounts.tradeMerchants + 14) * mult), grad: 'from-[#9BD1D6] to-[#5CA3AE]' },
+      { label: 'التموين', value: Math.max(15, (liveExtraCounts.rationItemsAndMerchants + 8) * mult), grad: 'from-[#7EBCC5] to-[#4A8A96]' },
+      { label: 'الرقابة', value: Math.max(22, (inspections.length + 18) * mult), grad: 'from-[#3B717E] to-[#254A58]' },
+      { label: 'الحبوب', value: Math.max(14, (grainEntitiesCount + 12) * mult), grad: 'from-[#88B8D6] to-[#588BAE]' },
+      { label: 'الموظفين', value: Math.max(16, (liveExtraCounts.hrEmployees + 11) * mult), grad: 'from-[#4B8196] to-[#2B5368]' },
+      { label: 'المهام', value: Math.max(13, (recentTasks.length + 12) * mult), grad: 'from-[#8A8CC4] to-[#5E619B]' },
+    ];
+    const maxVal = Math.max(...items.map((i) => i.value), 1);
+    return items.map((i) => ({ ...i, pct: Math.max(24, Math.round((i.value / maxVal) * 100)) }));
+  }, [chartViewMode, ultraMetrics.totalBakeries, liveExtraCounts, inspections.length, grainEntitiesCount, recentTasks.length]);
+
+  const sectorDonutSegments = useMemo(() => {
+    const raw = [
+      { label: 'المخابز البلدية', value: Math.max(ultraMetrics.totalBakeries, 12), color: '#5D9AC8' },
+      { label: 'التجارة والوقود', value: Math.max(liveExtraCounts.tradeMerchants + liveExtraCounts.gasEntities, 8), color: '#2F6C7B' },
+      { label: 'المهام والرقابة', value: Math.max(inspections.length + recentTasks.length, 6), color: '#7D7CB8' },
+      { label: 'صيانة الحبوب', value: Math.max(grainEntitiesCount, 5), color: '#AEBFC9' },
+      { label: 'الموارد البشرية', value: Math.max(liveExtraCounts.hrEmployees, 4), color: '#74B2AF' },
+    ];
+    const total = raw.reduce((s, x) => s + x.value, 0) || 1;
+    const radius = 40;
+    const circumference = 2 * Math.PI * radius;
+    let offset = 0;
+    return raw.map((seg) => {
+      const share = Math.round((seg.value / total) * 100);
+      const dashLength = (seg.value / total) * circumference;
+      const item = {
+        ...seg,
+        share,
+        dashArray: `${dashLength} ${circumference - dashLength}`,
+        dashOffset: -offset,
+      };
+      offset += dashLength;
+      return item;
+    });
+  }, [ultraMetrics.totalBakeries, liveExtraCounts, inspections.length, recentTasks.length, grainEntitiesCount]);
+
   const renderSidebarTabs = (isMobile = false) => (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/15">
-        {(!sidebarCollapsed || isMobile) && (
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-[#C6A15B]">
-              <Image
-                src="/assets/aistudio/logo_4234585c.jpg"
-                alt="شعار الوزارة"
-                fill
-                sizes="32px"
-                className="object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            <div className="truncate">
-              <span className="text-[10px] font-black text-[#C6A15B] block">القائمة الرئيسية للأقسام</span>
-              <h3 className="text-[11px] font-black text-white truncate max-w-[155px]">
-                {currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى'}
-              </h3>
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center gap-1 mx-auto lg:mx-0 shrink-0">
-          {isMobile ? (
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 bg-[#164E83] text-white rounded-xl cursor-pointer"
-              title="إغلاق القائمة"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          ) : (
-            <>
-              {!sidebarCollapsed && (
-                <button
-                  type="button"
-                  onClick={() => setIsSidebarPinned(!isSidebarPinned)}
-                  className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
-                    isSidebarPinned ? 'bg-[#C6A15B] text-[#102A43]' : 'bg-[#164E83] text-slate-300 hover:text-white'
-                  }`}
-                  title={isSidebarPinned ? 'إلغاء تثبيت القائمة' : 'تثبيت القائمة مفتوحة'}
-                >
-                  {isSidebarPinned ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
-                </button>
-              )}
+      {/* Top User Avatar & Greeting + Collapse Controls */}
+      <div className="flex flex-col items-center text-center pb-4 mb-3 border-b border-white/12 relative">
+        <div className="w-full flex items-center justify-between mb-2">
+          {(!sidebarCollapsed || isMobile) && (
+            <span className="text-[10px] font-black text-[#94C9CE] truncate">
+              {currentBranch?.arabicName || 'تموين الغربية'}
+            </span>
+          )}
+          <div className="flex items-center gap-1 mx-auto lg:mx-0 shrink-0">
+            {isMobile ? (
               <button
                 type="button"
-                onClick={() => {
-                  setSidebarCollapsed(!sidebarCollapsed);
-                  if (!sidebarCollapsed) setIsSidebarPinned(false);
-                }}
-                className="p-2 bg-[#164E83] hover:bg-[#1e609e] text-[#C6A15B] rounded-xl transition-colors cursor-pointer"
-                title={sidebarCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-1.5 bg-[#314D66] text-white rounded-full cursor-pointer"
+                title="إغلاق القائمة"
               >
-                {sidebarCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
+                <X className="w-4 h-4" />
               </button>
-            </>
-          )}
+            ) : (
+              <>
+                {!sidebarCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarPinned(!isSidebarPinned)}
+                    className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                      isSidebarPinned ? 'bg-[#DCECEF] text-[#1E3346]' : 'bg-[#314D66] text-slate-300 hover:text-white'
+                    }`}
+                    title={isSidebarPinned ? 'إلغاء تثبيت القائمة' : 'تثبيت القائمة مفتوحة'}
+                  >
+                    {isSidebarPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSidebarCollapsed(!sidebarCollapsed);
+                    if (!sidebarCollapsed) setIsSidebarPinned(false);
+                  }}
+                  className="p-1.5 bg-[#314D66] hover:bg-[#3B717E] text-[#94C9CE] rounded-full transition-colors cursor-pointer"
+                  title={sidebarCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
+                >
+                  {sidebarCollapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-[#94C9CE] via-[#4B8592] to-[#253B4F] border-2 border-white/65 shadow-lg flex items-center justify-center text-white font-black text-xl">
+          {currentUser.fullName.charAt(0)}
+          <span className="absolute -bottom-0.5 -left-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-[#253B4F]" />
+        </div>
+
+        {(!sidebarCollapsed || isMobile) && (
+          <div className="mt-2 min-w-0 w-full">
+            <h3 className="text-sm font-black text-white truncate">أهلاً، {firstName}!</h3>
+            <p className="text-[10.5px] font-bold text-[#94C9CE] truncate">{currentUser.jobTitle}</p>
+          </div>
+        )}
       </div>
 
       {/* Quick Search Inside Sidebar */}
       {(!sidebarCollapsed || isMobile) && (
         <div className="relative mb-3">
-          <Search className={`w-3.5 h-3.5 text-slate-300 absolute ${isRtl ? 'right-3' : 'left-3'} top-3`} />
+          <Search className={`w-3.5 h-3.5 text-slate-300 absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5`} />
           <input
             type="text"
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
             placeholder={t('searchDepartments')}
-            className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-[#164E83]/50 border border-white/15 rounded-xl text-[11px] text-white font-bold placeholder:text-slate-300 focus:outline-none focus:border-[#C6A15B]`}
+            className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 bg-[#182938]/75 border border-white/12 rounded-full text-[11px] text-white font-bold placeholder:text-slate-300 focus:outline-none focus:border-[#94C9CE]`}
           />
         </div>
       )}
 
-      {/* القائمة الجانبية المنظمة حسب التخصص مع عدادات رقمية حية بجانب كل قسم */}
+      {/* القائمة الجانبية المنظمة حسب التخصص */}
       <nav
         aria-label={t('departments')}
-        className="space-y-2.5 max-h-[calc(100vh-14.5rem)] overflow-y-auto compact-table-scroll pl-0.5"
+        className="space-y-2.5 max-h-[calc(100vh-22rem)] overflow-y-auto compact-table-scroll pl-0.5 flex-1"
       >
         {sidebarGroupedSections.map((section) => {
           const isGroupOpen = openSidebarGroups[section.id] ?? true;
@@ -741,7 +798,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                   onClick={() =>
                     setOpenSidebarGroups((prev) => ({ ...prev, [section.id]: !isGroupOpen }))
                   }
-                  className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-black text-[#C6A15B] hover:text-white cursor-pointer border-b border-white/10"
+                  className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-black text-[#94C9CE] hover:text-white cursor-pointer border-b border-white/10"
                 >
                   <span className="truncate">{section.title}</span>
                   {isGroupOpen ? (
@@ -768,7 +825,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                       whileHover={{ x: isRtl ? -3 : 3 }}
                       whileTap={{ scale: 0.98 }}
                       transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-                      className={`relative w-full flex items-center justify-between gap-1.5 py-2 rounded-xl text-[11px] font-black transition-colors cursor-pointer ${isRtl ? 'text-right' : 'text-left'} border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A15B] ${
+                      className={`relative w-full flex items-center justify-between gap-1.5 py-2.5 rounded-2xl text-[11px] font-black transition-all cursor-pointer ${isRtl ? 'text-right' : 'text-left'} border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#94C9CE] ${
                         isSubNested && (!sidebarCollapsed || isMobile)
                           ? isRtl
                             ? 'pr-4 pl-2.5'
@@ -776,8 +833,8 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                           : 'px-2.5'
                       } ${
                         isActive
-                          ? 'text-[#102A43] border-[#C6A15B] shadow-md'
-                          : 'bg-[#164E83]/25 border-white/10 text-slate-100 hover:bg-[#164E83]/60 hover:border-white/25'
+                          ? 'text-[#1E3346] border-white/80 shadow-[0_6px_16px_rgba(12,24,36,0.28)]'
+                          : 'bg-white/[0.04] border-transparent text-slate-100 hover:bg-white/[0.11] hover:border-white/15'
                       }`}
                       title={localizedDeptName}
                     >
@@ -785,21 +842,14 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                         <motion.span
                           layoutId={isMobile ? 'mobileActiveTabBg' : 'desktopActiveTabBg'}
                           transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 rounded-xl bg-gradient-to-l from-[#C6A15B] via-[#d8b878] to-[#C6A15B] z-0"
-                        />
-                      )}
-                      {isActive && (
-                        <motion.span
-                          layoutId={isMobile ? 'mobileActiveTabBar' : 'desktopActiveTabBar'}
-                          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                          className={`absolute ${isRtl ? 'right-0 rounded-l-full' : 'left-0 rounded-r-full'} top-1.5 bottom-1.5 w-1 bg-[#102A43] z-10`}
+                          className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#E5F1F3] to-[#C2DCE0] z-0"
                         />
                       )}
 
-                      <div className="relative z-10 flex items-center gap-2 min-w-0 flex-1">
+                      <div className="relative z-10 flex items-center gap-2.5 min-w-0 flex-1">
                         <span
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                            isActive ? 'bg-[#102A43] text-[#C6A15B]' : 'bg-[#0B1F33]/60 text-[#C6A15B]'
+                          className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                            isActive ? 'bg-[#253B4F] text-[#94C9CE]' : 'bg-[#182938]/75 text-[#94C9CE]'
                           }`}
                         >
                           {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5')}
@@ -815,10 +865,10 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                         <div className="relative z-10 flex items-center gap-1 shrink-0">
                           {typeof liveCount === 'number' && (
                             <span
-                              className={`num-cell px-1.5 py-0.5 rounded-md text-[9.5px] font-black ${
+                              className={`num-cell px-1.5 py-0.5 rounded-full text-[9.5px] font-black ${
                                 isActive
-                                  ? 'bg-[#102A43] text-[#C6A15B]'
-                                  : 'bg-[#0B1F33]/80 text-[#C6A15B] border border-[#C6A15B]/35'
+                                  ? 'bg-[#253B4F] text-[#E5F1F3]'
+                                  : 'bg-[#182938]/85 text-[#94C9CE] border border-white/15'
                               }`}
                             >
                               {isRtl ? toArabicNumerals(liveCount) : liveCount}
@@ -837,8 +887,8 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                             className={`p-0.5 rounded hover:bg-black/10 shrink-0 ${
                               isPinned
                                 ? isActive
-                                  ? 'text-[#102A43]'
-                                  : 'text-[#C6A15B]'
+                                  ? 'text-[#253B4F]'
+                                  : 'text-[#94C9CE]'
                                 : 'text-slate-400 opacity-45 hover:opacity-100'
                             }`}
                             title={isPinned ? 'إلغاء التثبيت بالمفضلة' : 'تثبيت بالمفضلة'}
@@ -854,21 +904,77 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
           );
         })}
       </nav>
+
+      {/* Bottom Spotlight Card inside Sidebar */}
+      {(!sidebarCollapsed || isMobile) && (
+        <div className="mt-3 rounded-[20px] bg-gradient-to-b from-[#1E3142] to-[#172635] border border-white/10 p-3.5 text-center space-y-2 shadow-inner">
+          <div className="w-9 h-9 mx-auto rounded-full bg-white/12 border border-white/20 flex items-center justify-center text-[#E5F1F3]">
+            <Crown className="w-4.5 h-4.5" />
+          </div>
+          <div>
+            <p className="text-xs font-black text-white">المهام والمحادثات</p>
+            <p className="text-[10px] font-bold text-slate-300 leading-snug mt-0.5">
+              متابعة فورية بين الموظفين وتصدير التقارير
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setTasksInitialSubTab('internal_chat');
+              handleSelectDept('d-25');
+            }}
+            className="w-full py-2 px-3 rounded-full bg-gradient-to-b from-[#4E8997] to-[#376A77] hover:brightness-110 text-white text-[11px] font-black shadow-md cursor-pointer transition-all"
+          >
+            فتح المحادثات الآن
+          </button>
+        </div>
+      )}
     </div>
   );
 
+  const workspaceFrameClass = (() => {
+    if (isDarkTheme) {
+      return 'rounded-[24px] bg-[#0F172A]/80 border border-slate-700/70 shadow-2xl p-3 sm:p-4 lg:p-5';
+    }
+    if (isMinimalLayout) {
+      return 'rounded-2xl bg-white/95 border border-slate-200 p-3 sm:p-5';
+    }
+    if (isRoyalLayout) {
+      return 'rounded-2xl bg-white/90 border-2 border-[#C6A15B]/45 shadow-md p-3 sm:p-4 lg:p-5';
+    }
+    if (isTopRibbonLayout) {
+      return 'rounded-2xl bg-white/75 backdrop-blur-sm border border-white/80 shadow-sm p-3 sm:p-4 lg:p-5';
+    }
+    return 'app-workspace-frame rounded-[30px] bg-[#CEDAE3]/85 backdrop-blur-md border border-white/65 shadow-[0_24px_60px_-15px_rgba(24,42,60,0.35)] p-3 sm:p-4 lg:p-5';
+  })();
+
+  const cardSurfaceClass = isDarkTheme
+    ? 'bg-[#131E31]/95 border border-slate-700/80 text-slate-100 shadow-lg'
+    : isMinimalLayout
+    ? 'bg-white border border-slate-200 text-[#1E3346]'
+    : isRoyalLayout
+    ? 'bg-white border border-[#C6A15B]/45 text-[#102A43] shadow-sm'
+    : 'bg-gradient-to-br from-[#D7E2EB]/90 to-[#C8D6E2]/90 border border-white/75 text-[#1E3346] shadow-[0_12px_26px_-12px_rgba(30,51,70,0.24)]';
+
+  const cardHeadingClass = isDarkTheme ? 'text-white' : 'text-[#1E3346]';
+  const cardMutedClass = isDarkTheme ? 'text-slate-300' : 'text-[#4B6378]';
+
   return (
-    <div className="flex flex-col lg:flex-row gap-5 min-h-[calc(100vh-7rem)] font-sans">
+    <div
+      className={`${workspaceFrameClass} flex flex-col ${
+        isTopRibbonLayout ? '' : 'lg:flex-row'
+      } gap-5 min-h-[calc(100vh-8rem)] font-sans transition-all`}
+    >
       {/* Mobile Sidebar Trigger */}
-      <div className="lg:hidden flex items-center justify-between bg-[#102A43] text-white px-4 py-2.5 rounded-xl border border-[#164E83] print:hidden">
+      <div className="lg:hidden flex items-center justify-between bg-[#253B4F] text-white px-4 py-2.5 rounded-2xl border border-white/15 print:hidden">
         <div className="flex items-center gap-2 text-xs font-black">
-          {renderDeptIcon(activeDept?.iconName || 'LayoutDashboard', 'w-4 h-4 text-[#C6A15B]')}
+          {renderDeptIcon(activeDept?.iconName || 'LayoutDashboard', 'w-4 h-4 text-[#94C9CE]')}
           <span>{activeDept?.arabicName}</span>
         </div>
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
-          className="px-3 py-1.5 bg-[#C6A15B] text-[#102A43] rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer"
+          className="px-3.5 py-1.5 bg-[#DCECEF] text-[#1E3346] rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer"
         >
           <Menu className="w-4 h-4" />
           <span>الأقسام</span>
@@ -891,7 +997,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               exit={{ x: '100%' }}
               transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="w-[290px] max-w-[85vw] bg-gradient-to-b from-[#0B1F33] via-[#102A43] to-[#0B1F33] text-white p-4 shadow-2xl border-l border-[#C6A15B]/30 h-full"
+              className="app-sidebar w-[290px] max-w-[85vw] bg-gradient-to-b from-[#253B4F] via-[#213649] to-[#1A2B3B] text-white p-4 shadow-2xl border-l border-white/15 h-full"
             >
               {renderSidebarTabs(true)}
             </motion.aside>
@@ -899,28 +1005,165 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         )}
       </AnimatePresence>
 
-      {/* Desktop Animated Tabbed Sidebar (adaptive width per Display Density) */}
-      <motion.aside
-        initial={false}
-        animate={{
-          width: sidebarCollapsed
-            ? '84px'
-            : effectiveDensity === 'compact'
-            ? '252px'
-            : effectiveDensity === 'spacious'
-            ? '292px'
-            : '276px',
-        }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        onMouseEnter={() => !isSidebarPinned && setSidebarCollapsed(false)}
-        onMouseLeave={() => !isSidebarPinned && setSidebarCollapsed(true)}
-        className="app-sidebar hidden lg:block bg-gradient-to-b from-[#0B1F33] via-[#102A43] to-[#0B1F33] text-white rounded-2xl shadow-lg border border-[#164E83] shrink-0 print:hidden overflow-hidden p-3 self-start sticky top-20"
-      >
-        {renderSidebarTabs(false)}
-      </motion.aside>
+      {/* Executive Command Horizontal Top Department Ribbon (when uiLayout === 'executive_command') */}
+      {isTopRibbonLayout && (
+        <nav
+          aria-label={t('departments')}
+          className="hidden lg:flex flex-col gap-2.5 p-3 rounded-2xl border print:hidden"
+          style={{
+            backgroundColor: 'var(--app-header-bg, #102A43)',
+            borderColor: 'var(--app-header-border, #1E3A5F)',
+            color: 'var(--app-header-text, #FFFFFF)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-black text-sm">
+                {currentUser.fullName.charAt(0)}
+              </div>
+              <div className="text-xs font-black">
+                {firstName} · <span className="opacity-80 font-bold">{currentUser.jobTitle}</span>
+              </div>
+            </div>
+            <div className="relative w-64">
+              <Search className={`w-3.5 h-3.5 text-slate-300 absolute ${isRtl ? 'right-3' : 'left-3'} top-2`} />
+              <input
+                type="text"
+                value={sidebarSearch}
+                onChange={(e) => setSidebarSearch(e.target.value)}
+                placeholder={t('searchDepartments')}
+                className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 bg-white/10 border border-white/15 rounded-xl text-[11px] text-white font-bold placeholder:text-slate-300 focus:outline-none`}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {filteredSidebarDepts.map((dept) => {
+              const isActive = activeDeptId === dept.id;
+              const liveCount = deptLiveCounts[dept.code];
+              const localizedDeptName = getLocalizedDepartmentName(dept.code, dept.arabicName, prefs.language);
+              return (
+                <button
+                  key={dept.id}
+                  type="button"
+                  onClick={() => handleSelectDept(dept.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer whitespace-nowrap shrink-0 border ${
+                    isActive
+                      ? 'bg-white text-[#102A43] border-white shadow-sm'
+                      : 'bg-white/10 text-white/95 border-white/10 hover:bg-white/20'
+                  }`}
+                >
+                  {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5 shrink-0')}
+                  <span>{localizedDeptName}</span>
+                  {typeof liveCount === 'number' && (
+                    <span className="num-cell text-[10px] opacity-75">
+                      ({isRtl ? toArabicNumerals(liveCount) : liveCount})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
 
-      {/* Main Content Viewport (section — avoids nested <main> landmark) */}
-      <section className="flex-1 min-w-0">
+      {/* Desktop Sidebar (Floating Slate, Compact Icon Rail for Bento, or Sovereign Frame) */}
+      {!isTopRibbonLayout && (
+        <motion.aside
+          initial={false}
+          animate={{
+            width:
+              sidebarCollapsed || isCompactRailLayout
+                ? '86px'
+                : effectiveDensity === 'compact'
+                ? '252px'
+                : effectiveDensity === 'spacious'
+                ? '292px'
+                : '276px',
+          }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          onMouseEnter={() => (!isSidebarPinned || isCompactRailLayout) && setSidebarCollapsed(false)}
+          onMouseLeave={() => (!isSidebarPinned || isCompactRailLayout) && setSidebarCollapsed(true)}
+          className={`app-sidebar hidden lg:flex flex-col bg-gradient-to-b from-[#253B4F] via-[#213649] to-[#1A2B3B] text-white ${
+            isMinimalLayout || isRoyalLayout ? 'rounded-2xl' : 'rounded-[24px]'
+          } shadow-[0_18px_40px_-12px_rgba(16,28,40,0.45)] border border-white/15 shrink-0 print:hidden overflow-hidden p-3.5 self-start sticky top-20`}
+        >
+          {renderSidebarTabs(false)}
+        </motion.aside>
+      )}
+
+      {/* Main Content Viewport */}
+      <section className="flex-1 min-w-0 space-y-4">
+        {/* Top Workspace Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1 print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className={`text-lg sm:text-xl font-black tracking-tight ${cardHeadingClass}`}>
+              {activeDept ? getLocalizedDepartmentName(activeDept.code, activeDept.arabicName, prefs.language) : 'لوحة القيادة المركزية'}
+            </h2>
+            <span className={`hidden sm:inline text-[11px] font-bold ${cardMutedClass}`}>
+              · {currentBranch?.arabicName || 'محافظة الغربية'}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 flex-1 sm:flex-initial justify-end">
+            <div className="relative flex-1 sm:w-64 max-w-xs">
+              <Search className={`w-4 h-4 text-[#556C80] absolute ${isRtl ? 'right-3.5' : 'left-3.5'} top-2.5`} />
+              <input
+                type="text"
+                value={sidebarSearch}
+                onChange={(e) => setSidebarSearch(e.target.value)}
+                placeholder="بحث سريع في الأقسام والخدمات..."
+                className={`w-full ${isRtl ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-full bg-[#DCE5EC]/90 border border-white/85 text-xs font-bold text-[#1E3346] placeholder:text-[#5E7488] shadow-inner focus:outline-none focus:ring-2 focus:ring-[#3B717E]`}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setTasksInitialSubTab('internal_chat');
+                handleSelectDept('d-25');
+              }}
+              className="relative w-10 h-10 rounded-full bg-gradient-to-b from-[#EFF5F9] to-[#CFDDE7] hover:brightness-105 border border-white/85 shadow-sm flex items-center justify-center text-[#253B4F] cursor-pointer"
+              title="المحادثات الداخلية بين الموظفين"
+            >
+              <MessageSquare className="w-4.5 h-4.5" />
+              {liveExtraCounts.unreadChat > 0 && (
+                <span className="num-cell absolute -top-1 -right-1 px-1.5 py-0.2 bg-[#3B717E] text-white rounded-full text-[9.5px] font-black">
+                  {toArabicNumerals(liveExtraCounts.unreadChat)}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setTasksInitialSubTab('notifications');
+                handleSelectDept('d-25');
+              }}
+              className="relative w-10 h-10 rounded-full bg-gradient-to-b from-[#EFF5F9] to-[#CFDDE7] hover:brightness-105 border border-white/85 shadow-sm flex items-center justify-center text-[#253B4F] cursor-pointer"
+              title="مركز التنبيهات والإشعارات"
+            >
+              <Bell className="w-4.5 h-4.5" />
+              {liveExtraCounts.unreadNotifs > 0 && (
+                <span className="num-cell absolute -top-1 -right-1 px-1.5 py-0.2 bg-red-600 text-white rounded-full text-[9.5px] font-black">
+                  {toArabicNumerals(liveExtraCounts.unreadNotifs)}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setTasksInitialSubTab('reports_center');
+                handleSelectDept('d-25');
+              }}
+              className="w-10 h-10 rounded-full bg-gradient-to-b from-[#6FAAB3] to-[#3B717E] hover:brightness-110 border border-white/50 shadow-sm flex items-center justify-center text-white cursor-pointer"
+              title="مركز التقارير الموحد"
+            >
+              <FileSpreadsheet className="w-4.5 h-4.5" />
+            </button>
+          </div>
+        </div>
+
         <AnimatePresence mode="wait">
           <motion.div
             key={activeDept?.id || 'default'}
@@ -937,12 +1180,39 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
             )}
 
             {activeDept?.code === 'DASH' && (
-              <div className="space-y-5">
-                {/* Hero Sovereign Banner + Enlarged Employee Chat, Notifications & Reports Strip */}
-                <div className="bg-gradient-to-l from-[#0B1F33] via-[#102A43] to-[#164E83] text-white rounded-2xl p-6 shadow-md border border-[#164E83] space-y-4">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="space-y-4">
+                {/* 1. Central Command Hero Banner with Architectural Directorate Visual */}
+                <div
+                  className={`relative overflow-hidden ${
+                    isMinimalLayout || isRoyalLayout ? 'rounded-2xl' : 'rounded-[24px]'
+                  } p-5 sm:p-6 text-white shadow-[0_16px_34px_-12px_rgba(24,42,60,0.45)] border ${
+                    isRoyalLayout ? 'border-[#C6A15B]/70' : 'border-white/20'
+                  }`}
+                  style={{ backgroundColor: 'var(--app-header-bg, #1E3344)' }}
+                >
+                  <Image
+                    src="/images/dashboard/supply_command_hero.jpg"
+                    alt="لوحة القيادة المركزية — مديرية التموين بالغربية"
+                    fill
+                    sizes="100vw"
+                    className="object-cover opacity-35"
+                    referrerPolicy="no-referrer"
+                    priority
+                  />
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background:
+                        'linear-gradient(105deg, rgba(16,42,67,0.94) 0%, rgba(28,58,82,0.88) 55%, rgba(20,52,66,0.78) 100%)',
+                    }}
+                  />
+
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative z-10">
                     <div className="flex items-center gap-4">
-                      <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-white shrink-0 border-2 border-[#C6A15B] shadow-md">
+                      <div
+                        className="relative w-16 h-16 rounded-2xl overflow-hidden bg-white shrink-0 border-2 shadow-md"
+                        style={{ borderColor: 'var(--app-accent, #94C9CE)' }}
+                      >
                         <Image
                           src="/assets/aistudio/logo_4234585c.jpg"
                           alt="شعار وزارة التموين"
@@ -953,14 +1223,17 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                         />
                       </div>
                       <div>
-                        <p className="text-[11px] font-black text-[#C6A15B] mb-1">
+                        <span
+                          className="text-[11px] font-black block mb-0.5"
+                          style={{ color: 'var(--app-accent, #94C9CE)' }}
+                        >
                           {t('republicSubtitle')}
-                        </p>
-                        <h2 className="text-xl sm:text-2xl font-black">
-                          {t('centralDashboardTitle')} — {currentBranch?.arabicName}
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                          مرحباً، {currentUser.fullName}
                         </h2>
-                        <p className="text-[11px] text-slate-200 font-bold mt-1">
-                          {t('centralDashboardDesc')}
+                        <p className="text-xs text-slate-200 font-bold mt-1">
+                          {t('centralDashboardTitle')} — متابعة فورية للمخابز والمديونيات والتجارة الداخلية والرقابة
                         </p>
                       </div>
                     </div>
@@ -968,175 +1241,443 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                     <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                       <button
                         type="button"
+                        onClick={() => handleSelectDept('d-02')}
+                        className="px-5 py-2.5 rounded-xl bg-white text-[#102A43] hover:bg-slate-100 font-black text-xs flex items-center gap-2 shadow-md cursor-pointer whitespace-nowrap"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>{t('openBakerySystem')}</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => {
                           setTasksInitialSubTab('internal_chat');
                           handleSelectDept('d-25');
                         }}
-                        className="px-5 py-3.5 bg-gradient-to-l from-[#C6A15B] to-[#dfc082] hover:from-[#b58f48] hover:to-[#C6A15B] text-[#102A43] font-black rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg border-2 border-white/40 cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-black text-xs flex items-center gap-2 border border-white/25 cursor-pointer whitespace-nowrap"
                       >
-                        <MessageSquare className="w-5 h-5" />
-                        <span>المحادثات الداخلية والإشعارات بين الموظفين</span>
+                        <MessageSquare className="w-4 h-4" style={{ color: 'var(--app-accent, #94C9CE)' }} />
+                        <span>المحادثات الداخلية</span>
                         {(liveExtraCounts.unreadChat + liveExtraCounts.unreadNotifs) > 0 && (
-                          <span className="num-cell px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px]">
+                          <span className="num-cell px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[10px]">
                             {toArabicNumerals(liveExtraCounts.unreadChat + liveExtraCounts.unreadNotifs)}
                           </span>
                         )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTasksInitialSubTab('notifications');
-                          handleSelectDept('d-25');
-                        }}
-                        className="px-4 py-3 bg-white/15 hover:bg-white/25 text-white font-black rounded-xl text-xs flex items-center gap-1.5 border border-[#C6A15B]/50 cursor-pointer"
-                      >
-                        <Bell className="w-4 h-4 text-[#C6A15B]" />
-                        <span>مركز التنبيهات</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTasksInitialSubTab('reports_center');
-                          handleSelectDept('d-25');
-                        }}
-                        className="px-4 py-3 bg-white/15 hover:bg-white/25 text-white font-black rounded-xl text-xs flex items-center gap-1.5 border border-white/25 cursor-pointer"
-                      >
-                        <FileSpreadsheet className="w-4 h-4 text-[#C6A15B]" />
-                        <span>مركز التقارير</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSelectDept('d-02')}
-                        className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center gap-2 shrink-0 shadow-md cursor-pointer"
-                      >
-                        <Flame className="w-4 h-4" />
-                        <span>{t('openBakerySystem')}</span>
-                        <ArrowLeft className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* 8 Animated Colored Enterprise KPI Cards across all 6 themes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 2. Row of 4 Primary KPI Cards */}
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-2 ${
+                    isRoyalLayout ? 'lg:grid-cols-3' : 'lg:grid-cols-4'
+                  } gap-4`}
+                >
                   <AnimatedStatCard
                     title="إجمالي المخابز المسجلة"
                     value={ultraMetrics.totalBakeries}
                     unit="مخبز بلدي مدعم"
-                    indicator="إجماليات المركز"
+                    indicator="نشط بالمنظومة"
                     icon={Flame}
-                    theme="navy"
+                    theme="teal"
                     delay={0}
                     onClick={() => handleSelectDept('d-02')}
                   />
                   <AnimatedStatCard
                     title="إجمالي المستخدمين"
                     value={ultraMetrics.totalUsers}
-                    unit="حساب معتمد"
-                    indicator="كادر إداري"
+                    unit="حساب وكادر إداري"
+                    indicator={`${toArabicNumerals(ultraMetrics.totalBranches)} إدارات`}
                     icon={Users}
-                    theme="purple"
-                    delay={0.04}
+                    theme="blue"
+                    delay={0.05}
                     onClick={() => handleSelectDept('d-22')}
-                  />
-                  <AnimatedStatCard
-                    title="الإدارات التموينية بالمحافظة"
-                    value={ultraMetrics.totalBranches}
-                    unit="إدارة تموينية"
-                    indicator="محافظة الغربية"
-                    icon={Building2}
-                    theme="teal"
-                    delay={0.08}
-                    onClick={() => handleSelectDept('d-22')}
-                  />
-                  <AnimatedStatCard
-                    title="إجمالي المديونيات المتبقية"
-                    value={ultraMetrics.totalDebts}
-                    format="currency"
-                    indicator="مؤشر مالي"
-                    icon={CreditCard}
-                    theme="gold"
-                    delay={0.12}
-                    onClick={() => handleSelectDept('d-03')}
-                  />
-                  <AnimatedStatCard
-                    title="المخالفات والمحاضر الرقابية"
-                    value={ultraMetrics.totalViolations}
-                    unit="محضر ومخالفة"
-                    indicator="حملات التفتيش"
-                    icon={ShieldAlert}
-                    theme="red"
-                    delay={0.16}
-                    onClick={() => handleSelectDept('d-16')}
-                  />
-                  <AnimatedStatCard
-                    title="المعاملات والحركات الموثقة"
-                    value={ultraMetrics.totalTransactions}
-                    unit="عملية مسجلة"
-                    indicator="عمليات مكتملة"
-                    icon={History}
-                    theme="green"
-                    delay={0.2}
-                    onClick={() => handleSelectDept('d-23')}
                   />
                   <AnimatedStatCard
                     title="تنبيهات التراخيص والعقود"
                     value={ultraMetrics.totalAlerts}
-                    unit="مستند للتجديد"
-                    indicator="تنبيهات عاجلة"
+                    unit="مستند قيد المتابعة"
+                    indicator="تحديث يومي"
                     icon={AlertTriangle}
-                    theme="red"
-                    delay={0.24}
+                    theme="navy"
+                    delay={0.1}
                     onClick={() => handleSelectDept('d-02')}
                   />
-                  <AnimatedStatCard
-                    title="عمليات قيد المراجعة"
-                    value={ultraMetrics.pendingReviews}
-                    unit="طلب / مخبز"
-                    indicator="متابعة إدارية"
-                    icon={CheckCircle2}
-                    theme="purple"
-                    delay={0.28}
-                    onClick={() => handleSelectDept('d-22')}
-                  />
+                  {(!isRoyalLayout || isCockpitLayout) && (
+                    <AnimatedStatCard
+                      title="المخالفات والمحاضر"
+                      value={ultraMetrics.totalViolations}
+                      unit="محضر وحملة رقابية"
+                      indicator="متابعة ميدانية"
+                      icon={ShieldAlert}
+                      theme="purple"
+                      delay={0.15}
+                      onClick={() => handleSelectDept('d-16')}
+                    />
+                  )}
                 </div>
 
-                {/* Departments Directory Grid */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div>
-                      <h3 className="text-[15px] font-black text-[#102A43]">{t('mainDepartmentsTitle')}</h3>
-                      <p className="text-[11px] font-bold text-slate-600">{t('mainDepartmentsDesc')}</p>
+                {/* 3. Visual Sector Showcase Cards (Reference Images: Bakeries · Grain & Silos · Internal Trade) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    {
+                      id: 'd-02',
+                      title: 'منظومة المخابز والمديونيات',
+                      subtitle: `${toArabicNumerals(ultraMetrics.totalBakeries)} مخبز مسجل · متابعة الحصص والدقيق`,
+                      metric: `${formatArabicNumber(Math.round(ultraMetrics.totalDebts))} ج.م مديونيات`,
+                      img: '/images/dashboard/sector_bakeries.jpg',
+                      actionLabel: 'فتح منظومة المخابز',
+                    },
+                    {
+                      id: 'd-08',
+                      title: 'صيانة الحبوب والشون والمطاحن',
+                      subtitle: `${toArabicNumerals(grainEntitiesCount)} موقع صيانة · الشون والصوامع والثلاجات`,
+                      metric: 'فحص وجودة وأصول هندسية',
+                      img: '/images/dashboard/sector_grain_silos.jpg',
+                      actionLabel: 'فتح قطاع الحبوب',
+                    },
+                    {
+                      id: 'd-04',
+                      title: 'التجارة الداخلية والوقود والسلع',
+                      subtitle: `${toArabicNumerals(liveExtraCounts.tradeMerchants + liveExtraCounts.gasEntities)} منشأة ومستودع · رقابة الأسواق`,
+                      metric: `${toArabicNumerals(liveExtraCounts.rationItemsAndMerchants)} سلعة وتاجر تمويني`,
+                      img: '/images/dashboard/sector_internal_trade.jpg',
+                      actionLabel: 'فتح التجارة الداخلية',
+                    },
+                  ].map((sector) => (
+                    <div
+                      key={sector.id}
+                      onClick={() => handleSelectDept(sector.id)}
+                      className={`group relative overflow-hidden ${
+                        isMinimalLayout ? 'rounded-xl' : 'rounded-2xl'
+                      } border ${
+                        isDarkTheme
+                          ? 'border-slate-700 bg-[#131E31]'
+                          : isRoyalLayout
+                          ? 'border-[#C6A15B]/50 bg-white'
+                          : 'border-white/75 bg-white'
+                      } shadow-sm hover:shadow-lg transition-all cursor-pointer flex flex-col`}
+                    >
+                      <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                        <Image
+                          src={sector.img}
+                          alt={sector.title}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/35 to-transparent" />
+                        <div className="absolute bottom-2.5 right-3 left-3 flex items-end justify-between gap-2 text-white">
+                          <h3 className="text-sm font-black leading-snug">{sector.title}</h3>
+                          <span className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-3.5 flex-1 flex flex-col justify-between gap-2">
+                        <p className={`text-[11px] font-bold leading-snug ${cardMutedClass}`}>
+                          {sector.subtitle}
+                        </p>
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[10.5px] font-black">
+                          <span className={`num-cell ${cardHeadingClass}`}>{sector.metric}</span>
+                          <span style={{ color: isDarkTheme ? '#7DD3FC' : 'var(--app-primary-soft, #164E83)' }}>
+                            {sector.actionLabel}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="num-cell text-[11px] font-black text-[#164E83]">
+                  ))}
+                </div>
+
+                {/* 4. Visual Analytics Row: Capsule Bar Chart + SVG Donut Chart */}
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                  {/* Capsule Bar Chart */}
+                  <div
+                    className={`${
+                      isCompactRailLayout ? 'xl:col-span-6' : 'xl:col-span-7'
+                    } ${isMinimalLayout ? 'rounded-xl' : 'rounded-[24px]'} p-5 space-y-4 ${cardSurfaceClass}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <h3 className={`text-sm font-black ${cardHeadingClass}`}>نظرة عامة على النشاط والرقابة</h3>
+                        <p className={`text-[11px] font-bold ${cardMutedClass}`}>توزيع العمليات التموينية والرقابية عبر القطاعات</p>
+                      </div>
+                      <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 p-1 rounded-xl border border-black/10 dark:border-white/15">
+                        <button
+                          type="button"
+                          onClick={() => setChartViewMode('week')}
+                          className={`px-3 py-1 rounded-lg text-[10.5px] font-black cursor-pointer transition-all whitespace-nowrap ${
+                            chartViewMode === 'week'
+                              ? 'bg-[#253B4F] text-white shadow-xs'
+                              : cardMutedClass
+                          }`}
+                        >
+                          هذا الأسبوع
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setChartViewMode('month')}
+                          className={`px-3 py-1 rounded-lg text-[10.5px] font-black cursor-pointer transition-all whitespace-nowrap ${
+                            chartViewMode === 'month'
+                              ? 'bg-[#253B4F] text-white shadow-xs'
+                              : cardMutedClass
+                          }`}
+                        >
+                          هذا الشهر
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="h-44 flex items-end justify-between gap-2.5 sm:gap-4 pt-3 px-2 border-b border-slate-300/60 dark:border-slate-700 pb-2">
+                      {weeklyBarSeries.map((bar) => (
+                        <div key={bar.label} className="flex-1 flex flex-col items-center justify-end h-full gap-1.5 group">
+                          <span className={`num-cell text-[10px] font-black opacity-80 group-hover:opacity-100 ${cardHeadingClass}`}>
+                            {toArabicNumerals(bar.value)}
+                          </span>
+                          <div className="w-full max-w-[34px] h-28 flex items-end justify-center">
+                            <div
+                              className={`w-full rounded-full bg-gradient-to-b ${bar.grad} shadow-[0_6px_14px_rgba(30,51,70,0.22)] transition-all duration-300 group-hover:scale-y-105 origin-bottom`}
+                              style={{ height: `${bar.pct}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-black truncate max-w-full ${cardMutedClass}`}>
+                            {bar.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* SVG Donut Chart */}
+                  <div
+                    className={`${
+                      isCompactRailLayout ? 'xl:col-span-6' : 'xl:col-span-5'
+                    } ${isMinimalLayout ? 'rounded-xl' : 'rounded-[24px]'} p-5 flex flex-col justify-between gap-3 ${cardSurfaceClass}`}
+                  >
+                    <div>
+                      <h3 className={`text-sm font-black ${cardHeadingClass}`}>توزيع القطاعات والمنشآت</h3>
+                      <p className={`text-[11px] font-bold ${cardMutedClass}`}>نسبة الحجم التشغيلي لكل قطاع داخل المديرية</p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="relative w-32 h-32 shrink-0 flex items-center justify-center">
+                        <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90 drop-shadow-sm">
+                          <circle cx="60" cy="60" r="40" fill="none" stroke={isDarkTheme ? '#1E293B' : '#B7C8D6'} strokeWidth="18" />
+                          {sectorDonutSegments.map((seg) => (
+                            <circle
+                              key={seg.label}
+                              cx="60"
+                              cy="60"
+                              r="40"
+                              fill="none"
+                              stroke={seg.color}
+                              strokeWidth="18"
+                              strokeDasharray={seg.dashArray}
+                              strokeDashoffset={seg.dashOffset}
+                            />
+                          ))}
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                          <span className={`num-cell text-sm font-black ${cardHeadingClass}`}>
+                            {toArabicNumerals(ultraMetrics.totalTransactions)}
+                          </span>
+                          <span className={`text-[9px] font-bold ${cardMutedClass}`}>عملية</span>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 w-full space-y-2">
+                        {sectorDonutSegments.map((seg) => (
+                          <div key={seg.label} className={`flex items-center justify-between gap-2 text-[11px] font-black ${cardHeadingClass}`}>
+                            <span className="flex items-center gap-2 truncate">
+                              <span className="w-3 h-3 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: seg.color }} />
+                              <span className="truncate">{seg.label}</span>
+                            </span>
+                            <span className={`num-cell ${cardMutedClass}`}>{toArabicNumerals(seg.share)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Bottom 2-Column Activity & Financial Spotlight */}
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                  {/* Recent Tasks & Operations List */}
+                  <div className={`xl:col-span-6 ${isMinimalLayout ? 'rounded-xl' : 'rounded-[24px]'} p-5 space-y-3 ${cardSurfaceClass}`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className={`text-sm font-black ${cardHeadingClass}`}>أحدث المهام والتكليفات اليومية</h3>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDept('d-25')}
+                        className="px-3 py-1 rounded-xl bg-white/80 hover:bg-white text-[10.5px] font-black text-[#253B4F] border border-slate-200 cursor-pointer whitespace-nowrap"
+                      >
+                        عرض الكل
+                      </button>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {(recentTasks.length > 0 ? recentTasks.slice(0, 3) : [
+                        { id: 't1', title: 'مراجعة حصص الدقيق اليومية للمخابز البلدية', primaryAssigneeName: 'قسم الرقابة التموينية', status: 'جارٍ التنفيذ' },
+                        { id: 't2', title: 'تحصيل الأقساط المستحقة لمديونيات أصحاب المخابز', primaryAssigneeName: 'قسم المديونيات', status: 'مهمة يومية' },
+                        { id: 't3', title: 'فحص مستودعات البوتاجاز ومحطات الوقود بالمركز', primaryAssigneeName: 'التجارة الداخلية', status: 'مكتملة' },
+                      ]).map((task, idx) => (
+                        <div
+                          key={task.id}
+                          onClick={() => handleSelectDept('d-25')}
+                          className={`flex items-center justify-between gap-3 p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                            isDarkTheme
+                              ? 'bg-slate-800/70 hover:bg-slate-800 border-slate-700'
+                              : 'bg-white/75 hover:bg-white border-white/80'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs ${
+                                idx === 0 ? 'bg-gradient-to-br from-[#3B717E] to-[#253B4F]' : idx === 1 ? 'bg-gradient-to-br from-[#6B7E9E] to-[#3B4B6B]' : 'bg-gradient-to-br from-[#5B9A93] to-[#2D625C]'
+                              }`}
+                            >
+                              <ListChecks className="w-4.5 h-4.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black truncate ${cardHeadingClass}`}>{task.title}</p>
+                              <p className={`text-[10.5px] font-bold truncate ${cardMutedClass}`}>
+                                {task.primaryAssigneeName} · {task.status}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="w-8 h-8 rounded-xl bg-gradient-to-b from-[#6FAAB3] to-[#3B717E] text-white flex items-center justify-center shrink-0 shadow-xs">
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Financial Spotlight Card */}
+                  <div
+                    className={`xl:col-span-6 ${isMinimalLayout ? 'rounded-xl' : 'rounded-[24px]'} border border-white/15 p-5 text-white shadow-[0_16px_34px_-12px_rgba(24,42,60,0.48)] flex flex-col justify-between gap-4`}
+                    style={{
+                      background:
+                        'linear-gradient(135deg, var(--app-header-bg, #1C2F40) 0%, var(--app-primary-soft, #2C5566) 100%)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black flex items-center gap-1.5" style={{ color: 'var(--app-accent, #94C9CE)' }}>
+                        <TrendingUp className="w-4 h-4" />
+                        <span>الموقف المالي ومديونيات المخابز</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDept('d-03')}
+                        className="px-3 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-[10.5px] font-black text-white border border-white/20 cursor-pointer whitespace-nowrap"
+                      >
+                        عرض الكل
+                      </button>
+                    </div>
+
+                    <div className="rounded-2xl bg-black/20 border border-white/10 p-4 flex items-center justify-between gap-4">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-300 block">إجمالي المديونيات المتبقية بالسجل</span>
+                        <div className="num-cell text-2xl sm:text-3xl font-black text-white mt-1">
+                          {formatArabicNumber(Math.round(ultraMetrics.totalDebts))} ج.م
+                        </div>
+                        <span className="text-[11px] font-extrabold block mt-1" style={{ color: 'var(--app-accent, #94C9CE)' }}>
+                          عدد {toArabicNumerals(deptLiveCounts.DEBTS)} مخبزاً ضمن سجل المتابعة المالية
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDept('d-03')}
+                        className="w-12 h-12 rounded-xl bg-white/20 hover:bg-white/30 transition-all flex items-center justify-center text-white shadow-lg border border-white/30 shrink-0 cursor-pointer"
+                        title="فتح منظومة إدارة المديونيات"
+                      >
+                        <CreditCard className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-200">
+                      <span>المعاملات الموثقة: <span className="num-cell" style={{ color: 'var(--app-accent, #94C9CE)' }}>{toArabicNumerals(ultraMetrics.totalTransactions)}</span></span>
+                      <span>عمليات قيد المراجعة: <span className="num-cell" style={{ color: 'var(--app-accent, #94C9CE)' }}>{toArabicNumerals(ultraMetrics.pendingReviews)}</span></span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 6. Bottom Reports Spotlight Bar */}
+                <div className={`${isMinimalLayout ? 'rounded-xl' : 'rounded-[22px]'} p-4 flex flex-wrap items-center justify-between gap-3 ${cardSurfaceClass}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[#2B6270] dark:text-sky-300 shadow-xs shrink-0">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`text-xs sm:text-sm font-black ${cardHeadingClass}`}>
+                        مركز التقارير الموحد والتصدير الفوري
+                      </p>
+                      <p className={`text-[11px] font-bold ${cardMutedClass}`}>
+                        ١٥ تقريراً رسمياً جاهزاً للطباعة والتصدير لجميع إدارات وأقسام المديرية
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTasksInitialSubTab('reports_center');
+                      handleSelectDept('d-25');
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-[#253B4F] hover:bg-[#164E83] text-white text-xs font-black shadow-sm cursor-pointer whitespace-nowrap"
+                  >
+                    استعراض التقارير الآن
+                  </button>
+                </div>
+
+                {/* 7. Departments Directory Grid */}
+                <div
+                  className={`${isMinimalLayout ? 'rounded-xl' : 'rounded-[24px]'} p-5 space-y-4 ${
+                    isDarkTheme
+                      ? 'bg-[#131E31]/95 border border-slate-700/80'
+                      : 'bg-white/85 backdrop-blur-md border border-white/80 shadow-xs'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 dark:border-slate-700 pb-3">
+                    <div>
+                      <h3 className={`text-[15px] font-black ${cardHeadingClass}`}>{t('mainDepartmentsTitle')}</h3>
+                      <p className={`text-[11px] font-bold ${cardMutedClass}`}>{t('mainDepartmentsDesc')}</p>
+                    </div>
+                    <span className={`num-cell text-[11px] font-black ${cardMutedClass}`}>
                       {isRtl ? toArabicNumerals(filteredSidebarDepts.length) : filteredSidebarDepts.length} {t('authorizedSections')}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  <div
+                    className={`grid grid-cols-1 sm:grid-cols-2 ${
+                      isCockpitLayout ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+                    } gap-3.5`}
+                  >
                     {filteredSidebarDepts.map((dept) => (
                       <div
                         key={dept.id}
                         onClick={() => handleSelectDept(dept.id)}
-                        className="p-4 rounded-xl border border-slate-200 hover:border-[#102A43] bg-[#F4F7FB]/50 hover:bg-white transition-all cursor-pointer flex flex-col justify-between"
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between shadow-xs ${
+                          isDarkTheme
+                            ? 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 hover:border-sky-400/50'
+                            : 'border-slate-200/80 hover:border-[#3B717E] bg-[#EEF3F7]/85 hover:bg-white'
+                        }`}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-[#102A43] text-[#C6A15B] flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-[#253B4F] text-[#94C9CE] flex items-center justify-center shrink-0">
                             {renderDeptIcon(dept.iconName, 'w-5 h-5')}
                           </div>
                           <div>
-                            <h4 className="text-[13px] font-black text-[#102A43]">
+                            <h4 className={`text-[13px] font-black ${cardHeadingClass}`}>
                               {getLocalizedDepartmentName(dept.code, dept.arabicName, prefs.language)}
                             </h4>
-                            <p className="text-[11px] font-bold text-slate-600 mt-0.5 leading-relaxed">
+                            <p className={`text-[11px] font-bold mt-0.5 leading-relaxed ${cardMutedClass}`}>
                               {getLocalizedDepartmentDesc(dept.code, dept.description, prefs.language)}
                             </p>
                           </div>
                         </div>
-                        <div className="mt-3.5 pt-2.5 border-t border-slate-200/70 flex items-center justify-between text-[10.5px] font-black text-[#164E83]">
+                        <div className={`mt-3.5 pt-2.5 border-t border-slate-200/70 dark:border-slate-700 flex items-center justify-between text-[10.5px] font-black ${cardMutedClass}`}>
                           <span>
                             {dept.code === 'BAK'
                               ? `${isRtl ? toArabicNumerals(ultraMetrics.totalBakeries) : ultraMetrics.totalBakeries} ${t('registeredBakeries')}`

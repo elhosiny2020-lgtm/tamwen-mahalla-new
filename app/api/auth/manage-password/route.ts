@@ -6,6 +6,10 @@ import {
   deleteServerUserPassword,
   setServerUserPassword,
 } from '@/lib/server/admin-credential-store';
+import {
+  deleteDbUserPasswordByUsername,
+  setDbUserPasswordByUsername,
+} from '@/lib/server/users-db';
 import { getClientIp } from '@/lib/server/rate-limit';
 
 const ManagePasswordSchema = z.object({
@@ -39,6 +43,7 @@ export async function POST(req: NextRequest) {
 
   if (action === 'delete') {
     deleteServerUserPassword(username);
+    await deleteDbUserPasswordByUsername(username);
     recordServerAuditLog({
       userId: auth.session.userId,
       username: auth.session.username,
@@ -46,7 +51,7 @@ export async function POST(req: NextRequest) {
       action: 'حذف كلمة مرور مستخدم',
       module: 'إدارة المستخدمين والصلاحيات',
       branchId: auth.session.branchId,
-      details: `تم حذف كلمة مرور الحساب (${username}) وتعطيل الدخول بها لحين تعيين كلمة مرور جديدة`,
+      details: `تم حذف كلمة مرور الحساب (${username}) بقاعدة البيانات وتعطيل الدخول بها لحين تعيين كلمة مرور جديدة`,
       ipAddress: ip,
       deviceInfo: userAgent,
       status: 'success',
@@ -62,6 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   const res = setServerUserPassword(username, password, auth.session.username);
+  await setDbUserPasswordByUsername(username, password);
   if (!res.ok) {
     return NextResponse.json({ ok: false, error: 'تعذر تحديث كلمة المرور.' }, { status: 400 });
   }
@@ -73,7 +79,7 @@ export async function POST(req: NextRequest) {
     action: 'إضافة / تعديل كلمة مرور مستخدم',
     module: 'إدارة المستخدمين والصلاحيات',
     branchId: auth.session.branchId,
-    details: `تم تعيين أو تحديث كلمة مرور الحساب (${username}) بنجاح`,
+    details: `تم تحديث كلمة مرور الحساب (${username}) وحفظها مشفرة بقاعدة البيانات`,
     ipAddress: ip,
     deviceInfo: userAgent,
     status: 'success',

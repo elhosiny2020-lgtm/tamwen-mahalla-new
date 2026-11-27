@@ -95,17 +95,20 @@ export default function Home() {
 
   if (!hydrated) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A192F] font-sans text-white">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#253B4F] font-sans text-white">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-4 border-[#C6A15B]/30 border-t-[#C6A15B] animate-spin" />
-          <p className="text-sm font-bold text-[#C6A15B]">{t('loadingSystem')}</p>
+          <div className="w-12 h-12 rounded-full border-4 border-[#94C9CE]/30 border-t-[#94C9CE] animate-spin" />
+          <p className="text-sm font-bold text-[#94C9CE]">{t('loadingSystem')}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="app-shell min-h-screen flex flex-col bg-[#F4F7FB] font-sans text-[#243447] selection:bg-[#102A43] selection:text-white">
+    <div
+      className="app-shell min-h-screen flex flex-col font-sans selection:bg-[#253B4F] selection:text-white transition-colors"
+      style={{ backgroundColor: 'var(--app-canvas-bg, #BDC9D4)', color: 'var(--app-text, #1E3346)' }}
+    >
       {currentUser ? (
         <>
           <Header
@@ -118,7 +121,7 @@ export default function Home() {
             }}
             onLogout={handleLogout}
           />
-          <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <main className="flex-1 max-w-[1480px] w-full mx-auto px-3 sm:px-5 lg:px-7 py-5">
             {!selectedBranchId ? (
               <BranchSelection currentUser={currentUser} onSelectBranch={handleSelectBranch} />
             ) : (
@@ -134,9 +137,9 @@ export default function Home() {
           <Footer />
         </>
       ) : (
-        <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-[#0A192F] via-[#102A43] to-[#0A192F]">
-          {/* Subtle sovereign background pattern */}
-          <div className="absolute inset-0 bg-[radial-gradient(#C6A15B_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none"></div>
+        <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-[#1C2F40] via-[#253B4F] to-[#1D3242]">
+          {/* Subtle frosted slate-teal pattern */}
+          <div className="absolute inset-0 bg-[radial-gradient(#94C9CE_1px,transparent_1px)] [background-size:28px_28px] opacity-12 pointer-events-none"></div>
 
           <LoginForm
             onLoginSuccess={handleLoginSuccess}

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { formatArabicDecimal, formatArabicNumber, formatArabicPercent } from '@/lib/utils';
+import { useSystemPreferences } from '@/lib/user-preferences-store';
 
 export type StatColorTheme = 'navy' | 'green' | 'gold' | 'red' | 'teal' | 'purple' | 'blue';
 
@@ -28,65 +29,81 @@ const THEME_STYLES: Record<
     border: string;
     iconBox: string;
     valueColor: string;
-    indicatorBg: string;
-    topBar: string;
+    indicatorColor: string;
+    subtitleColor: string;
+    darkIconBox: string;
+    darkAccentBorder: string;
   }
 > = {
   navy: {
-    cardBg: 'bg-gradient-to-bl from-[#102A43]/[0.06] via-white to-white',
-    border: 'border-[#102A43]/20 hover:border-[#102A43]/45',
-    iconBox: 'bg-[#102A43] text-[#C6A15B]',
-    valueColor: 'text-[#102A43]',
-    indicatorBg: 'text-[#102A43] bg-[#102A43]/10',
-    topBar: 'bg-[#102A43]',
+    cardBg: 'bg-gradient-to-br from-[#D9E4EC] via-[#CBD9E3] to-[#BDCDD9]',
+    border: 'border-white/75 hover:border-white',
+    iconBox: 'bg-[#EEF5F9] text-[#253B4F] shadow-[0_4px_10px_rgba(37,59,79,0.16)]',
+    valueColor: 'text-[#182B3B]',
+    indicatorColor: 'text-[#253B4F]',
+    subtitleColor: 'text-[#395166]',
+    darkIconBox: 'bg-sky-500/20 text-sky-300 border-sky-400/30',
+    darkAccentBorder: 'border-sky-400/25 hover:border-sky-400/50',
   },
   green: {
-    cardBg: 'bg-gradient-to-bl from-emerald-600/[0.08] via-white to-white',
-    border: 'border-emerald-200 hover:border-emerald-500/60',
-    iconBox: 'bg-emerald-700 text-white',
-    valueColor: 'text-emerald-800',
-    indicatorBg: 'text-emerald-800 bg-emerald-100/80',
-    topBar: 'bg-emerald-700',
+    cardBg: 'bg-gradient-to-br from-[#CFE8E4] via-[#BBDCD7] to-[#A6CFC9]',
+    border: 'border-white/75 hover:border-white',
+    iconBox: 'bg-[#E9F7F5] text-[#1D5C54] shadow-[0_4px_10px_rgba(29,92,84,0.16)]',
+    valueColor: 'text-[#133A35]',
+    indicatorColor: 'text-[#154A43]',
+    subtitleColor: 'text-[#245952]',
+    darkIconBox: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30',
+    darkAccentBorder: 'border-emerald-400/25 hover:border-emerald-400/50',
   },
   gold: {
-    cardBg: 'bg-gradient-to-bl from-[#C6A15B]/[0.14] via-white to-white',
-    border: 'border-[#C6A15B]/45 hover:border-[#C6A15B]',
-    iconBox: 'bg-[#C6A15B] text-[#102A43]',
-    valueColor: 'text-amber-900',
-    indicatorBg: 'text-amber-900 bg-amber-100/80',
-    topBar: 'bg-[#C6A15B]',
+    cardBg: 'bg-gradient-to-br from-[#EDE4D4] via-[#E3D5BE] to-[#D7C6AA]',
+    border: 'border-white/75 hover:border-white',
+    iconBox: 'bg-[#FAF5EB] text-[#6B4E1B] shadow-[0_4px_10px_rgba(107,78,27,0.16)]',
+    valueColor: 'text-[#3D2C0F]',
+    indicatorColor: 'text-[#6B4E1B]',
+    subtitleColor: 'text-[#5E461D]',
+    darkIconBox: 'bg-amber-500/20 text-amber-300 border-amber-400/30',
+    darkAccentBorder: 'border-amber-400/25 hover:border-amber-400/50',
   },
   red: {
-    cardBg: 'bg-gradient-to-bl from-red-600/[0.08] via-white to-white',
-    border: 'border-red-200 hover:border-red-500/60',
-    iconBox: 'bg-red-700 text-white',
-    valueColor: 'text-red-800',
-    indicatorBg: 'text-red-800 bg-red-100/80',
-    topBar: 'bg-red-700',
+    cardBg: 'bg-gradient-to-br from-[#EFE0E3] via-[#E7CED3] to-[#DDBCC3]',
+    border: 'border-white/75 hover:border-white',
+    iconBox: 'bg-[#FBF3F5] text-[#882B3B] shadow-[0_4px_10px_rgba(136,43,59,0.16)]',
+    valueColor: 'text-[#521823]',
+    indicatorColor: 'text-[#882B3B]',
+    subtitleColor: 'text-[#6B2835]',
+    darkIconBox: 'bg-rose-500/20 text-rose-300 border-rose-400/30',
+    darkAccentBorder: 'border-rose-400/25 hover:border-rose-400/50',
   },
   teal: {
-    cardBg: 'bg-gradient-to-bl from-teal-600/[0.08] via-white to-white',
-    border: 'border-teal-200 hover:border-teal-500/60',
-    iconBox: 'bg-teal-700 text-white',
-    valueColor: 'text-teal-800',
-    indicatorBg: 'text-teal-800 bg-teal-100/80',
-    topBar: 'bg-teal-700',
+    cardBg: 'bg-gradient-to-br from-[#B5D7DC] via-[#A1CAD0] to-[#8FBCC4]',
+    border: 'border-white/75 hover:border-white',
+    iconBox: 'bg-[#DFF1F3] text-[#2B6270] shadow-[0_4px_10px_rgba(43,98,112,0.18)]',
+    valueColor: 'text-[#142D37]',
+    indicatorColor: 'text-[#193A46]',
+    subtitleColor: 'text-[#214B59]',
+    darkIconBox: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30',
+    darkAccentBorder: 'border-cyan-400/25 hover:border-cyan-400/50',
   },
   purple: {
-    cardBg: 'bg-gradient-to-bl from-indigo-600/[0.08] via-white to-white',
-    border: 'border-indigo-200 hover:border-indigo-500/60',
-    iconBox: 'bg-indigo-700 text-white',
-    valueColor: 'text-indigo-900',
-    indicatorBg: 'text-indigo-900 bg-indigo-100/80',
-    topBar: 'bg-indigo-700',
+    cardBg: 'bg-gradient-to-br from-[#A6ACCC] via-[#959BC0] to-[#858BB3]',
+    border: 'border-white/65 hover:border-white',
+    iconBox: 'bg-[#E3E6F4] text-[#353B6B] shadow-[0_4px_10px_rgba(53,59,107,0.18)]',
+    valueColor: 'text-[#171A38]',
+    indicatorColor: 'text-[#1F2347]',
+    subtitleColor: 'text-[#252A4D]',
+    darkIconBox: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30',
+    darkAccentBorder: 'border-indigo-400/25 hover:border-indigo-400/50',
   },
   blue: {
-    cardBg: 'bg-gradient-to-bl from-[#164E83]/[0.08] via-white to-white',
-    border: 'border-[#164E83]/25 hover:border-[#164E83]/60',
-    iconBox: 'bg-[#164E83] text-white',
-    valueColor: 'text-[#164E83]',
-    indicatorBg: 'text-[#164E83] bg-[#164E83]/10',
-    topBar: 'bg-[#164E83]',
+    cardBg: 'bg-gradient-to-br from-[#E2EBF2] via-[#D3DFE8] to-[#C4D3DF]',
+    border: 'border-white/80 hover:border-white',
+    iconBox: 'bg-[#F4F8FB] text-[#254E6B] shadow-[0_4px_10px_rgba(37,78,107,0.16)]',
+    valueColor: 'text-[#172C3D]',
+    indicatorColor: 'text-[#1F3A52]',
+    subtitleColor: 'text-[#314F69]',
+    darkIconBox: 'bg-blue-500/20 text-blue-300 border-blue-400/30',
+    darkAccentBorder: 'border-blue-400/25 hover:border-blue-400/50',
   },
 };
 
@@ -104,6 +121,7 @@ export default function AnimatedStatCard({
   delay = 0,
   onClick,
 }: AnimatedStatCardProps) {
+  const { prefs } = useSystemPreferences();
   const safeTarget = Number.isFinite(value) ? value : 0;
   const [displayValue, setDisplayValue] = useState<number>(safeTarget);
 
@@ -125,7 +143,6 @@ export default function AnimatedStatCard({
     const tick = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / duration);
-      // Smooth easeOutCubic
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = safeTarget * eased;
       setDisplayValue(progress >= 1 ? safeTarget : current);
@@ -146,60 +163,92 @@ export default function AnimatedStatCard({
   })();
 
   const styles = THEME_STYLES[theme];
+  const isDarkTheme = prefs.themeId === 'dark_mode' || prefs.themeId === 'midnight_aurora';
+  const layout = prefs.uiLayout;
+
+  const containerStyleClass = (() => {
+    if (isDarkTheme) {
+      return `rounded-2xl bg-[#131E31]/95 ${styles.darkAccentBorder} shadow-lg`;
+    }
+    if (layout === 'ultra_minimal') {
+      return 'rounded-xl bg-white border border-slate-200 hover:border-slate-400 shadow-none';
+    }
+    if (layout === 'royal_heritage') {
+      return 'rounded-xl bg-white border border-[#C6A15B]/45 hover:border-[#C6A15B] shadow-sm';
+    }
+    if (layout === 'executive_command') {
+      return 'rounded-2xl bg-white border border-slate-200 hover:border-[#164E83] shadow-sm';
+    }
+    if (layout === 'operations_cockpit') {
+      return `rounded-2xl ${styles.cardBg} ${styles.border} shadow-md`;
+    }
+    return `rounded-[22px] border shadow-[0_10px_24px_-10px_rgba(30,51,70,0.24),inset_0_1px_0_rgba(255,255,255,0.65)] hover:shadow-[0_14px_28px_-10px_rgba(30,51,70,0.34)] ${styles.cardBg} ${styles.border}`;
+  })();
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: Math.min(delay, 0.3), ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ y: -2 }}
+      whileHover={{ y: -3 }}
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl border shadow-xs transition-shadow hover:shadow-md ${styles.cardBg} ${styles.border} ${
-        compact ? 'p-3' : 'p-4'
+      className={`relative overflow-hidden transition-all ${containerStyleClass} ${
+        compact ? 'p-3.5' : 'p-4'
       } ${onClick ? 'cursor-pointer' : ''}`}
     >
-      <div className={`absolute top-0 right-0 left-0 h-1 ${styles.topBar}`} />
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1 space-y-1">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div
+            className={`${compact ? 'w-9 h-9 rounded-xl' : 'w-10 h-10 rounded-xl'} flex items-center justify-center shrink-0 border ${
+              isDarkTheme
+                ? styles.darkIconBox
+                : layout === 'ultra_minimal'
+                ? 'bg-slate-100 text-[#102A43] border-slate-200'
+                : `${styles.iconBox} border-white/80`
+            }`}
+          >
+            <Icon className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
+          </div>
+          {indicator && (
+            <span
+              className={`text-[10px] font-black leading-tight ${
+                isDarkTheme ? 'text-slate-300' : styles.indicatorColor
+              }`}
+            >
+              {indicator}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0 space-y-0.5">
           <span
             className={`${
-              compact ? 'text-[10.5px] leading-snug' : 'text-[11.5px] leading-snug'
-            } font-black text-slate-700 block break-words whitespace-normal`}
+              compact ? 'text-[11px] leading-snug' : 'text-xs leading-snug'
+            } font-black block break-words whitespace-normal ${
+              isDarkTheme ? 'text-slate-300' : styles.subtitleColor
+            }`}
             title={title}
           >
             {title}
           </span>
           <div
             className={`num-cell ${
-              compact ? 'text-base sm:text-lg' : 'text-lg sm:text-[20px]'
-            } font-black break-words leading-tight my-0.5 ${styles.valueColor}`}
+              compact ? 'text-lg sm:text-xl' : 'text-2xl sm:text-[26px]'
+            } font-black break-words leading-tight ${
+              isDarkTheme ? 'text-white' : styles.valueColor
+            }`}
           >
             {formattedNumber}
           </div>
-          <div className="flex items-center flex-wrap gap-1">
-            {unit && (
-              <span className="text-[10px] font-extrabold text-slate-600 break-words whitespace-normal leading-tight">
-                {unit}
-              </span>
-            )}
-            {subtitle && !unit && (
-              <span className="text-[10px] font-extrabold text-slate-600 break-words whitespace-normal leading-tight">
-                {subtitle}
-              </span>
-            )}
-            {indicator && (
-              <span
-                className={`text-[9.5px] font-black px-1.5 py-0.5 rounded break-words whitespace-normal leading-tight ${styles.indicatorBg}`}
-              >
-                {indicator}
-              </span>
-            )}
-          </div>
-        </div>
-        <div
-          className={`${compact ? 'w-8 h-8 rounded-xl' : 'w-10 h-10 rounded-xl'} flex items-center justify-center shrink-0 shadow-xs ${styles.iconBox}`}
-        >
-          <Icon className={compact ? 'w-4 h-4' : 'w-4.5 h-4.5'} />
+          {(unit || subtitle) && (
+            <span
+              className={`text-[10.5px] font-extrabold block leading-tight ${
+                isDarkTheme ? 'text-slate-400' : styles.subtitleColor
+              }`}
+            >
+              {unit || subtitle}
+            </span>
+          )}
         </div>
       </div>
     </motion.div>

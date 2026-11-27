@@ -12,16 +12,33 @@ const PreferencesPayloadSchema = z
     fontScale: z.number().int().min(80).max(150),
     language: z.enum(['ar', 'en']),
     themeId: z.enum([
+      'frosted_teal',
       'gov_navy',
       'soft_white',
       'calm_gray',
       'calm_blue',
       'calm_green',
       'warm_beige',
+      'royal_emerald',
+      'indigo_horizon',
+      'burgundy_gold',
+      'desert_sand',
       'dark_mode',
+      'midnight_aurora',
       'eye_comfort',
       'custom',
     ]),
+    uiLayout: z
+      .enum([
+        'frosted_slate',
+        'executive_command',
+        'bento_mosaic',
+        'royal_heritage',
+        'ultra_minimal',
+        'operations_cockpit',
+      ])
+      .optional()
+      .default('frosted_slate'),
     customColors: z
       .object({
         background: z.string().regex(HEX_COLOR_REGEX),
@@ -86,11 +103,12 @@ export async function GET(request: NextRequest) {
       preferences: {
         fontScale: Number(row.font_scale) || 100,
         language: row.language === 'en' ? 'en' : 'ar',
-        themeId: typeof row.theme_id === 'string' ? row.theme_id : 'gov_navy',
+        themeId: typeof row.theme_id === 'string' ? row.theme_id : 'frosted_teal',
+        uiLayout: typeof row.ui_layout === 'string' ? row.ui_layout : 'frosted_slate',
         customColors: row.custom_colors || {
-          background: '#F4F7FB',
-          primary: '#102A43',
-          accent: '#C6A15B',
+          background: '#BDC9D4',
+          primary: '#253B4F',
+          accent: '#94C9CE',
         },
         displayMode: row.display_mode === 'manual' ? 'manual' : 'auto',
         density:
@@ -152,6 +170,7 @@ export async function POST(request: NextRequest) {
         font_scale: data.fontScale,
         language: data.language,
         theme_id: data.themeId,
+        ui_layout: data.uiLayout,
         custom_colors: data.customColors,
         display_mode: data.displayMode,
         density: data.density,

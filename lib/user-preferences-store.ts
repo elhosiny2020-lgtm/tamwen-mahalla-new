@@ -8,15 +8,29 @@ import {
 } from './full-ui-translator';
 
 export type ThemePresetId =
+  | 'frosted_teal'
   | 'gov_navy'
   | 'soft_white'
   | 'calm_gray'
   | 'calm_blue'
   | 'calm_green'
   | 'warm_beige'
+  | 'royal_emerald'
+  | 'indigo_horizon'
+  | 'burgundy_gold'
+  | 'desert_sand'
   | 'dark_mode'
+  | 'midnight_aurora'
   | 'eye_comfort'
   | 'custom';
+
+export type UiLayoutId =
+  | 'frosted_slate'
+  | 'executive_command'
+  | 'bento_mosaic'
+  | 'royal_heritage'
+  | 'ultra_minimal'
+  | 'operations_cockpit';
 
 export type DisplayScalingMode = 'auto' | 'manual';
 export type UiDensity = 'compact' | 'comfortable' | 'spacious';
@@ -31,6 +45,7 @@ export interface UserDisplayPreferences {
   fontScale: number; // 80 - 150
   language: AppLanguage; // 'ar' | 'en'
   themeId: ThemePresetId;
+  uiLayout: UiLayoutId;
   customColors: CustomThemeColors;
   displayMode: DisplayScalingMode;
   density: UiDensity;
@@ -58,7 +73,99 @@ export interface ThemePresetMeta {
   isDark?: boolean;
 }
 
+export interface UiLayoutPresetMeta {
+  id: UiLayoutId;
+  labelKey: keyof TranslationDictionary;
+  descAr: string;
+  descEn: string;
+  navPositionAr: string;
+  navPositionEn: string;
+  recommendedTheme: ThemePresetId;
+  wireframeType: 'sidebar_glass' | 'top_ribbon' | 'icon_rail_bento' | 'sovereign_grid' | 'minimal_flat' | 'cockpit_dense';
+}
+
+export interface UxSkinBundleMeta {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  subtitleAr: string;
+  subtitleEn: string;
+  layoutId: UiLayoutId;
+  themeId: ThemePresetId;
+}
+
+export const UI_LAYOUT_PRESETS: UiLayoutPresetMeta[] = [
+  {
+    id: 'frosted_slate',
+    labelKey: 'layout_frosted_slate',
+    descAr: 'شريط جانبي عائم مع بطاقات زجاجية ناعمة ورسوم بيانية متناسقة',
+    descEn: 'Floating frosted sidebar with tactile KPI cards & modern analytics',
+    navPositionAr: 'قائمة جانبية عائمة',
+    navPositionEn: 'Floating Sidebar',
+    recommendedTheme: 'frosted_teal',
+    wireframeType: 'sidebar_glass',
+  },
+  {
+    id: 'executive_command',
+    labelKey: 'layout_executive_command',
+    descAr: 'شريط أقسام أفقي علوي لفتح مساحة العرض بالكامل للقيادات',
+    descEn: 'Full-width executive canvas with horizontal top department ribbon',
+    navPositionAr: 'شريط علوي أفقي',
+    navPositionEn: 'Top Ribbon Nav',
+    recommendedTheme: 'gov_navy',
+    wireframeType: 'top_ribbon',
+  },
+  {
+    id: 'bento_mosaic',
+    labelKey: 'layout_bento_mosaic',
+    descAr: 'شريط أيقونات مضغوط مع شبكة بطاقات بينتو وصور القطاعات التفاعلية',
+    descEn: 'Compact icon rail paired with asymmetric visual Bento mosaic grid',
+    navPositionAr: 'شريط أيقونات مضغوط',
+    navPositionEn: 'Compact Icon Rail',
+    recommendedTheme: 'indigo_horizon',
+    wireframeType: 'icon_rail_bento',
+  },
+  {
+    id: 'royal_heritage',
+    labelKey: 'layout_royal_heritage',
+    descAr: 'هيكلة رسمية مؤطرة بخطوط ذهبية وإحصائيات قيادية منظمة في ٣ أعمدة',
+    descEn: 'Formal ministerial grid with sovereign borders and structured pillars',
+    navPositionAr: 'إطار سيادي منظم',
+    navPositionEn: 'Sovereign Frame',
+    recommendedTheme: 'royal_emerald',
+    wireframeType: 'sovereign_grid',
+  },
+  {
+    id: 'ultra_minimal',
+    labelKey: 'layout_ultra_minimal',
+    descAr: 'تصميم مسطح خفيف بدون تشتيت بصري وتركيز كامل على البيانات',
+    descEn: 'Crisp hairline flat interface with maximum data clarity and calm spacing',
+    navPositionAr: 'تخطيط مسطح هادئ',
+    navPositionEn: 'Minimal Flat Grid',
+    recommendedTheme: 'soft_white',
+    wireframeType: 'minimal_flat',
+  },
+  {
+    id: 'operations_cockpit',
+    labelKey: 'layout_operations_cockpit',
+    descAr: 'غرفة عمليات كثيفة للرصد اللحظي والمهام العاجلة والتحليلات المباشرة',
+    descEn: 'High-efficiency telemetry cockpit with dense monitoring & quick actions',
+    navPositionAr: 'غرفة عمليات فورية',
+    navPositionEn: 'Live Cockpit Deck',
+    recommendedTheme: 'midnight_aurora',
+    wireframeType: 'cockpit_dense',
+  },
+];
+
 export const THEME_PRESETS: ThemePresetMeta[] = [
+  {
+    id: 'frosted_teal',
+    labelKey: 'theme_frosted_teal',
+    previewBg: '#BDC9D4',
+    previewPrimary: '#253B4F',
+    previewAccent: '#94C9CE',
+    previewText: '#1E3346',
+  },
   {
     id: 'gov_navy',
     labelKey: 'theme_gov_navy',
@@ -100,12 +207,52 @@ export const THEME_PRESETS: ThemePresetMeta[] = [
     previewText: '#0F2F1E',
   },
   {
+    id: 'royal_emerald',
+    labelKey: 'theme_royal_emerald',
+    previewBg: '#EFF5F2',
+    previewPrimary: '#0F3D2E',
+    previewAccent: '#D4AF37',
+    previewText: '#0B2B21',
+  },
+  {
+    id: 'indigo_horizon',
+    labelKey: 'theme_indigo_horizon',
+    previewBg: '#EEF1FA',
+    previewPrimary: '#242B5E',
+    previewAccent: '#5B6BE6',
+    previewText: '#1A1F47',
+  },
+  {
+    id: 'burgundy_gold',
+    labelKey: 'theme_burgundy_gold',
+    previewBg: '#F7F1F2',
+    previewPrimary: '#5B1829',
+    previewAccent: '#C99B49',
+    previewText: '#3A0E19',
+  },
+  {
     id: 'warm_beige',
     labelKey: 'theme_warm_beige',
     previewBg: '#F6F0E6',
     previewPrimary: '#4A3728',
     previewAccent: '#B47B38',
     previewText: '#2E2219',
+  },
+  {
+    id: 'desert_sand',
+    labelKey: 'theme_desert_sand',
+    previewBg: '#F4EFE4',
+    previewPrimary: '#3E4735',
+    previewAccent: '#C28E42',
+    previewText: '#2A3024',
+  },
+  {
+    id: 'eye_comfort',
+    labelKey: 'theme_eye_comfort',
+    previewBg: '#F4ECD8',
+    previewPrimary: '#3D3522',
+    previewAccent: '#8A6D3B',
+    previewText: '#2B2619',
   },
   {
     id: 'dark_mode',
@@ -117,33 +264,107 @@ export const THEME_PRESETS: ThemePresetMeta[] = [
     isDark: true,
   },
   {
-    id: 'eye_comfort',
-    labelKey: 'theme_eye_comfort',
-    previewBg: '#F4ECD8',
-    previewPrimary: '#3D3522',
-    previewAccent: '#8A6D3B',
-    previewText: '#2B2619',
+    id: 'midnight_aurora',
+    labelKey: 'theme_midnight_aurora',
+    previewBg: '#09111E',
+    previewPrimary: '#12263A',
+    previewAccent: '#38BDF8',
+    previewText: '#E2E8F0',
+    isDark: true,
+  },
+];
+
+export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
+  {
+    id: 'skin_glass_modern',
+    titleAr: 'الداش بورد الزجاجي العصري',
+    titleEn: 'Modern Frosted Glass',
+    subtitleAr: 'تصميم زجاجي ثلجي مع شريط جانبي عائم',
+    subtitleEn: 'Frosted teal & floating sidebar',
+    layoutId: 'frosted_slate',
+    themeId: 'frosted_teal',
+  },
+  {
+    id: 'skin_exec_ribbon',
+    titleAr: 'القيادة التنفيذية الواسعة',
+    titleEn: 'Executive Wide Ribbon',
+    subtitleAr: 'شريط أقسام علوي وكحلي حكومي ذهبي',
+    subtitleEn: 'Top ribbon nav & official navy',
+    layoutId: 'executive_command',
+    themeId: 'gov_navy',
+  },
+  {
+    id: 'skin_bento_indigo',
+    titleAr: 'شبكة بينتو الذكية',
+    titleEn: 'Smart Bento Mosaic',
+    subtitleAr: 'شريط أيقونات مضغوط وألوان نيلية حديثة',
+    subtitleEn: 'Icon rail & indigo mosaic grid',
+    layoutId: 'bento_mosaic',
+    themeId: 'indigo_horizon',
+  },
+  {
+    id: 'skin_sovereign_emerald',
+    titleAr: 'الطراز السيادي الزمردي',
+    titleEn: 'Sovereign Emerald',
+    subtitleAr: 'أعمدة قيادية رسمية بالزمردي والذهبي',
+    subtitleEn: 'Royal frame & emerald gold',
+    layoutId: 'royal_heritage',
+    themeId: 'royal_emerald',
+  },
+  {
+    id: 'skin_minimal_paper',
+    titleAr: 'البساطة الهادئة لراحة العين',
+    titleEn: 'Calm Minimal Paper',
+    subtitleAr: 'تخطيط مسطح مريح بألوان دافئة',
+    subtitleEn: 'Flat crisp grid & soft paper',
+    layoutId: 'ultra_minimal',
+    themeId: 'eye_comfort',
+  },
+  {
+    id: 'skin_night_cockpit',
+    titleAr: 'غرفة العمليات الليلية',
+    titleEn: 'Night Operations Cockpit',
+    subtitleAr: 'وضع داكن عالي التباين للعمل الليلي',
+    subtitleEn: 'Midnight aurora dark telemetry',
+    layoutId: 'operations_cockpit',
+    themeId: 'midnight_aurora',
   },
 ];
 
 export const DEFAULT_USER_PREFERENCES: UserDisplayPreferences = {
   fontScale: 100,
   language: 'ar',
-  themeId: 'gov_navy',
+  themeId: 'frosted_teal',
+  uiLayout: 'frosted_slate',
   customColors: {
-    background: '#F4F7FB',
-    primary: '#102A43',
-    accent: '#C6A15B',
+    background: '#BDC9D4',
+    primary: '#253B4F',
+    accent: '#94C9CE',
   },
   displayMode: 'auto',
   density: 'comfortable',
-  updatedAt: '2026-11-26T00:00:00Z',
+  updatedAt: '2026-11-27T00:00:00Z',
 };
 
 const PREFS_KEY_PREFIX = 'gharbia_supply_user_prefs_v2_';
 
 function getStorageKey(userId: string): string {
   return `${PREFS_KEY_PREFIX}${userId || 'guest'}`;
+}
+
+const VALID_LAYOUTS = new Set<UiLayoutId>([
+  'frosted_slate',
+  'executive_command',
+  'bento_mosaic',
+  'royal_heritage',
+  'ultra_minimal',
+  'operations_cockpit',
+]);
+
+function normalizeLayout(v: unknown): UiLayoutId {
+  return typeof v === 'string' && VALID_LAYOUTS.has(v as UiLayoutId)
+    ? (v as UiLayoutId)
+    : DEFAULT_USER_PREFERENCES.uiLayout;
 }
 
 export function loadUserPreferences(userId: string): UserDisplayPreferences {
@@ -155,6 +376,7 @@ export function loadUserPreferences(userId: string): UserDisplayPreferences {
     return {
       ...DEFAULT_USER_PREFERENCES,
       ...parsed,
+      uiLayout: normalizeLayout(parsed.uiLayout),
       fontScale: Math.min(150, Math.max(80, Number(parsed.fontScale) || 100)),
       language: parsed.language === 'en' ? 'en' : 'ar',
       customColors: {
@@ -197,6 +419,7 @@ async function fetchRemoteUserPreferences(userId: string): Promise<UserDisplayPr
     return {
       ...DEFAULT_USER_PREFERENCES,
       ...data.preferences,
+      uiLayout: normalizeLayout(data.preferences.uiLayout),
       fontScale: Math.min(150, Math.max(80, Number(data.preferences.fontScale) || 100)),
       language: data.preferences.language === 'en' ? 'en' : 'ar',
       customColors: {
@@ -226,6 +449,7 @@ async function syncRemoteUserPreferences(
         fontScale: prefs.fontScale,
         language: prefs.language,
         themeId: prefs.themeId,
+        uiLayout: prefs.uiLayout,
         customColors: prefs.customColors,
         displayMode: prefs.displayMode,
         density: prefs.density,
@@ -337,6 +561,8 @@ interface SystemPreferencesContextValue {
   resetFontScale: () => void;
   setLanguage: (lang: AppLanguage) => void;
   setThemeId: (themeId: ThemePresetId) => void;
+  setUiLayout: (uiLayout: UiLayoutId, alsoApplyPairedTheme?: boolean) => void;
+  applyUiSkinBundle: (uiLayout: UiLayoutId, themeId: ThemePresetId) => void;
   setCustomColors: (colors: CustomThemeColors) => void;
   setDisplayMode: (mode: DisplayScalingMode) => void;
   setDensity: (density: UiDensity) => void;
@@ -404,12 +630,13 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
     root.lang = prefs.language;
     root.dir = prefs.language === 'ar' ? 'rtl' : 'ltr';
     root.setAttribute('data-theme', prefs.themeId);
+    root.setAttribute('data-ui-layout', prefs.uiLayout);
     root.setAttribute('data-density', effectiveDensity);
 
-    // تفعيل كلاس dark للوضع الداكن أو اللون المخصص الداكن
+    // تفعيل كلاس dark للوضع الداكن أو الشفق الليلي أو اللون المخصص الداكن
     const isCustomDark =
       prefs.themeId === 'custom' && getLuminance(prefs.customColors.background) < 0.35;
-    if (prefs.themeId === 'dark_mode' || isCustomDark) {
+    if (prefs.themeId === 'dark_mode' || prefs.themeId === 'midnight_aurora' || isCustomDark) {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
@@ -533,6 +760,25 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
     [updatePrefs]
   );
 
+  const setUiLayout = useCallback(
+    (uiLayout: UiLayoutId, alsoApplyPairedTheme = false) => {
+      const matched = UI_LAYOUT_PRESETS.find((l) => l.id === uiLayout);
+      updatePrefs((p) => ({
+        ...p,
+        uiLayout,
+        themeId: alsoApplyPairedTheme && matched ? matched.recommendedTheme : p.themeId,
+      }));
+    },
+    [updatePrefs]
+  );
+
+  const applyUiSkinBundle = useCallback(
+    (uiLayout: UiLayoutId, themeId: ThemePresetId) => {
+      updatePrefs((p) => ({ ...p, uiLayout, themeId }));
+    },
+    [updatePrefs]
+  );
+
   const setCustomColors = useCallback(
     (customColors: CustomThemeColors) => {
       updatePrefs((p) => ({ ...p, themeId: 'custom', customColors }));
@@ -580,6 +826,8 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
       resetFontScale,
       setLanguage,
       setThemeId,
+      setUiLayout,
+      applyUiSkinBundle,
       setCustomColors,
       setDisplayMode,
       setDensity,
@@ -598,6 +846,8 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
       resetFontScale,
       setLanguage,
       setThemeId,
+      setUiLayout,
+      applyUiSkinBundle,
       setCustomColors,
       setDisplayMode,
       setDensity,
@@ -625,6 +875,8 @@ export function useSystemPreferences(): SystemPreferencesContextValue {
       resetFontScale: () => {},
       setLanguage: () => {},
       setThemeId: () => {},
+      setUiLayout: () => {},
+      applyUiSkinBundle: () => {},
       setCustomColors: () => {},
       setDisplayMode: () => {},
       setDensity: () => {},

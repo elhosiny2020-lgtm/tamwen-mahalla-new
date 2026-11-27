@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
-  Database,
   Download,
   ExternalLink,
   FileSpreadsheet,
@@ -60,7 +59,6 @@ import {
   saveChatMessages,
   saveDailyTasks,
   saveUnifiedNotifications,
-  SUPABASE_COMPLETE_MIGRATION_SQL,
 } from '@/lib/major-debts-tasks-chat-store';
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
@@ -72,8 +70,7 @@ export type TasksModuleSubTab =
   | 'cross_followup'
   | 'internal_chat'
   | 'notifications'
-  | 'reports_center'
-  | 'supabase_arch';
+  | 'reports_center';
 
 interface DailyTasksAndInternalChatModuleProps {
   currentUser: User;
@@ -1031,8 +1028,8 @@ export default function DailyTasksAndInternalChatModule({
           </div>
         </div>
 
-        {/* شريط التبويبات الفرعية للقسم */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/15 pb-1">
+        {/* شريط التبويبات الفرعية للقسم (مكبرة درجتين) */}
+        <div className="flex flex-wrap items-center gap-3 pt-3.5 border-t border-white/15 pb-1.5">
           {[
             { id: 'dashboard', label: '١. لوحة متابعة المهام اليومية', icon: ClipboardList },
             {
@@ -1067,11 +1064,6 @@ export default function DailyTasksAndInternalChatModule({
               icon: FileSpreadsheet,
               prominent: true,
             },
-            {
-              id: 'supabase_arch',
-              label: '٧. مخطط وترحيل قاعدة بيانات Supabase والتقرير النهائي',
-              icon: Database,
-            },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeSubTab === tab.id;
@@ -1081,24 +1073,24 @@ export default function DailyTasksAndInternalChatModule({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveSubTab(tab.id as TasksModuleSubTab)}
-                className={`rounded-xl font-black whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition-all ${
+                className={`rounded-2xl font-black whitespace-nowrap flex items-center gap-2.5 cursor-pointer transition-all ${
                   isProminent
-                    ? 'px-4 py-2.5 text-xs sm:text-[13px] border border-[#C6A15B]/60'
-                    : 'px-3 py-1.5 text-[11px]'
+                    ? 'px-6 py-4 text-[15px] sm:text-base border-2 border-[#94C9CE]/70'
+                    : 'px-5 py-3.5 text-sm sm:text-[15.5px] border border-white/25'
                 } ${
                   active
-                    ? 'bg-[#C6A15B] text-[#102A43] shadow-md'
+                    ? 'bg-gradient-to-b from-[#E5F1F3] to-[#C2DCE0] text-[#1D3549] shadow-lg scale-[1.02]'
                     : isProminent
-                    ? 'bg-[#164E83] text-white hover:bg-[#1e609e]'
-                    : 'bg-white/10 text-white hover:bg-white/20'
+                    ? 'bg-[#2C4B63] text-white hover:bg-[#355A76] shadow-sm'
+                    : 'bg-white/12 text-white hover:bg-white/22'
                 }`}
               >
-                <Icon className={isProminent ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
+                <Icon className={isProminent ? 'w-5.5 h-5.5 shrink-0' : 'w-5 h-5 shrink-0'} />
                 <span>{tab.label}</span>
                 {tab.badge && tab.badge > 0 ? (
                   <span
-                    className={`num-cell px-1.5 py-0.5 rounded-full text-[9.5px] font-black ${
-                      active ? 'bg-[#102A43] text-[#C6A15B]' : 'bg-red-600 text-white'
+                    className={`num-cell px-2.5 py-0.5 rounded-full text-xs font-black ${
+                      active ? 'bg-[#1D3549] text-[#E5F1F3]' : 'bg-red-600 text-white'
                     }`}
                   >
                     {toArabicNumerals(tab.badge)}
@@ -1823,77 +1815,6 @@ export default function DailyTasksAndInternalChatModule({
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* ٧. مخطط وترحيل قاعدة بيانات Supabase والتقرير النهائي للجداول والصلاحيات والاختبارات */}
-      {activeSubTab === 'supabase_arch' && (
-        <div className="bg-white rounded-2xl border-2 border-[#102A43]/20 p-5 shadow-xs space-y-4 text-xs">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
-            <div>
-              <h3 className="text-base font-black text-[#102A43]">
-                تقرير التنفيذ النهائي وترحيل قاعدة بيانات Supabase (٢٧ جدولاً مترابطاً + RLS + Realtime)
-              </h3>
-              <p className="text-[11px] font-bold text-slate-600" dir="ltr">
-                Designed &amp; Developed by Eng. Ahmed El-Hosseiny — Tel: 01004414038
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const blob = new Blob([SUPABASE_COMPLETE_MIGRATION_SQL], {
-                  type: 'text/sql;charset=utf-8',
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `supabase_migration_gharbia_supply_${todayRef}.sql`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                notify('تم تحميل ملف ترحيل قاعدة بيانات Supabase بنجاح.');
-              }}
-              className="px-4 py-2 rounded-xl bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] font-black flex items-center gap-1.5 cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>تحميل ملف Migration SQL الكامل</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-              <h4 className="font-black text-[#102A43]">١. جداول المديونيات والجدولة (٦)</h4>
-              <p className="font-mono text-[10.5px] text-slate-700 leading-relaxed">
-                bakery_debt_threshold_settings, bakery_major_debts, bakery_payment_plans, bakery_installments, bakery_installment_payments, bakery_debt_alerts
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-              <h4 className="font-black text-[#102A43]">٢. جداول محاضر المخالفات (٦)</h4>
-              <p className="font-mono text-[10.5px] text-slate-700 leading-relaxed">
-                bakery_violation_authorities, bakery_violation_types, bakery_violation_legal_bases, bakery_violation_reports, bakery_violation_report_items, bakery_violation_debt_links
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-              <h4 className="font-black text-[#102A43]">٣. جداول المهام والمتابعة (٩)</h4>
-              <p className="font-mono text-[10.5px] text-slate-700 leading-relaxed">
-                daily_tasks, task_assignments, task_updates, task_comments, task_attachments, task_approvals, task_activity_logs, department_followups, system_notifications
-              </p>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-              <h4 className="font-black text-[#102A43]">٤. جداول الشات الداخلي (٦)</h4>
-              <p className="font-mono text-[10.5px] text-slate-700 leading-relaxed">
-                chat_conversations, chat_participants, chat_messages, chat_message_reads, chat_attachments, chat_groups
-              </p>
-            </div>
-          </div>
-
-          <pre
-            dir="ltr"
-            className="p-3.5 rounded-xl bg-[#0B1F33] text-emerald-300 font-mono text-[10.5px] max-h-64 overflow-y-auto leading-relaxed"
-          >
-            {SUPABASE_COMPLETE_MIGRATION_SQL}
-          </pre>
         </div>
       )}
 

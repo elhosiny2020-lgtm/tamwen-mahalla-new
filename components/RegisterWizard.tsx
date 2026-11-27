@@ -187,8 +187,11 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
     const reqs = getStoredRegistrationRequests();
     saveStoredRegistrationRequests([newReq, ...reqs]);
 
+    let activeUser: User = { ...newUser };
+    delete activeUser.password;
+
     try {
-      await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -201,31 +204,45 @@ export default function RegisterWizard({ onClose, onSuccess }: RegisterWizardPro
             fullName: newUser.fullName,
             role: newUser.role,
             primaryBranchId: newUser.primaryBranchId,
+            nationalId: newUser.nationalId,
+            phone: newUser.phone,
+            email: newUser.email,
+            jobTitle: newUser.jobTitle,
+            jobGrade: newUser.jobGrade,
+            workplace: newUser.workplace,
+            branchIds: newUser.branchIds,
+            departmentIds: newUser.departmentIds,
           },
         }),
       });
+      if (res.ok) {
+        const data = (await res.json()) as { ok?: boolean; user?: User };
+        if (data.ok && data.user) {
+          activeUser = data.user;
+        }
+      }
     } catch {
       // المتابعة للدخول الفوري حتى في حال عدم استجابة طلب الشبكة الثانوي
     }
 
     addAuditLog({
-      userId: newUser.id,
-      username: newUser.username,
-      fullName: newUser.fullName,
+      userId: activeUser.id,
+      username: activeUser.username,
+      fullName: activeUser.fullName,
       action: 'تسجيل مستخدم جديد ودخول فوري للنظام',
       module: 'إدارة المستخدمين',
       branchId: primaryBranchId,
-      details: `تم إنشاء وتفعيل حساب المستخدم (${newUser.fullName}) برتبة (${getRoleArabicLabel(requestedRole)}) والدخول المباشر للمنظومة`,
+      details: `تم إنشاء وتفعيل حساب المستخدم (${activeUser.fullName}) برتبة (${getRoleArabicLabel(requestedRole)}) والدخول المباشر للمنظومة`,
       ipAddress: '192.168.1.50',
       deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
       status: 'success',
     });
 
-    setCurrentSessionUser(newUser);
+    setCurrentSessionUser(activeUser);
     setSelectedBranchSession(primaryBranchId);
     setClientSessionExpiryTimestamp();
     setIsSubmitting(false);
-    onSuccess(newUser);
+    onSuccess(activeUser);
   };
 
   return (

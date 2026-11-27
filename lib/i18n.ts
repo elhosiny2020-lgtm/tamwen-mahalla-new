@@ -47,15 +47,35 @@ export interface TranslationDictionary {
   savedForUser: string;
 
   // Theme Names
+  theme_frosted_teal: string;
   theme_gov_navy: string;
   theme_soft_white: string;
   theme_calm_gray: string;
   theme_calm_blue: string;
   theme_calm_green: string;
   theme_warm_beige: string;
+  theme_royal_emerald: string;
+  theme_indigo_horizon: string;
+  theme_burgundy_gold: string;
+  theme_desert_sand: string;
   theme_dark_mode: string;
+  theme_midnight_aurora: string;
   theme_eye_comfort: string;
   theme_custom: string;
+
+  // UX/UI Studio & Layouts
+  uxStudioBtn: string;
+  uxStudioTitle: string;
+  uxTabLayouts: string;
+  uxTabColors: string;
+  uxTabCustom: string;
+  uxQuickBundlesTitle: string;
+  layout_frosted_slate: string;
+  layout_executive_command: string;
+  layout_bento_mosaic: string;
+  layout_royal_heritage: string;
+  layout_ultra_minimal: string;
+  layout_operations_cockpit: string;
 
   // Sidebar & Navigation
   departments: string;
@@ -180,14 +200,14 @@ const AR: TranslationDictionary = {
   arabicLabel: 'العربية 🇪🇬 (يمين إلى يسار RTL)',
   englishLabel: 'English 🇬🇧 (Left-to-Right LTR)',
   languageNote: 'تُترجم عناوين الواجهة والقوائم والأزرار فقط مع الحفاظ على البيانات المدخلة والأسماء الأصلية كما هي.',
-  themeBtn: 'الألوان والمظهر',
-  themeTitle: 'أنماط الألوان وراحة العين',
+  themeBtn: 'الواجهات والألوان UX/UI',
+  themeTitle: 'استوديو الواجهات والألوان (UX/UI Studio)',
   customColorsTitle: 'تخصيص الألوان يدوياً',
   customBgLabel: 'خلفية الواجهة',
   customPrimaryLabel: 'اللون الرئيسي',
   customAccentLabel: 'اللون المميز',
   applyCustomTheme: 'تطبيق اللون المخصص',
-  resetThemeBtn: 'العودة للكحلي الحكومي',
+  resetThemeBtn: 'الوضع الافتراضي',
   displayBtn: 'إعدادات العرض',
   displayTitle: 'الضبط الذكي لدقة الشاشة والعرض',
   autoDisplayMode: 'ضبط تلقائي للشاشة',
@@ -202,15 +222,34 @@ const AR: TranslationDictionary = {
   detectedProfile: 'ملف الشاشة المكتشف',
   savedForUser: 'محفوظ تلقائياً لحسابك الشخصي فقط',
 
+  theme_frosted_teal: 'الرمادي الثلجي والتركواز',
   theme_gov_navy: 'الكحلي والأبيض الحكومي',
   theme_soft_white: 'الأبيض المريح',
   theme_calm_gray: 'الرمادي الهادئ',
   theme_calm_blue: 'الأزرق الهادئ',
   theme_calm_green: 'الأخضر الهادئ',
   theme_warm_beige: 'البيج الدافئ',
+  theme_royal_emerald: 'الزمردي الملكي والذهبي',
+  theme_indigo_horizon: 'النيلي الحديث',
+  theme_burgundy_gold: 'العنابي السيادي',
+  theme_desert_sand: 'الرملي الدافئ والزيتوني',
   theme_dark_mode: 'الوضع الداكن Dark Mode',
+  theme_midnight_aurora: 'الشفق الليلي Aurora',
   theme_eye_comfort: 'وضع راحة العين Eye Comfort',
   theme_custom: 'لون مخصص',
+
+  uxStudioBtn: 'الواجهات والألوان UX/UI',
+  uxStudioTitle: 'استوديو تصميم الواجهات والألوان',
+  uxTabLayouts: 'أشكال الواجهات (UX/UI)',
+  uxTabColors: 'لوحات الألوان',
+  uxTabCustom: 'تخصيص حر',
+  uxQuickBundlesTitle: 'تغييرات شاملة فورية (واجهة + ألوان)',
+  layout_frosted_slate: 'اللوحة الزجاجية العصرية (Frosted Glass)',
+  layout_executive_command: 'القيادة التنفيذية (شريط علوي أفقى)',
+  layout_bento_mosaic: 'الشبكة الذكية (Bento Mosaic)',
+  layout_royal_heritage: 'الطراز السيادي الرسمي (Sovereign)',
+  layout_ultra_minimal: 'التصميم البسيط المسطح (Minimal)',
+  layout_operations_cockpit: 'غرفة العمليات الفورية (Cockpit)',
 
   departments: 'الأقسام',
   searchDepartments: 'بحث في الأقسام...',
@@ -329,14 +368,14 @@ const EN: TranslationDictionary = {
   arabicLabel: 'العربية 🇪🇬 (Right-to-Left RTL)',
   englishLabel: 'English 🇬🇧 (Left-to-Right LTR)',
   languageNote: 'Translates interface labels, menus, and buttons while preserving all user-entered names and records untouched.',
-  themeBtn: 'Colors & Theme',
-  themeTitle: 'Color Palettes & Eye Comfort',
+  themeBtn: 'UX/UI & Colors',
+  themeTitle: 'UX/UI Layouts & Color Studio',
   customColorsTitle: 'Custom Color Palette',
   customBgLabel: 'Canvas Background',
   customPrimaryLabel: 'Primary Color',
   customAccentLabel: 'Accent Color',
   applyCustomTheme: 'Apply Custom Colors',
-  resetThemeBtn: 'Reset to Official Navy',
+  resetThemeBtn: 'Reset Default',
   displayBtn: 'Display Settings',
   displayTitle: 'Smart Screen Resolution & Scaling',
   autoDisplayMode: 'Auto Screen Fit',
@@ -351,15 +390,34 @@ const EN: TranslationDictionary = {
   detectedProfile: 'Detected Display Profile',
   savedForUser: 'Saved independently for your account',
 
+  theme_frosted_teal: 'Frosted Slate & Teal',
   theme_gov_navy: 'Official Navy & White',
   theme_soft_white: 'Comfort White',
   theme_calm_gray: 'Calm Gray',
   theme_calm_blue: 'Calm Blue',
   theme_calm_green: 'Calm Green',
   theme_warm_beige: 'Warm Beige',
+  theme_royal_emerald: 'Royal Emerald & Gold',
+  theme_indigo_horizon: 'Modern Indigo Horizon',
+  theme_burgundy_gold: 'Sovereign Burgundy',
+  theme_desert_sand: 'Desert Sand & Olive',
   theme_dark_mode: 'Dark Mode',
+  theme_midnight_aurora: 'Midnight Aurora Dark',
   theme_eye_comfort: 'Eye Comfort Mode',
   theme_custom: 'Custom Theme',
+
+  uxStudioBtn: 'UX/UI & Colors',
+  uxStudioTitle: 'UX/UI Interface & Color Studio',
+  uxTabLayouts: 'UI Layouts (UX/UI)',
+  uxTabColors: 'Color Palettes',
+  uxTabCustom: 'Custom Colors',
+  uxQuickBundlesTitle: 'One-Click UX/UI + Color Skins',
+  layout_frosted_slate: 'Frosted Glass Dashboard',
+  layout_executive_command: 'Executive Command (Top Ribbon)',
+  layout_bento_mosaic: 'Smart Bento Mosaic (Rail)',
+  layout_royal_heritage: 'Sovereign Official Grid',
+  layout_ultra_minimal: 'Ultra Minimal Flat Grid',
+  layout_operations_cockpit: 'Live Operations Cockpit',
 
   departments: 'Departments',
   searchDepartments: 'Search departments...',

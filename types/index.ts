@@ -75,6 +75,7 @@ export interface User {
   username: string;
   password?: string;
   passwordDisabled?: boolean;
+  hasCustomPassword?: boolean;
   jobTitle: string;
   jobGrade: string;
   workplace: string;
