@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import LoginForm from '@/components/LoginForm';
-import SessionExpiryBanner from '@/components/SessionExpiryBanner';
 
+const Header = dynamic(() => import('@/components/Header'), { ssr: false });
+const Footer = dynamic(() => import('@/components/Footer'), { ssr: false });
+const SessionExpiryBanner = dynamic(() => import('@/components/SessionExpiryBanner'), { ssr: false });
 const RegisterWizard = dynamic(() => import('@/components/RegisterWizard'), { ssr: false });
 const BranchSelection = dynamic(() => import('@/components/BranchSelection'), { ssr: false });
 const UserPortal = dynamic(() => import('@/components/UserPortal'), {

@@ -700,27 +700,52 @@ export default function GrainMaintenanceModule({
   }) => {
     const isApproved = options.approvalStatus === 'معتمد';
     return (
-      <div className="flex flex-wrap items-center justify-center gap-1">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         {options.onViewHistory && (
           <button
             type="button"
             onClick={options.onViewHistory}
             title="عرض السجل التاريخي الشامل ٣٦٠°"
-            className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#164E83] border border-blue-200 text-[10px] font-black flex items-center gap-1 cursor-pointer"
+            className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#164E83] border border-blue-200 text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer"
           >
-            <Eye className="w-3 h-3" />
+            <Eye className="w-4.5 h-4.5 shrink-0" />
             <span>عرض</span>
           </button>
         )}
-        {!isApproved && options.onApprove && (
+        <button
+          type="button"
+          onClick={() => {
+            if (options.onQuickAdd) options.onQuickAdd();
+            else setIsQuickAddOpen(true);
+          }}
+          title="إضافة سجل جديد مرتبط"
+          className="px-2.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer"
+        >
+          <PlusCircle className="w-4.5 h-4.5 shrink-0" />
+          <span>إضافة</span>
+        </button>
+        {!isApproved && options.onApprove ? (
           <button
             type="button"
             onClick={options.onApprove}
-            title="اعتماد السجل وترحيل أثره للرصيد المعتمد"
-            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black flex items-center gap-1 cursor-pointer"
+            title="تعديل / اعتماد السجل وترحيل أثره للرصيد المعتمد"
+            className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer"
           >
-            <Edit3 className="w-3 h-3" />
-            <span>اعتماد</span>
+            <Edit3 className="w-4.5 h-4.5 shrink-0" />
+            <span>تعديل / اعتماد</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (options.onViewHistory) options.onViewHistory();
+              else notify(`فتح تفاصيل وتحديث السجل (${options.recordCode})`);
+            }}
+            title="تعديل ومراجعة بيانات السجل"
+            className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer"
+          >
+            <Edit3 className="w-4.5 h-4.5 shrink-0" />
+            <span>تعديل</span>
           </button>
         )}
         {isApproved ? (
@@ -731,15 +756,15 @@ export default function GrainMaintenanceModule({
                 options.onCancelApproved();
               } else {
                 notify(
-                  `السجل (${options.recordCode}) معتمد رسمياً؛ لا يُسمح بالحذف المباشر وتم تسجيل طلب إلغاء موثق / قيد عكسي في سجل التدقيق.`
+                  `السجل (${options.recordCode}) معتمد رسمياً؛ تم تسجيل طلب إلغاء موثق / قيد عكسي في سجل التدقيق.`
                 );
               }
             }}
-            title="إلغاء موثق / قيد عكسي (يُمنع الحذف المباشر للسجل المعتمد)"
-            className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black flex items-center gap-1 cursor-pointer"
+            title="حذف / إلغاء موثق (قيد عكسي للسجل المعتمد)"
+            className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer"
           >
-            <Ban className="w-3 h-3" />
-            <span>إلغاء موثق</span>
+            <Ban className="w-4.5 h-4.5 shrink-0" />
+            <span>حذف / إلغاء</span>
           </button>
         ) : (
           <button
@@ -747,32 +772,20 @@ export default function GrainMaintenanceModule({
             onClick={() => {
               if (options.onDeleteDraft) options.onDeleteDraft();
             }}
-            title="حذف السجل غير المعتمد"
-            className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-900 border border-red-200 text-[10px] font-black flex items-center gap-1 cursor-pointer"
+            title="حذف السجل"
+            className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-900 border border-red-200 text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-4.5 h-4.5 shrink-0" />
             <span>حذف</span>
           </button>
         )}
         <button
           type="button"
-          onClick={() => {
-            if (options.onQuickAdd) options.onQuickAdd();
-            else setIsQuickAddOpen(true);
-          }}
-          title="إضافة سجل جديد مرتبط"
-          className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black flex items-center gap-1 cursor-pointer"
-        >
-          <PlusCircle className="w-3 h-3" />
-          <span>إضافة</span>
-        </button>
-        <button
-          type="button"
           onClick={() => handleOfficialPrint(options.recordCode)}
           title="طباعة المستند الرسمي"
-          className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[#102A43] border border-slate-300 text-[10px] font-black flex items-center gap-1 cursor-pointer"
+          className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#102A43] border border-slate-300 text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer"
         >
-          <Printer className="w-3 h-3" />
+          <Printer className="w-4.5 h-4.5 shrink-0" />
           <span>طباعة</span>
         </button>
       </div>

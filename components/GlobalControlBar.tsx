@@ -123,6 +123,43 @@ function LayoutWireframePreview({
     );
   }
 
+  if (type === 'liquid_glass') {
+    return (
+      <div className="w-full h-12 rounded-lg bg-gradient-to-br from-sky-200 via-indigo-100 to-teal-100 border border-white p-1 flex gap-1 overflow-hidden shadow-inner">
+        <div className="w-5 h-full rounded-md bg-[#133C68]/75 backdrop-blur-sm border border-white/50 shrink-0 p-0.5 flex flex-col gap-0.5">
+          <span className="w-full h-1.5 rounded-sm bg-sky-300" />
+          <span className="w-full h-1 rounded-sm bg-white/50" />
+          <span className="w-full h-1 rounded-sm bg-white/30" />
+        </div>
+        <div className="flex-1 flex flex-col gap-1">
+          <div className="h-3.5 rounded-md bg-white/65 border border-white/80 shadow-xs" />
+          <div className="flex-1 grid grid-cols-3 gap-0.5">
+            <div className="rounded-md bg-white/60 border border-white/80" />
+            <div className="rounded-md bg-white/60 border border-white/80" />
+            <div className="rounded-md bg-white/60 border border-white/80" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'glass_split') {
+    return (
+      <div className="w-full h-12 rounded-lg bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 border border-sky-400/40 p-1 flex flex-col gap-1 overflow-hidden">
+        <div className="h-2.5 w-full rounded-md bg-white/15 border border-white/25 flex items-center gap-0.5 px-1">
+          <span className="w-3 h-1 rounded-full bg-sky-400" />
+          <span className="w-2.5 h-1 rounded-full bg-white/50" />
+          <span className="w-2.5 h-1 rounded-full bg-white/30" />
+        </div>
+        <div className="flex-1 grid grid-cols-4 gap-1">
+          <div className="col-span-2 rounded-md bg-white/12 border border-white/20" />
+          <div className="col-span-1 rounded-md bg-sky-400/20 border border-sky-300/30" />
+          <div className="col-span-1 rounded-md bg-white/12 border border-white/20" />
+        </div>
+      </div>
+    );
+  }
+
   // Default: sidebar_glass
   return (
     <div className="w-full h-12 rounded-lg bg-[#CEDAE3] border border-white p-1 flex gap-1 overflow-hidden">
@@ -496,8 +533,13 @@ export default function GlobalControlBar() {
                         <LayoutWireframePreview type={layout.wireframeType} active={isActive} />
                         <div className="flex items-start justify-between gap-1.5">
                           <div className="min-w-0">
-                            <span className="text-[11px] font-black text-[#102A43] block leading-snug">
-                              {t(layout.labelKey)}
+                            <span className="text-[11px] font-black text-[#102A43] flex items-center gap-1 flex-wrap leading-snug">
+                              <span>{t(layout.labelKey)}</span>
+                              {layout.isGlass && (
+                                <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-300 text-[8.5px] font-black">
+                                  {isRtl ? 'زجاجي' : 'Glass'}
+                                </span>
+                              )}
                             </span>
                             <span className="text-[10px] font-bold text-slate-600 block mt-0.5 leading-snug">
                               {isRtl ? layout.descAr : layout.descEn}
@@ -588,9 +630,16 @@ export default function GlobalControlBar() {
                               style={{ backgroundColor: preset.previewAccent }}
                             />
                           </span>
-                          <span className="text-[10.5px] font-black text-[#102A43] truncate">
-                            {t(preset.labelKey)}
-                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10.5px] font-black text-[#102A43] block truncate">
+                              {t(preset.labelKey)}
+                            </span>
+                            {preset.isGlass && (
+                              <span className="text-[8.5px] font-black text-sky-700 block">
+                                {isRtl ? 'تأثير زجاجي شفاف' : 'Frosted Glass'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {active && <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />}
                       </button>

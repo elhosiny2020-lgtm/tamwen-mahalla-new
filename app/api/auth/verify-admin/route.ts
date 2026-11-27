@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdminSession } from '@/lib/server/auth-guard';
 import { recordServerAuditLog } from '@/lib/server/audit-log-store';
-import {
-  claimInitialAdminPasscode,
-  getAdminPasscodeStatus,
-  verifyAdminPasscode,
-} from '@/lib/server/admin-credential-store';
+import { verifyFactoryResetPasscode } from '@/lib/server/admin-credential-store';
 import {
   checkSlidingWindowRateLimit,
   getClientIp,
@@ -15,26 +11,25 @@ import {
 
 const VerifyAdminSchema = z.object({
   action: z.enum(['verify', 'claim']).optional().default('verify'),
-  password: z.string().min(4, 'كلمة المرور الإدارية يجب ألا تقل عن ٤ أحرف').max(256),
+  password: z.string().min(4, 'كلمة مرور استعادة ضبط المصنع يجب ألا تقل عن ٤ أحرف').max(256),
 });
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminSession(req);
   if (auth.errorResponse) return auth.errorResponse;
 
-  const status = getAdminPasscodeStatus();
+  const hasEnv = Boolean(process.env.FACTORY_RESET_PASSWORD?.trim());
   return NextResponse.json(
     {
       ok: true,
-      configured: status.configured,
-      source: status.source,
+      configured: true,
+      source: hasEnv ? 'env' : 'fixed',
     },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }
 
 export async function POST(req: NextRequest) {
-  // Always verify session & admin role directly inside the route handler
   const auth = await requireAdminSession(req);
   if (auth.errorResponse) return auth.errorResponse;
 
@@ -42,7 +37,7 @@ export async function POST(req: NextRequest) {
   const userAgent = req.headers.get('user-agent') || 'متصفح الويب المعتمد';
   const rl = checkSlidingWindowRateLimit({
     key: `auth:verify-admin:${ip}:${auth.session.userId}`,
-    limit: 10,
+    limit: 20,
     windowMs: 10 * 60 * 1000,
   });
   if (!rl.allowed) {
@@ -50,16 +45,16 @@ export async function POST(req: NextRequest) {
       userId: auth.session.userId,
       username: auth.session.username,
       fullName: auth.session.username,
-      action: 'تجاوز حد التحقق الإداري',
+      action: 'تجاوز حد التحقق بكلمة مرور استعادة ضبط المصنع',
       module: 'الأمن والصلاحيات السيادية',
       branchId: auth.session.branchId,
-      details: 'تم إيقاف محاولات التحقق الإداري مؤقتاً لتجاوز الحد المسموح',
+      details: 'تم إيقاف محاولات التحقق من كلمة مرور استعادة ضبط المصنع مؤقتاً لتجاوز الحد المسموح',
       ipAddress: ip,
       deviceInfo: userAgent,
       status: 'warning',
     });
     return rateLimitExceededResponse(
-      'تم تجاوز الحد الأقصى لمحاولات التحقق الإداري. يرجى الانتظار ١٠ دقائق.',
+      'تم تجاوز الحد الأقصى لمحاولات التحقق بكلمة مرور استعادة ضبط المصنع. يرجى الانتظار قليلاً.',
       rl.retryAfterSeconds
     );
   }
@@ -74,81 +69,29 @@ export async function POST(req: NextRequest) {
   const parsed = VerifyAdminSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { ok: false, error: parsed.error.issues[0]?.message || 'يرجى إدخال كلمة المرور الإدارية بشكل صحيح.' },
+      { ok: false, error: parsed.error.issues[0]?.message || 'يرجى إدخال كلمة مرور استعادة ضبط المصنع بشكل صحيح.' },
       { status: 400 }
     );
   }
 
-  const { action, password } = parsed.data;
-  const status = getAdminPasscodeStatus();
+  const cleanPass = parsed.data.password.trim();
+  const check = verifyFactoryResetPasscode(cleanPass);
 
-  // First-run one-time atomic admin passcode setup (only when env secret is unset and unclaimed)
-  if (action === 'claim') {
-    if (status.configured) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'كلمة المرور الإدارية مهيأة مسبقاً على الخادم. يرجى إدخالها مباشرة للتحقق.',
-        },
-        { status: 409 }
-      );
-    }
-
-    const claimed = claimInitialAdminPasscode(password, auth.session.username);
-    if (!claimed.ok) {
-      return NextResponse.json(
-        { ok: false, error: 'تعذر تعيين كلمة المرور الإدارية. يرجى إدخال كلمة مرور لا تقل عن ٤ أحرف.' },
-        { status: 400 }
-      );
-    }
-
+  if (!check.valid) {
     recordServerAuditLog({
       userId: auth.session.userId,
       username: auth.session.username,
       fullName: auth.session.username,
-      action: 'تهيئة كلمة المرور الإدارية السيادية لأول مرة',
+      action: 'فشل التحقق بكلمة مرور استعادة ضبط المصنع',
       module: 'الأمن والصلاحيات السيادية',
       branchId: auth.session.branchId,
-      details: 'تم حفظ بصمة كلمة المرور الإدارية (scrypt) على الخادم بنجاح',
-      ipAddress: ip,
-      deviceInfo: userAgent,
-      status: 'success',
-    });
-
-    return NextResponse.json(
-      { ok: true, verified: true, claimed: true, userId: auth.session.userId, role: auth.session.role },
-      { headers: { 'Cache-Control': 'no-store' } }
-    );
-  }
-
-  // Standard verification path
-  if (!status.configured) {
-    return NextResponse.json(
-      {
-        ok: false,
-        needsSetup: true,
-        error: 'لم يتم تعيين كلمة المرور الإدارية بعد. يرجى اعتماد كلمة المرور الإدارية أولاً.',
-      },
-      { status: 409 }
-    );
-  }
-
-  const verification = verifyAdminPasscode(password);
-  if (!verification.valid) {
-    recordServerAuditLog({
-      userId: auth.session.userId,
-      username: auth.session.username,
-      fullName: auth.session.username,
-      action: 'فشل التحقق الإداري',
-      module: 'الأمن والصلاحيات السيادية',
-      branchId: auth.session.branchId,
-      details: 'إدخال كلمة مرور إدارية غير مطابقة',
+      details: 'إدخال كلمة مرور غير مطابقة لكلمة مرور استعادة ضبط المصنع الموحدة',
       ipAddress: ip,
       deviceInfo: userAgent,
       status: 'failed',
     });
     return NextResponse.json(
-      { ok: false, error: 'كلمة المرور الإدارية غير صحيحة.' },
+      { ok: false, error: 'كلمة مرور استعادة ضبط المصنع غير صحيحة. لا يمكن تنفيذ التصفير.' },
       { status: 403 }
     );
   }
@@ -157,10 +100,10 @@ export async function POST(req: NextRequest) {
     userId: auth.session.userId,
     username: auth.session.username,
     fullName: auth.session.username,
-    action: 'تحقق إداري سيادي ناجح',
+    action: 'تحقق ناجح بكلمة مرور استعادة ضبط المصنع',
     module: 'الأمن والصلاحيات السيادية',
     branchId: auth.session.branchId,
-    details: 'تم تأكيد الصلاحية السيادية لتنفيذ إجراء حساس',
+    details: 'تم التحقق من كلمة مرور استعادة ضبط المصنع الموحدة لتنفيذ التصفير الفوري',
     ipAddress: ip,
     deviceInfo: userAgent,
     status: 'success',

@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   CalendarPlus,
+  Eye,
   CalendarClock,
   CreditCard,
   PauseCircle,
@@ -259,7 +260,15 @@ export default function DebtsSchedulingTab({
         headerText: 'الإجراءات',
         type: 'actions',
         render: (r) => (
-          <div className="flex items-center gap-1 whitespace-nowrap">
+          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => onOpenBakeryProfile(r.bakeryId)}
+              title="عرض ملف المخبز"
+              className="p-1.5 rounded-xl bg-blue-50 hover:bg-[#102A43] hover:text-white text-[#164E83] border border-blue-200 cursor-pointer transition-colors"
+            >
+              <Eye className="w-5 h-5" />
+            </button>
             {r.remainingAmount > 0 && r.status !== 'ملغي بقرار معتمد' && (
               <>
                 <button
@@ -269,9 +278,9 @@ export default function DebtsSchedulingTab({
                     if (parent) onPayInstallmentShortcut(parent, r);
                   }}
                   title="سداد هذا القسط"
-                  className="p-1 rounded bg-emerald-50 hover:bg-emerald-700 hover:text-white text-emerald-800 cursor-pointer"
+                  className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-700 hover:text-white text-emerald-800 border border-emerald-200 cursor-pointer transition-colors"
                 >
-                  <CreditCard className="w-3.5 h-3.5" />
+                  <CreditCard className="w-5 h-5" />
                 </button>
                 <button
                   type="button"
@@ -280,10 +289,10 @@ export default function DebtsSchedulingTab({
                     setPostponeDate(r.dueDate);
                     setPostponeReason('');
                   }}
-                  title="تأجيل القسط بموافقة معتمدة"
-                  className="p-1 rounded bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-800 cursor-pointer"
+                  title="تأجيل / تعديل القسط بموافقة معتمدة"
+                  className="p-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-800 border border-amber-200 cursor-pointer transition-colors"
                 >
-                  <PauseCircle className="w-3.5 h-3.5" />
+                  <PauseCircle className="w-5 h-5" />
                 </button>
               </>
             )}

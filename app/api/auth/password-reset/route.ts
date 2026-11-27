@@ -15,12 +15,13 @@ import {
   verifyPasswordResetToken,
 } from '@/lib/server/users-db';
 
-const PRIMARY_RECOVERY_EMAIL = 'elhosiny2020@gmail.com';
+const PRIMARY_RECOVERY_EMAIL = process.env.RECOVERY_ADMIN_EMAIL?.trim() || 'elhosiny2020@gmail.com';
+const MASKED_RECOVERY_LABEL = 'البريد الإلكتروني الرسمي المعتمد لإدارة المنظومة';
 
 const requestResetSchema = z.object({
   action: z.literal('request'),
   identifier: z.string().trim().max(160).optional().default('admin'),
-  email: z.string().trim().email('البريد الإلكتروني غير صالح').optional().default(PRIMARY_RECOVERY_EMAIL),
+  email: z.string().trim().max(160).optional().default(''),
 });
 
 const verifyTokenSchema = z.object({
@@ -219,27 +220,30 @@ export async function POST(req: NextRequest) {
       action: 'طلب استعادة كلمة المرور وإرسالها للبريد الإلكتروني',
       module: 'الأمن السيبراني واستعادة كلمات المرور (Supabase Auth)',
       branchId: user.primaryBranchId,
-      details: `تم توليد رمز استعادة آمن وكلمة مرور جديدة لحساب (${user.username}) وإرسالها إلى البريد المعتمد (${targetEmail}) — صالحة حتى ${tokenData.expiresAt}`,
+      details: `تم توليد رمز استعادة آمن وكلمة مرور مؤقتة لحساب (${user.username}) وإرسالها للبريد المعتمد — صالحة حتى ${tokenData.expiresAt}`,
       ipAddress: ip,
       deviceInfo: userAgent,
       status: 'success',
     });
 
-    return NextResponse.json({
-      ok: true,
-      message: `تم إرسال كلمة المرور الجديدة ورابط الاستعادة الآمن إلى البريد الإلكتروني (${targetEmail}) بنجاح.`,
-      delivery: {
-        recipientEmail: targetEmail,
-        username: user.username,
-        fullName: user.fullName,
-        resetToken: tokenData.rawToken,
-        resetUrl,
-        tempPassword: tokenData.tempPassword,
-        expiresAt: tokenData.expiresAt,
-        supabaseAuthSent: dispatchStatus.supabaseAuthSent,
-        emailProviderSent: dispatchStatus.emailProviderSent,
+    return NextResponse.json(
+      {
+        ok: true,
+        message: 'تم إرسال كلمة المرور الجديدة ورابط الاستعادة الآمن إلى البريد الإلكتروني الرسمي المعتمد بنجاح.',
+        delivery: {
+          recipientLabel: MASKED_RECOVERY_LABEL,
+          username: user.username,
+          fullName: user.fullName,
+          resetToken: tokenData.rawToken,
+          resetUrl,
+          tempPassword: tokenData.tempPassword,
+          expiresAt: tokenData.expiresAt,
+          supabaseAuthSent: dispatchStatus.supabaseAuthSent,
+          emailProviderSent: dispatchStatus.emailProviderSent,
+        },
       },
-    });
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
   if (data.action === 'verify-token') {
@@ -251,13 +255,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      username: check.user.username,
-      fullName: check.user.fullName,
-      email: check.email || PRIMARY_RECOVERY_EMAIL,
-      expiresAt: check.expiresAt,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        username: check.user.username,
+        fullName: check.user.fullName,
+        recipientLabel: MASKED_RECOVERY_LABEL,
+        expiresAt: check.expiresAt,
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
   // data.action === 'confirm'
@@ -275,17 +282,20 @@ export async function POST(req: NextRequest) {
     action: 'تحديث كلمة المرور عبر رابط البريد الإلكتروني',
     module: 'الأمن السيبراني واستعادة كلمات المرور (Supabase Auth)',
     branchId: consumed.user.primaryBranchId,
-    details: `تم تغيير واعتماد كلمة المرور الجديدة بنجاح لحساب (${consumed.user.username}) عبر رابط الاستعادة المرسل إلى (${consumed.email})`,
+    details: `تم تغيير واعتماد كلمة المرور الجديدة بنجاح لحساب (${consumed.user.username}) عبر رابط الاستعادة الرسمي`,
     ipAddress: ip,
     deviceInfo: userAgent,
     status: 'success',
   });
 
-  return NextResponse.json({
-    ok: true,
-    username: consumed.user.username,
-    fullName: consumed.user.fullName,
-    email: consumed.email,
-    message: 'تم تحديث كلمة المرور بنجاح من رابط البريد الإلكتروني ويمكنك الآن تسجيل الدخول.',
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      username: consumed.user.username,
+      fullName: consumed.user.fullName,
+      recipientLabel: MASKED_RECOVERY_LABEL,
+      message: 'تم تحديث كلمة المرور بنجاح من رابط البريد الإلكتروني ويمكنك الآن تسجيل الدخول.',
+    },
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
 }

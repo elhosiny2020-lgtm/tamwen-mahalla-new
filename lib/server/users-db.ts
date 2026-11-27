@@ -137,6 +137,10 @@ function getSqliteDb(): SqliteDatabase {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash);
+      CREATE TABLE IF NOT EXISTS system_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
     `);
 
     // Ensure admin default email is elhosiny2020@gmail.com
@@ -144,9 +148,13 @@ function getSqliteDb(): SqliteDatabase {
       `UPDATE system_users SET email = 'elhosiny2020@gmail.com' WHERE id = 'usr-001' AND (email = 'admin.gharbia@supply.gov.eg' OR email = '')`
     ).run();
 
+    const seededRow = db
+      .prepare(`SELECT value FROM system_meta WHERE key = 'initial_users_seeded' LIMIT 1`)
+      .get() as { value?: string } | undefined;
     const countRow = db.prepare('SELECT COUNT(*) as cnt FROM system_users').get();
     const total = Number(countRow?.cnt ?? 0);
-    if (total === 0) {
+
+    if (total === 0 && seededRow?.value !== '1') {
       const insertStmt = db.prepare(`
         INSERT OR IGNORE INTO system_users (
           id, full_name, national_id, phone, email, username,
@@ -179,6 +187,9 @@ function getSqliteDb(): SqliteDatabase {
           u.createdBy || 'system'
         );
       }
+      db.prepare(`INSERT OR REPLACE INTO system_meta (key, value) VALUES ('initial_users_seeded', '1')`).run();
+    } else if (total > 0 && seededRow?.value !== '1') {
+      db.prepare(`INSERT OR REPLACE INTO system_meta (key, value) VALUES ('initial_users_seeded', '1')`).run();
     }
     globalForUsersDb.__gharbiaSqliteInitialized = true;
   }
@@ -318,15 +329,28 @@ export function getDbUserById(id: string): StoredSystemUser | null {
 export function getDbUserRowByUsername(username: string): DbUserRow | null {
   const db = getSqliteDb();
   const trimmed = username.trim();
+  if (!trimmed) return null;
   const row = db
-    .prepare('SELECT * FROM system_users WHERE LOWER(username) = LOWER(?) LIMIT 1')
-    .get(trimmed) as unknown as DbUserRow | undefined;
+    .prepare(
+      `SELECT * FROM system_users
+       WHERE LOWER(username) = LOWER(?)
+          OR LOWER(email) = LOWER(?)
+          OR employee_number = ?
+       LIMIT 1`
+    )
+    .get(trimmed, trimmed, trimmed) as unknown as DbUserRow | undefined;
   return row || null;
 }
 
 export function getDbUserByUsername(username: string): StoredSystemUser | null {
   const row = getDbUserRowByUsername(username);
   return row ? rowToStoredUser(row) : null;
+}
+
+export function countDbUsers(): number {
+  const db = getSqliteDb();
+  const row = db.prepare('SELECT COUNT(*) as cnt FROM system_users').get();
+  return Number(row?.cnt ?? 0);
 }
 
 export interface CreateDbUserInput {
@@ -518,10 +542,32 @@ export async function updateDbUser(
 
 export async function setDbUserPasswordByUsername(
   username: string,
-  newPassword: string
+  newPassword: string,
+  fallbackUser?: Partial<CreateDbUserInput>
 ): Promise<boolean> {
   const row = getDbUserRowByUsername(username);
-  if (!row) return false;
+  if (!row) {
+    if (!fallbackUser) return false;
+    const created = await createDbUser({
+      id: fallbackUser.id,
+      fullName: fallbackUser.fullName || username.trim(),
+      username: username.trim(),
+      password: newPassword.trim(),
+      nationalId: fallbackUser.nationalId || '29501011600001',
+      phone: fallbackUser.phone || '01000000000',
+      email: fallbackUser.email || `${username.trim()}@supply.gov.eg`,
+      jobTitle: fallbackUser.jobTitle || 'موظف تموين',
+      jobGrade: fallbackUser.jobGrade || 'الثالثة التخصصية',
+      workplace: fallbackUser.workplace || 'مديرية التموين بالغربية',
+      branchIds: fallbackUser.branchIds?.length ? fallbackUser.branchIds : [fallbackUser.primaryBranchId || 'b-03'],
+      primaryBranchId: fallbackUser.primaryBranchId || 'b-03',
+      departmentIds: fallbackUser.departmentIds?.length ? fallbackUser.departmentIds : ['d-01', 'd-25'],
+      role: fallbackUser.role || 'bakery_officer',
+      status: fallbackUser.status || 'active',
+      createdBy: fallbackUser.createdBy || 'admin',
+    });
+    return created.ok;
+  }
   const hashed = hashPasswordScrypt(newPassword.trim());
   const db = getSqliteDb();
   const nowIso = new Date().toISOString();
@@ -586,35 +632,40 @@ export function touchDbUserLastLogin(id: string): void {
 
 export async function deleteDbUsersByIds(
   ids: string[],
-  actorUserId: string
+  _actorUserId?: string
 ): Promise<{ deletedIds: string[]; skippedCount: number }> {
+  void _actorUserId;
   const db = getSqliteDb();
   const allRows = db.prepare('SELECT * FROM system_users').all() as unknown as DbUserRow[];
-  let remainingSuperAdmins = allRows.filter((r) => r.role === 'super_admin').length;
-
   const deletedIds: string[] = [];
-  let skippedCount = 0;
 
   for (const targetId of ids) {
     const row = allRows.find((r) => r.id === targetId);
     if (!row) continue;
-    if (row.id === actorUserId || row.username.toLowerCase() === 'admin') {
-      skippedCount++;
-      continue;
-    }
-    if (row.role === 'super_admin' && remainingSuperAdmins <= 1) {
-      skippedCount++;
-      continue;
-    }
     const res = db.prepare('DELETE FROM system_users WHERE id = ?').run(row.id);
     if (res.changes > 0) {
-      if (row.role === 'super_admin') remainingSuperAdmins--;
       deletedIds.push(row.id);
       void deleteUserFromSupabase(row.id);
     }
   }
 
-  return { deletedIds, skippedCount };
+  db.prepare(`INSERT OR REPLACE INTO system_meta (key, value) VALUES ('initial_users_seeded', '1')`).run();
+  return { deletedIds, skippedCount: 0 };
+}
+
+export async function wipeAllDbUsers(): Promise<{ deletedCount: number; deletedIds: string[] }> {
+  const db = getSqliteDb();
+  const allRows = db.prepare('SELECT id FROM system_users').all() as unknown as { id: string }[];
+  const deletedIds = allRows.map((r) => r.id);
+  const res = db.prepare('DELETE FROM system_users').run();
+  db.prepare('DELETE FROM password_reset_tokens').run();
+  db.prepare(`INSERT OR REPLACE INTO system_meta (key, value) VALUES ('initial_users_seeded', '1')`).run();
+
+  for (const id of deletedIds) {
+    void deleteUserFromSupabase(id);
+  }
+
+  return { deletedCount: Number(res.changes ?? deletedIds.length), deletedIds };
 }
 
 function hashResetTokenSha256(rawToken: string): string {

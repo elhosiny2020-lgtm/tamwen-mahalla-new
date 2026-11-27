@@ -676,6 +676,7 @@ const STORAGE_KEYS = {
   BAKERY_ALERT_ACTIONS: 'gharbia_supply_bakery_alert_actions_v4',
   BAKERY_INSPECTIONS: 'gharbia_supply_bakery_inspections_v1',
   BAKERY_DEBTS: 'gharbia_supply_bakery_debts_v1',
+  COMPLAINTS: 'gharbia_supply_complaints_v1',
   TABLE_PIN_PREFS: 'gharbia_supply_table_pins_v1',
   TABLE_WIDTH_PREFS: 'gharbia_supply_table_widths_v1',
 };
@@ -797,6 +798,12 @@ export function getStoredAuditLogs(): AuditLog[] {
   }
 }
 
+export function saveStoredAuditLogs(logs: AuditLog[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs));
+  window.dispatchEvent(new CustomEvent('gharbia-audit-log-added'));
+}
+
 export function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>) {
   if (typeof window === 'undefined') return;
   const logs = getStoredAuditLogs();
@@ -911,6 +918,11 @@ export function addBakeryAuditChange(change: Omit<BakeryAuditChange, 'id' | 'tim
     timestamp: new Date().toISOString(),
   };
   localStorage.setItem(STORAGE_KEYS.BAKERY_AUDIT, JSON.stringify([newChange, ...list].slice(0, 500)));
+}
+
+export function saveStoredBakeryAuditChanges(changes: BakeryAuditChange[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEYS.BAKERY_AUDIT, JSON.stringify(changes));
 }
 
 export function getStoredBakeryColumns(userId?: string): BakeryColumnConfig[] {
@@ -1048,6 +1060,36 @@ export function getStoredDebtTransactions(): DebtTransactionRecord[] {
 export function saveStoredDebtTransactions(records: DebtTransactionRecord[]) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEYS.BAKERY_DEBTS, JSON.stringify(records));
+}
+
+export interface CitizenComplaintRecord {
+  id: string;
+  citizen: string;
+  phone: string;
+  issue: string;
+  status: string;
+  date: string;
+}
+
+export const INITIAL_COMPLAINTS: CitizenComplaintRecord[] = [
+  { id: 'comp-1', citizen: 'أحمد محمود الششتاوي', phone: '01011112222', issue: 'مراجعة أوزان رغيف الخبز بقرية الهياتم', status: 'جاري الفحص والتفتيش', date: '2026-11-24' },
+  { id: 'comp-2', citizen: 'فاطمة علي أبو النجا', phone: '01233334444', issue: 'تحديث بيانات بطاقة تموينية بمركز المحلة', status: 'تم الحل وإعادة التفعيل', date: '2026-11-23' },
+  { id: 'comp-3', citizen: 'سعيد عبد الرحمن الدسوقي', phone: '01122334455', issue: 'متابعة مواعيد تشغيل مخبز بقرية صفط تراب', status: 'تمت المعاينة والمطابقة', date: '2026-11-22' },
+];
+
+export function getStoredComplaints(): CitizenComplaintRecord[] {
+  if (typeof window === 'undefined') return INITIAL_COMPLAINTS;
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.COMPLAINTS);
+    return data ? JSON.parse(data) : INITIAL_COMPLAINTS;
+  } catch {
+    return INITIAL_COMPLAINTS;
+  }
+}
+
+export function saveStoredComplaints(records: CitizenComplaintRecord[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEYS.COMPLAINTS, JSON.stringify(records));
 }
 
 

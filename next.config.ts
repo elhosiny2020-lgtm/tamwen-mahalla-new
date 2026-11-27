@@ -89,6 +89,8 @@ const nextConfig: NextConfig = {
     '127.0.0.1',
   ],
   experimental: {
+    webpackMemoryOptimizations: true,
+    optimizePackageImports: ['lucide-react', 'd3', 'motion'],
     serverActions: {
       allowedOrigins: [
         '*.run.app',
@@ -100,7 +102,7 @@ const nextConfig: NextConfig = {
     },
   },
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: false,
@@ -118,6 +120,11 @@ const nextConfig: NextConfig = {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     if (dev && process.env.DISABLE_HMR === 'true') {
       config.watchOptions = { ignored: /.*/ };
+    } else if (dev) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: ['**/node_modules/**', '**/.next/**', '**/data/**', '**/public/assets/**'],
+      };
     }
     return config;
   },

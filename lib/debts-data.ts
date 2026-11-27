@@ -988,7 +988,7 @@ export function loadDebtsStore(): DebtsFullStore {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<DebtsFullStore>;
     return {
-      debts: Array.isArray(parsed.debts) && parsed.debts.length ? parsed.debts : fallback.debts,
+      debts: Array.isArray(parsed.debts) ? parsed.debts : fallback.debts,
       items: Array.isArray(parsed.items) ? parsed.items : fallback.items,
       payments: Array.isArray(parsed.payments) ? parsed.payments : fallback.payments,
       schedules: Array.isArray(parsed.schedules) ? parsed.schedules : fallback.schedules,

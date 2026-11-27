@@ -17,6 +17,9 @@ import {
   CheckCircle2,
   Printer,
   RefreshCw,
+  Eye,
+  Edit3,
+  Trash2,
 } from 'lucide-react';
 import { User } from '@/types';
 import {
@@ -498,19 +501,58 @@ export default function HrCoreOperationsView({
                       {row.hasStalledRequest ? `${row.stalledRequestNumber} — ${row.stalledRequestStatus}` : 'لا توجد طلبات متوقفة'}
                     </td>
                     <td className="p-2 border border-slate-200 text-center">
-                      <div className="flex flex-wrap items-center justify-center gap-1">
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => onOpenProfileModal('profile', row.emp)}
-                          className="px-2 py-1 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#164E83] border border-blue-200 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                          title="عرض الملف الموحد"
                         >
-                          الملف الموحد
+                          <Eye className="w-4.5 h-4.5 shrink-0" />
+                          <span>عرض</span>
                         </button>
+                        {isHrAdminOrSupervisor && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onOpenProfileModal('create', null)}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                              title="إضافة موظف جديد"
+                            >
+                              <PlusCircle className="w-4.5 h-4.5 shrink-0" />
+                              <span>إضافة</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOpenProfileModal('edit', row.emp)}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                              title="تعديل بيانات الموظف"
+                            >
+                              <Edit3 className="w-4.5 h-4.5 shrink-0" />
+                              <span>تعديل</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateStore((prev) => ({
+                                  ...prev,
+                                  employees: prev.employees.filter((x) => x.id !== row.emp.id),
+                                }));
+                                onNotify(`تم حذف ملف الموظف (${row.emp.fullName}) بنجاح.`);
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                              title="حذف السجل"
+                            >
+                              <Trash2 className="w-4.5 h-4.5 shrink-0" />
+                              <span>حذف</span>
+                            </button>
+                          </>
+                        )}
                         {(row.needsRenewal || row.isExpired) && (
                           <button
                             type="button"
                             onClick={() => setActiveScreen('renewal_requests')}
-                            className="px-2 py-1 rounded bg-amber-600 text-white text-[10px] font-black cursor-pointer"
+                            className="px-2.5 py-1.5 rounded-xl bg-amber-600 text-white text-[10.5px] font-black cursor-pointer"
                           >
                             طلب تجديد
                           </button>
@@ -644,29 +686,61 @@ export default function HrCoreOperationsView({
                       {formatArabicCurrency(emp.approvedFunctionalWageEgp + emp.supplementaryWageEgp)}
                     </td>
                     <td className="p-2 border border-slate-200 text-center">
-                      <div className="flex flex-wrap items-center justify-center gap-1">
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => onOpenProfileModal('profile', emp)}
-                          className="px-2 py-1 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#164E83] border border-blue-200 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                          title="عرض الملف الموحد (١٢ تبويب)"
                         >
-                          الملف (١٢ تبويب)
+                          <Eye className="w-4.5 h-4.5 shrink-0" />
+                          <span>عرض</span>
                         </button>
                         {isHrAdminOrSupervisor && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenProfileModal('edit', emp)}
-                            className="px-2 py-1 rounded bg-blue-700 text-white text-[10px] font-black cursor-pointer"
-                          >
-                            تعديل
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onOpenProfileModal('create', null)}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                              title="إضافة موظف جديد"
+                            >
+                              <PlusCircle className="w-4.5 h-4.5 shrink-0" />
+                              <span>إضافة</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOpenProfileModal('edit', emp)}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                              title="تعديل بيانات الموظف"
+                            >
+                              <Edit3 className="w-4.5 h-4.5 shrink-0" />
+                              <span>تعديل</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateStore((prev) => ({
+                                  ...prev,
+                                  employees: prev.employees.filter((x) => x.id !== emp.id),
+                                }));
+                                onNotify(`تم حذف ملف الموظف (${emp.fullName}) بنجاح.`);
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                              title="حذف السجل"
+                            >
+                              <Trash2 className="w-4.5 h-4.5 shrink-0" />
+                              <span>حذف</span>
+                            </button>
+                          </>
                         )}
                         <button
                           type="button"
                           onClick={() => window.print()}
-                          className="px-2 py-1 rounded bg-slate-200 text-[#102A43] text-[10px] font-black cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#102A43] border border-slate-300 text-[10.5px] font-black inline-flex items-center gap-1 cursor-pointer"
+                          title="طباعة"
                         >
-                          طباعة
+                          <Printer className="w-4.5 h-4.5 shrink-0" />
+                          <span>طباعة</span>
                         </button>
                       </div>
                     </td>

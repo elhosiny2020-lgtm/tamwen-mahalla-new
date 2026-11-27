@@ -61,6 +61,12 @@ export interface TranslationDictionary {
   theme_dark_mode: string;
   theme_midnight_aurora: string;
   theme_eye_comfort: string;
+  theme_crystal_glass: string;
+  theme_obsidian_glass: string;
+  theme_aurora_glass: string;
+  theme_emerald_glass: string;
+  theme_sapphire_executive: string;
+  theme_copper_editorial: string;
   theme_custom: string;
 
   // UX/UI Studio & Layouts
@@ -76,6 +82,8 @@ export interface TranslationDictionary {
   layout_royal_heritage: string;
   layout_ultra_minimal: string;
   layout_operations_cockpit: string;
+  layout_liquid_glass: string;
+  layout_glass_split: string;
 
   // Sidebar & Navigation
   departments: string;
@@ -236,6 +244,12 @@ const AR: TranslationDictionary = {
   theme_dark_mode: 'الوضع الداكن Dark Mode',
   theme_midnight_aurora: 'الشفق الليلي Aurora',
   theme_eye_comfort: 'وضع راحة العين Eye Comfort',
+  theme_crystal_glass: 'الكريستال الزجاجي الشفاف (Glass)',
+  theme_obsidian_glass: 'الأوبسيديان الزجاجي الداكن (Glass)',
+  theme_aurora_glass: 'الشفق الزجاجي المتلألئ (Glass)',
+  theme_emerald_glass: 'الزمرد الزجاجي الملكي (Glass)',
+  theme_sapphire_executive: 'الياقوت التنفيذي الفاخر',
+  theme_copper_editorial: 'النحاس الدافئ والتحريري',
   theme_custom: 'لون مخصص',
 
   uxStudioBtn: 'الواجهات والألوان UX/UI',
@@ -250,6 +264,8 @@ const AR: TranslationDictionary = {
   layout_royal_heritage: 'الطراز السيادي الرسمي (Sovereign)',
   layout_ultra_minimal: 'التصميم البسيط المسطح (Minimal)',
   layout_operations_cockpit: 'غرفة العمليات الفورية (Cockpit)',
+  layout_liquid_glass: 'الزجاج السائل الشفاف (Liquid Glass)',
+  layout_glass_split: 'المنصة الزجاجية المقسمة (Glass Command)',
 
   departments: 'الأقسام',
   searchDepartments: 'بحث في الأقسام...',
@@ -404,6 +420,12 @@ const EN: TranslationDictionary = {
   theme_dark_mode: 'Dark Mode',
   theme_midnight_aurora: 'Midnight Aurora Dark',
   theme_eye_comfort: 'Eye Comfort Mode',
+  theme_crystal_glass: 'Crystal Frost Glass',
+  theme_obsidian_glass: 'Obsidian Dark Glass',
+  theme_aurora_glass: 'Aurora Prism Glass',
+  theme_emerald_glass: 'Royal Emerald Glass',
+  theme_sapphire_executive: 'Sapphire Executive',
+  theme_copper_editorial: 'Warm Copper Editorial',
   theme_custom: 'Custom Theme',
 
   uxStudioBtn: 'UX/UI & Colors',
@@ -418,6 +440,8 @@ const EN: TranslationDictionary = {
   layout_royal_heritage: 'Sovereign Official Grid',
   layout_ultra_minimal: 'Ultra Minimal Flat Grid',
   layout_operations_cockpit: 'Live Operations Cockpit',
+  layout_liquid_glass: 'Liquid Crystal Glass',
+  layout_glass_split: 'Glass Executive Command',
 
   departments: 'Departments',
   searchDepartments: 'Search departments...',

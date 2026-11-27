@@ -16,6 +16,8 @@ import {
   PlusCircle,
   AlertTriangle,
   RefreshCw,
+  Trash2,
+  Edit3,
 } from 'lucide-react';
 import { User } from '@/types';
 import {
@@ -967,16 +969,18 @@ export default function HrRenewalAndReportsView({
                     )}
                   </td>
                   <td className="p-2 border border-slate-200 text-center">
-                    <div className="flex flex-wrap items-center justify-center gap-1">
+                    <div className="flex flex-wrap items-center justify-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => {
                           setPrintingRequest(req);
                           setActiveScreen('renewal_requests');
                         }}
-                        className="px-2 py-1 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                        title="عرض وطباعة نموذج الطلب A4"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#102A43] hover:bg-[#1E3A5F] text-[#C6A15B] text-[11px] font-black cursor-pointer shadow-xs transition-all"
                       >
-                        عرض وطباعة A4
+                        <Eye className="w-4.5 h-4.5" />
+                        <span>عرض</span>
                       </button>
                       {isHrAdminOrSupervisor && (
                         <>
@@ -985,18 +989,22 @@ export default function HrRenewalAndReportsView({
                             onClick={() =>
                               handleAdvanceRenewalWorkflow(req, 'قيد مراجعة شؤون العاملين')
                             }
-                            className="px-2 py-1 rounded bg-blue-700 text-white text-[10px] font-black cursor-pointer"
+                            title="تعديل الحالة إلى قيد المراجعة"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-[11px] font-black cursor-pointer shadow-xs transition-all"
                           >
-                            مراجعة
+                            <Edit3 className="w-4.5 h-4.5" />
+                            <span>مراجعة</span>
                           </button>
                           <button
                             type="button"
                             onClick={() =>
                               handleAdvanceRenewalWorkflow(req, 'مطلوب استكمال مستندات')
                             }
-                            className="px-2 py-1 rounded bg-amber-600 text-white text-[10px] font-black cursor-pointer"
+                            title="طلب استكمال مستندات"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black cursor-pointer shadow-xs transition-all"
                           >
-                            استكمال مستندات
+                            <PlusCircle className="w-4.5 h-4.5" />
+                            <span>استكمال</span>
                           </button>
                           <button
                             type="button"
@@ -1007,9 +1015,11 @@ export default function HrRenewalAndReportsView({
                                 `قرار-تجديد-٢٠٢٦/${toArabicNumerals(100 + store.serviceHistory.length + 1)}`
                               )
                             }
-                            className="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black cursor-pointer"
+                            title="اعتماد القرار وتحديث الملف"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black cursor-pointer shadow-xs transition-all"
                           >
-                            اعتماد القرار وتحديث الملف
+                            <CheckCircle2 className="w-4.5 h-4.5" />
+                            <span>اعتماد</span>
                           </button>
                           <button
                             type="button"
@@ -1021,9 +1031,26 @@ export default function HrRenewalAndReportsView({
                                 'عدم استيفاء شروط التجديد المقررة'
                               )
                             }
-                            className="px-2 py-1 rounded bg-red-700 text-white text-[10px] font-black cursor-pointer"
+                            title="رفض الطلب مع بيان السبب"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-700 hover:bg-orange-800 text-white text-[11px] font-black cursor-pointer shadow-xs transition-all"
                           >
-                            رفض
+                            <XCircle className="w-4.5 h-4.5" />
+                            <span>رفض</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateStore((prev) => ({
+                                ...prev,
+                                renewalRequests: prev.renewalRequests.filter((x) => x.id !== req.id),
+                              }));
+                              onNotify(`تم حذف طلب التجديد (${req.requestNumber}) من السجل.`);
+                            }}
+                            title="حذف طلب التجديد نهائياً"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-black cursor-pointer shadow-xs transition-all"
+                          >
+                            <Trash2 className="w-4.5 h-4.5" />
+                            <span>حذف</span>
                           </button>
                         </>
                       )}
@@ -1169,16 +1196,35 @@ export default function HrRenewalAndReportsView({
                         {r.hrPublicMessageToEmployee}
                       </td>
                       <td className="p-2 border border-slate-200 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPrintingRequest(r);
-                            setActiveScreen('renewal_requests');
-                          }}
-                          className="px-2.5 py-1 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
-                        >
-                          طباعة وتنزيل PDF
-                        </button>
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrintingRequest(r);
+                              setActiveScreen('renewal_requests');
+                            }}
+                            title="عرض وطباعة الطلب"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#102A43] hover:bg-[#1E3A5F] text-[#C6A15B] text-[11px] font-black cursor-pointer shadow-xs transition-all"
+                          >
+                            <Printer className="w-4.5 h-4.5" />
+                            <span>طباعة</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateStore((prev) => ({
+                                ...prev,
+                                renewalRequests: prev.renewalRequests.filter((x) => x.id !== r.id),
+                              }));
+                              onNotify(`تم حذف الطلب (${r.requestNumber}) من السجل.`);
+                            }}
+                            title="حذف الطلب"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-black cursor-pointer shadow-xs transition-all"
+                          >
+                            <Trash2 className="w-4.5 h-4.5" />
+                            <span>حذف</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1494,16 +1540,18 @@ export default function HrRenewalAndReportsView({
                       </span>
                     </td>
                     <td className="p-2 border border-slate-200 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedEmpId(al.employeeId);
                             setActiveScreen('renewal_requests');
                           }}
-                          className="px-2 py-1 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+                          title="إضافة طلب تجديد لهذا التنبيه"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#102A43] hover:bg-[#1E3A5F] text-[#C6A15B] text-[11px] font-black cursor-pointer shadow-xs transition-all"
                         >
-                          إنشاء طلب تجديد
+                          <PlusCircle className="w-4.5 h-4.5" />
+                          <span>طلب تجديد</span>
                         </button>
                         <button
                           type="button"
@@ -1517,9 +1565,11 @@ export default function HrRenewalAndReportsView({
                             }));
                             onNotify(`تم توثيق معالجة وإغلاق التنبيه (${al.alertNumber}).`);
                           }}
-                          className="px-2 py-1 rounded bg-emerald-700 text-white text-[10px] font-black cursor-pointer"
+                          title="إغلاق التنبيه بعد المعالجة"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black cursor-pointer shadow-xs transition-all"
                         >
-                          إغلاق
+                          <CheckCircle2 className="w-4.5 h-4.5" />
+                          <span>إغلاق</span>
                         </button>
                       </div>
                     </td>

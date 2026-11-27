@@ -20,6 +20,7 @@ import {
   TrendingUp,
   X,
   BarChart3,
+  Eye,
 } from 'lucide-react';
 import {
   BakeryDebtRecord,
@@ -335,9 +336,10 @@ export default function DebtsDashboardTab({
           <button
             type="button"
             onClick={() => onOpenBakeryProfile(r.bakeryId)}
-            className="px-2.5 py-1 rounded bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10px] font-black cursor-pointer whitespace-nowrap"
+            className="px-3 py-1.5 rounded-xl bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10.5px] font-black inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
-            فتح ملف المخبز
+            <Eye className="w-4.5 h-4.5" />
+            <span>عرض ملف المخبز</span>
           </button>
         ),
       },

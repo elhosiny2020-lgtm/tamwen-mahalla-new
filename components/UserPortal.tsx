@@ -82,6 +82,10 @@ import {
   saveStoredInspections,
   getStoredDebtTransactions,
   saveStoredDebtTransactions,
+  INITIAL_COMPLAINTS,
+  getStoredComplaints,
+  saveStoredComplaints,
+  CitizenComplaintRecord,
 } from '@/lib/mock-db';
 import { evaluateDocumentExpiry } from '@/lib/bakery-math';
 import {
@@ -98,6 +102,9 @@ import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import FactoryResetButton from './FactoryResetButton';
 import { TableActionButtons } from './trade/TradeSharedCrudUi';
+import AnalyticsDashboardWidget from './AnalyticsDashboardWidget';
+import RealtimeToastNotifications from './RealtimeToastNotifications';
+import { loadDebtsStore } from '@/lib/debts-data';
 
 const ModuleLoadingFallback = () => (
   <div className="bg-white rounded-2xl border border-slate-200 p-10 flex flex-col items-center justify-center gap-3 text-[#102A43]">
@@ -173,9 +180,13 @@ const ACTIVE_TAB_STORAGE_KEY = 'gharbia_supply_active_dept_tab_v1';
 
 export default function UserPortal({ currentUser, activeBranchId }: UserPortalProps) {
   const { prefs, effectiveDensity, isRtl, t } = useSystemPreferences();
-  const isDarkTheme = prefs.themeId === 'dark_mode' || prefs.themeId === 'midnight_aurora';
+  const isDarkTheme =
+    prefs.themeId === 'dark_mode' ||
+    prefs.themeId === 'midnight_aurora' ||
+    prefs.themeId === 'obsidian_glass' ||
+    prefs.themeId === 'aurora_glass';
   const uiLayout = prefs.uiLayout;
-  const isTopRibbonLayout = uiLayout === 'executive_command';
+  const isTopRibbonLayout = uiLayout === 'executive_command' || uiLayout === 'glass_split';
   const isCompactRailLayout = uiLayout === 'bento_mosaic';
   const isMinimalLayout = uiLayout === 'ultra_minimal';
   const isRoyalLayout = uiLayout === 'royal_heritage';
@@ -217,11 +228,15 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     rationItemsAndMerchants: 10,
     managedDocs: 4,
     hrEmployees: 8,
+    grainEntities: 10,
+    debtsCount: 6,
+    tasksCount: 6,
     unreadChat: 0,
     unreadNotifs: 0,
   });
 
   // Complaints table state
+  const [complaintsList, setComplaintsList] = useState<CitizenComplaintRecord[]>(INITIAL_COMPLAINTS);
   const [compSearch, setCompSearch] = useState('');
   const [compSort, setCompSort] = useState<{ key: string; asc: boolean }>({ key: 'date', asc: false });
   const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
@@ -231,41 +246,57 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
   const [standaloneStatementBakeryId, setStandaloneStatementBakeryId] = useState<string>(INITIAL_BAKERIES[0]?.id || '');
   const [portalSelectedBakery, setPortalSelectedBakery] = useState<BakeryRecord | null>(null);
 
+  const refreshAllPortalCounts = React.useCallback(() => {
+    setBranches(getStoredBranches());
+    setAllDepartments(getStoredDepartments());
+    setBakeries(getStoredBakeries());
+    setAllUsers(getStoredUsers());
+    setRegRequests(getStoredRegistrationRequests());
+    setAuditLogs(getStoredAuditLogs());
+    setInspections(getStoredInspections());
+    setDebtTransactions(getStoredDebtTransactions());
+    setComplaintsList(getStoredComplaints());
+
+    const msgs = loadChatMessages();
+    const unreadChat = msgs.filter(
+      (m) =>
+        !m.isDeletedFromUi &&
+        m.senderId !== currentUser.id &&
+        !m.readByUserIds.includes(currentUser.id)
+    ).length;
+    const sysNotifs = loadUnifiedNotifications();
+    const unreadNotifs = sysNotifs.filter(
+      (n) => !n.isRead && (n.recipientUserId === 'ALL' || n.recipientUserId === currentUser.id)
+    ).length;
+    const allTasks = loadDailyTasks();
+    setRecentTasks(allTasks.slice(0, 4));
+    const gs = loadGrainMaintenanceStore();
+    const grainTotal =
+      gs.warehouses.length + gs.mills.length + gs.refrigerators.length + gs.assets.length;
+    let debtsTotal = 0;
+    try {
+      debtsTotal = loadDebtsStore().debts.length;
+    } catch {
+      debtsTotal = 0;
+    }
+    setLiveExtraCounts({
+      tradeMerchants: loadCommercialEstablishments().length,
+      gasEntities: loadButaneWarehouses().length + loadFuelStations().length,
+      rationItemsAndMerchants: loadRationCommodities().length + loadRationMerchants().length,
+      managedDocs: loadMasterDocExpiries().length,
+      hrEmployees: loadHrPersonnelStore().employees.length,
+      grainEntities: grainTotal,
+      debtsCount: debtsTotal,
+      tasksCount: allTasks.length,
+      unreadChat,
+      unreadNotifs,
+    });
+  }, [currentUser.id]);
+
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
-      setBranches(getStoredBranches());
-      setAllDepartments(getStoredDepartments());
-      setBakeries(getStoredBakeries());
-      setAllUsers(getStoredUsers());
-      setRegRequests(getStoredRegistrationRequests());
-      setAuditLogs(getStoredAuditLogs());
-      setInspections(getStoredInspections());
-      setDebtTransactions(getStoredDebtTransactions());
       setTodayRef(new Date().toISOString().slice(0, 10));
-      const refreshCounts = () => {
-        const msgs = loadChatMessages();
-        const unreadChat = msgs.filter(
-          (m) =>
-            !m.isDeletedFromUi &&
-            m.senderId !== currentUser.id &&
-            !m.readByUserIds.includes(currentUser.id)
-        ).length;
-        const sysNotifs = loadUnifiedNotifications();
-        const unreadNotifs = sysNotifs.filter(
-          (n) => !n.isRead && (n.recipientUserId === 'ALL' || n.recipientUserId === currentUser.id)
-        ).length;
-        setRecentTasks(loadDailyTasks().slice(0, 4));
-        setLiveExtraCounts({
-          tradeMerchants: loadCommercialEstablishments().length,
-          gasEntities: loadButaneWarehouses().length + loadFuelStations().length,
-          rationItemsAndMerchants: loadRationCommodities().length + loadRationMerchants().length,
-          managedDocs: loadMasterDocExpiries().length,
-          hrEmployees: loadHrPersonnelStore().employees.length,
-          unreadChat,
-          unreadNotifs,
-        });
-      };
-      refreshCounts();
+      refreshAllPortalCounts();
 
       try {
         const savedTab = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
@@ -297,8 +328,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       }
     });
     const onDepartmentsUpdated = () => {
-      setAllDepartments(getStoredDepartments());
-      setAllUsers(getStoredUsers());
+      refreshAllPortalCounts();
     };
     const onOpenTasksSubTab = (ev: Event) => {
       const custom = ev as CustomEvent<{ subTab?: TasksModuleSubTab }>;
@@ -314,36 +344,67 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       }
     };
     const onChatUpdated = () => {
-      const msgs = loadChatMessages();
-      const unreadChat = msgs.filter(
-        (m) =>
-          !m.isDeletedFromUi &&
-          m.senderId !== currentUser.id &&
-          !m.readByUserIds.includes(currentUser.id)
-      ).length;
-      const sysNotifs = loadUnifiedNotifications();
-      const unreadNotifs = sysNotifs.filter(
-        (n) => !n.isRead && (n.recipientUserId === 'ALL' || n.recipientUserId === currentUser.id)
-      ).length;
-      setLiveExtraCounts((prev) => ({ ...prev, unreadChat, unreadNotifs }));
+      refreshAllPortalCounts();
+    };
+    const onGlobalNavigate = (ev: Event) => {
+      const custom = ev as CustomEvent<{
+        departmentId?: string;
+        departmentCode?: string;
+        recordId?: string;
+      }>;
+      const detail = custom.detail;
+      if (!detail) return;
+      const depts = getStoredDepartments();
+      let targetDeptId = detail.departmentId;
+      if (!targetDeptId && detail.departmentCode) {
+        const found = depts.find((d) => d.code === detail.departmentCode);
+        if (found) targetDeptId = found.id;
+      }
+      if (targetDeptId) {
+        setActiveDeptId(targetDeptId);
+        setMobileMenuOpen(false);
+        try {
+          sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, targetDeptId);
+        } catch {
+          // ignore
+        }
+      }
+      if (detail.recordId && (detail.departmentCode === 'BAK' || targetDeptId === 'd-02')) {
+        const foundBakery = getStoredBakeries().find((b) => b.id === detail.recordId);
+        if (foundBakery) {
+          setPortalSelectedBakery(foundBakery);
+        }
+      }
     };
     const unsubDropdowns = subscribeDropdownLists(() => {
-      setLiveExtraCounts((prev) => ({
-        ...prev,
-        managedDocs: loadMasterDocExpiries().length,
-      }));
+      refreshAllPortalCounts();
     });
     window.addEventListener('gharbia-departments-updated', onDepartmentsUpdated);
     window.addEventListener('gharbia-open-tasks-subtab', onOpenTasksSubTab);
     window.addEventListener('gharbia-chat-updated', onChatUpdated);
+    window.addEventListener('gharbia-audit-log-added', refreshAllPortalCounts);
+    window.addEventListener('gharbia-inspections-reset', refreshAllPortalCounts);
+    window.addEventListener('gharbia-global-navigate', onGlobalNavigate);
+    window.addEventListener('storage', refreshAllPortalCounts);
     return () => {
       cancelAnimationFrame(frameId);
       unsubDropdowns();
       window.removeEventListener('gharbia-departments-updated', onDepartmentsUpdated);
       window.removeEventListener('gharbia-open-tasks-subtab', onOpenTasksSubTab);
       window.removeEventListener('gharbia-chat-updated', onChatUpdated);
+      window.removeEventListener('gharbia-audit-log-added', refreshAllPortalCounts);
+      window.removeEventListener('gharbia-inspections-reset', refreshAllPortalCounts);
+      window.removeEventListener('gharbia-global-navigate', onGlobalNavigate);
+      window.removeEventListener('storage', refreshAllPortalCounts);
     };
-  }, [currentUser.id]);
+  }, [currentUser.id, refreshAllPortalCounts]);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      refreshAllPortalCounts();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeDeptId, refreshAllPortalCounts]);
 
   const handleSelectDept = (deptId: string) => {
     let resolvedId = deptId;
@@ -399,12 +460,6 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       }),
     [allDepartments, currentUser, ADMIN_ONLY_DEPT_CODES]
   );
-
-  const [complaintsList, setComplaintsList] = useState([
-    { id: 'comp-1', citizen: 'أحمد محمود الششتاوي', phone: '01011112222', issue: 'مراجعة أوزان رغيف الخبز بقرية الهياتم', status: 'جاري الفحص والتفتيش', date: '2026-11-24' },
-    { id: 'comp-2', citizen: 'فاطمة علي أبو النجا', phone: '01233334444', issue: 'تحديث بيانات بطاقة تموينية بمركز المحلة', status: 'تم الحل وإعادة التفعيل', date: '2026-11-23' },
-    { id: 'comp-3', citizen: 'سعيد عبد الرحمن الدسوقي', phone: '01122334455', issue: 'متابعة مواعيد تشغيل مخبز بقرية صفط تراب', status: 'تمت المعاينة والمطابقة', date: '2026-11-22' },
-  ]);
 
   const [compNotice, setCompNotice] = useState('');
 
@@ -479,7 +534,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
           recordLabel={c.citizen}
           onView={() => setCompNotice(`معاينة شكوى المواطن: ${c.citizen} — ${c.issue}`)}
           onAdd={() => {
-            const newComp = {
+            const newComp: CitizenComplaintRecord = {
               id: `comp-${Date.now()}`,
               citizen: 'مواطن جديد — مركز المحلة',
               phone: '01000000000',
@@ -487,17 +542,29 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               status: 'جاري الفحص والتفتيش',
               date: todayRef,
             };
-            setComplaintsList((prev) => [newComp, ...prev]);
+            setComplaintsList((prev) => {
+              const next = [newComp, ...prev];
+              saveStoredComplaints(next);
+              return next;
+            });
             setCompNotice('تمت إضافة بلاغ جديد إلى سجل الشكاوى.');
           }}
           onEdit={() => {
-            setComplaintsList((prev) =>
-              prev.map((x) => (x.id === c.id ? { ...x, status: 'تم الحل وإعادة التفعيل' } : x))
-            );
+            setComplaintsList((prev) => {
+              const next = prev.map((x) =>
+                x.id === c.id ? { ...x, status: 'تم الحل وإعادة التفعيل' } : x
+              );
+              saveStoredComplaints(next);
+              return next;
+            });
             setCompNotice(`تم تحديث حالة شكوى (${c.citizen}) إلى تم الحل.`);
           }}
           onDelete={() => {
-            setComplaintsList((prev) => prev.filter((x) => x.id !== c.id));
+            setComplaintsList((prev) => {
+              const next = prev.filter((x) => x.id !== c.id);
+              saveStoredComplaints(next);
+              return next;
+            });
             setCompNotice(`تم حذف شكوى (${c.citizen}) من الجدول.`);
           }}
         />
@@ -530,7 +597,6 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         'REP',
         'BACK',
         'SETT',
-        'AUDIT',
         'FIN',
         'STORE',
         'ROLES',
@@ -578,18 +644,19 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
     };
   }, [bakeries, allUsers, branches, regRequests, auditLogs, inspections, debtTransactions, todayRef]);
 
-  const grainEntitiesCount = useMemo(() => {
-    const gs = loadGrainMaintenanceStore();
-    return gs.warehouses.length + gs.mills.length + gs.refrigerators.length + gs.assets.length;
-  }, []);
+  const grainEntitiesCount = liveExtraCounts.grainEntities;
 
-  // عدادات حية رقمية بجانب كل قسم في القائمة الجانبية
+  // عدادات حية رقمية مضبوطة ومتزامنة بجانب كل تبويب في شريط القوائم الأيمن
   const deptLiveCounts = useMemo<Record<string, number>>(
     () => ({
-      DASH: ultraMetrics.totalAlerts,
+      DASH: ultraMetrics.totalBakeries,
       BAK: ultraMetrics.totalBakeries,
-      DEBTS: bakeries.filter((b) => !b.isArchived && (b.remainingDebtEgp || 0) > 0).length || debtTransactions.length,
+      DEBTS:
+        liveExtraCounts.debtsCount ||
+        bakeries.filter((b) => !b.isArchived && (b.remainingDebtEgp || 0) > 0).length ||
+        debtTransactions.length,
       LISTS: liveExtraCounts.managedDocs,
+      TASKS: liveExtraCounts.tasksCount,
       TRADE: liveExtraCounts.tradeMerchants + liveExtraCounts.gasEntities,
       GAS: liveExtraCounts.gasEntities,
       COMM: liveExtraCounts.rationItemsAndMerchants,
@@ -599,12 +666,22 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       VIOL: ultraMetrics.totalViolations,
       COMP: complaintsList.length,
       USERS: allUsers.length,
-      TASKS: ultraMetrics.pendingReviews,
+      AUDIT: auditLogs.length,
     }),
-    [ultraMetrics, bakeries, debtTransactions.length, liveExtraCounts, grainEntitiesCount, inspections.length, complaintsList.length, allUsers.length]
+    [
+      ultraMetrics,
+      bakeries,
+      debtTransactions.length,
+      liveExtraCounts,
+      grainEntitiesCount,
+      inspections.length,
+      complaintsList.length,
+      allUsers.length,
+      auditLogs.length,
+    ]
   );
 
-  // تنظيم القائمة الجانبية مع وضع إدارة المهام اليومية والمتابعة مباشرة بعد إدارة القوائم المنسدلة وإظهار الموارد البشرية وحذف الأرشيف
+  // تنظيم القائمة الجانبية مع وضع إدارة المهام اليومية والمتابعة مباشرة بعد إدارة القوائم المنسدلة وإظهار الموارد البشرية وسجل التدقيق
   const sidebarGroupedSections = useMemo(() => {
     const groupsDef: { id: string; title: string; codes: string[] }[] = [
       { id: 'grp_cmd', title: t('grp_cmd'), codes: ['DASH'] },
@@ -617,7 +694,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       {
         id: 'grp_admin',
         title: t('grp_admin'),
-        codes: ['USERS'],
+        codes: ['USERS', 'AUDIT'],
       },
     ];
     const usedIds = new Set<string>();
@@ -848,11 +925,16 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
 
                       <div className="relative z-10 flex items-center gap-2.5 min-w-0 flex-1">
                         <span
-                          className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                          className={`relative w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                             isActive ? 'bg-[#253B4F] text-[#94C9CE]' : 'bg-[#182938]/75 text-[#94C9CE]'
                           }`}
                         >
                           {renderDeptIcon(dept.iconName, 'w-3.5 h-3.5')}
+                          {sidebarCollapsed && !isMobile && typeof liveCount === 'number' && (
+                            <span className="num-cell tabular-nums absolute -top-1.5 -left-1.5 min-w-[18px] h-[16px] px-1 rounded-full bg-[#3B717E] text-white border border-white/40 text-[9px] font-black flex items-center justify-center shadow-xs">
+                              {isRtl ? toArabicNumerals(liveCount) : liveCount}
+                            </span>
+                          )}
                         </span>
                         {(!sidebarCollapsed || isMobile) && (
                           <span className={`leading-snug break-words whitespace-normal ${isRtl ? 'text-right' : 'text-left'}`}>
@@ -862,14 +944,15 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                       </div>
 
                       {(!sidebarCollapsed || isMobile) && (
-                        <div className="relative z-10 flex items-center gap-1 shrink-0">
+                        <div className="relative z-10 flex items-center gap-1.5 shrink-0">
                           {typeof liveCount === 'number' && (
                             <span
-                              className={`num-cell px-1.5 py-0.5 rounded-full text-[9.5px] font-black ${
+                              className={`num-cell tabular-nums min-w-[26px] h-[20px] px-1.5 rounded-lg text-[10px] font-black inline-flex items-center justify-center leading-none shadow-2xs transition-colors ${
                                 isActive
-                                  ? 'bg-[#253B4F] text-[#E5F1F3]'
-                                  : 'bg-[#182938]/85 text-[#94C9CE] border border-white/15'
+                                  ? 'bg-[#1E3346] text-[#94C9CE] border border-[#1E3346]/20'
+                                  : 'bg-[#142331]/90 text-[#94C9CE] border border-[#94C9CE]/25'
                               }`}
+                              title={`إجمالي السجلات: ${isRtl ? toArabicNumerals(liveCount) : liveCount}`}
                             >
                               {isRtl ? toArabicNumerals(liveCount) : liveCount}
                             </span>
@@ -1264,6 +1347,27 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                           </span>
                         )}
                       </button>
+
+                      <FactoryResetButton
+                        sectionName="لوحة القيادة المركزية"
+                        sectionKey="central_dashboard"
+                        currentUser={currentUser}
+                        tableSummary={[
+                          { tableName: 'معاملات المديونيات اليومية', count: debtTransactions.length },
+                          { tableName: 'محاضر التفتيش والحملات', count: inspections.length },
+                          { tableName: 'سجل شكاوى المواطنين', count: complaintsList.length },
+                        ]}
+                        compact
+                        onConfirmReset={() => {
+                          setDebtTransactions([]);
+                          saveStoredDebtTransactions([]);
+                          setInspections([]);
+                          saveStoredInspections([]);
+                          setComplaintsList([]);
+                          saveStoredComplaints([]);
+                          refreshAllPortalCounts();
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1317,6 +1421,18 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                     />
                   )}
                 </div>
+
+                {/* 2.5 D3.js Interactive Analytics Dashboard Widget */}
+                <AnalyticsDashboardWidget
+                  branches={branches}
+                  bakeries={bakeries.filter((b) => !b.isArchived)}
+                  users={allUsers}
+                  auditLogs={auditLogs}
+                  inspections={inspections}
+                  debtTransactions={debtTransactions}
+                  regRequests={regRequests}
+                  activeBranchId={activeBranchId || currentUser.primaryBranchId}
+                />
 
                 {/* 3. Visual Sector Showcase Cards (Reference Images: Bakeries · Grain & Silos · Internal Trade) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1736,7 +1852,10 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                   </div>
                 }
               >
-                <AdminDashboard userId={currentUser.id} />
+                <AdminDashboard
+                  userId={currentUser.id}
+                  initialTab={activeDept?.code === 'AUDIT' ? 'audit' : 'users'}
+                />
               </RoleGuard>
             )}
 
@@ -1796,12 +1915,15 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                         onCaptureBackup={() => ({ complaintsList })}
                         onRestoreBackup={(snap) => {
                           if (Array.isArray(snap.complaintsList)) {
-                            setComplaintsList(snap.complaintsList as typeof complaintsList);
+                            const restored = snap.complaintsList as CitizenComplaintRecord[];
+                            setComplaintsList(restored);
+                            saveStoredComplaints(restored);
                           }
                         }}
                         compact
                         onConfirmReset={() => {
                           setComplaintsList([]);
+                          saveStoredComplaints([]);
                           setSelectedCompIds([]);
                           setCompNotice('تم تنفيذ إعادة ضبط المصنع ومسح جميع الشكاوى المدخلة.');
                         }}
@@ -2011,7 +2133,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
                     const bId = portalSelectedBakery.id;
                     setPortalSelectedBakery(null);
                     setStandaloneStatementBakeryId(bId);
-                    handleSelectDept('d-15');
+                    handleSelectDept('d-03');
                   }}
                   className="px-4 py-2 rounded-xl bg-[#164E83] hover:bg-[#102A43] text-white font-black cursor-pointer"
                 >
@@ -2032,6 +2154,17 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
           </div>
         </div>
       )}
+
+      {/* نظام الإشعارات الفورية الحية (Real-Time Toast Notification System) */}
+      <RealtimeToastNotifications
+        currentUser={currentUser}
+        onNavigateToDepartmentCode={(deptCode) => {
+          const found = allDepartments.find((d) => d.code === deptCode);
+          if (found) {
+            handleSelectDept(found.id);
+          }
+        }}
+      />
     </div>
   );
 }

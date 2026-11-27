@@ -9,7 +9,9 @@ import {
   ClipboardList,
   Clock,
   Download,
+  Edit3,
   ExternalLink,
+  Eye,
   FileSpreadsheet,
   FolderKanban,
   MessageSquare,
@@ -871,11 +873,11 @@ export default function DailyTasksAndInternalChatModule({
       },
       {
         key: 'actions',
-        label: 'المتابعة والمحادثة',
-        headerText: 'المتابعة والمحادثة',
+        label: 'الإجراءات',
+        headerText: 'الإجراءات',
         type: 'actions',
         render: (t) => (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
             <button
               type="button"
               onClick={() => {
@@ -884,9 +886,48 @@ export default function DailyTasksAndInternalChatModule({
                 setUpdateCompletionReport(t.completionReportText || '');
                 setTaskModalView('details');
               }}
-              className="px-2 py-1 rounded bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#164E83] border border-blue-200 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="عرض تفاصيل المهمة"
             >
-              متابعة وإنجاز
+              <Eye className="w-4.5 h-4.5 shrink-0" />
+              <span>عرض</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCreateTaskModal(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="إضافة مهمة جديدة"
+            >
+              <PlusCircle className="w-4.5 h-4.5 shrink-0" />
+              <span>إضافة</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedTask(t);
+                setUpdateProgressVal(t.progressPercent);
+                setUpdateCompletionReport(t.completionReportText || '');
+                setTaskModalView('details');
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="تعديل وإنجاز المهمة"
+            >
+              <Edit3 className="w-4.5 h-4.5 shrink-0" />
+              <span>تعديل</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextList = tasks.filter((x) => x.id !== t.id);
+                setTasks(nextList);
+                saveDailyTasks(nextList);
+                window.dispatchEvent(new Event('gharbia-departments-updated'));
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="حذف المهمة"
+            >
+              <Trash2 className="w-4.5 h-4.5 shrink-0" />
+              <span>حذف</span>
             </button>
             <button
               type="button"
@@ -896,16 +937,17 @@ export default function DailyTasksAndInternalChatModule({
                 setUpdateCompletionReport(t.completionReportText || '');
                 setTaskModalView('task_chat');
               }}
-              className="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black flex items-center gap-1 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="محادثة المهمة"
             >
-              <MessageSquare className="w-3 h-3" />
-              <span>محادثة المهمة</span>
+              <MessageSquare className="w-4.5 h-4.5 shrink-0" />
+              <span>محادثة</span>
             </button>
           </div>
         ),
       },
     ],
-    []
+    [tasks]
   );
 
   // محادثات الشات المتاحة للموظف الحالي (تطبيق قواعد الخصوصية: لا يطلع أي موظف على محادثة خاصة لا تخصه)
@@ -1034,17 +1076,30 @@ export default function DailyTasksAndInternalChatModule({
               description="تصفير كافة المهام اليومية وسجلات المحادثات الداخلية والإشعارات فوراً وإعادة الإعدادات للوضع الافتراضي بدون طلب نسخة احتياطية."
               getTableSummary={() => [
                 { tableName: 'المهام اليومية والتكليفات', count: tasks.length },
-                { tableName: 'المحادثات الداخلية والرسائل', count: messages.length },
+                { tableName: 'قنوات المحادثات الداخلية', count: conversations.length },
+                { tableName: 'الرسائل الداخلية', count: messages.length },
                 { tableName: 'مركز التنبيهات والإشعارات', count: notifications.length },
               ]}
               onConfirmReset={() => {
                 saveDailyTasks([]);
+                saveChatConversations([]);
                 saveChatMessages([]);
                 saveUnifiedNotifications([]);
                 setTasks([]);
+                setConversations([]);
                 setMessages([]);
                 setNotifications([]);
-                notify('تم تنفيذ التصفير الفوري واستعادة ضبط المصنع لقسم المهام اليومية والمحادثات الداخلية.');
+                setActiveConvId('');
+                if (typeof window !== 'undefined') {
+                  try {
+                    localStorage.setItem('gharbia_official_violation_reports_v1', JSON.stringify([]));
+                  } catch {
+                    // ignore
+                  }
+                  window.dispatchEvent(new CustomEvent('gharbia-chat-updated'));
+                  window.dispatchEvent(new CustomEvent('gharbia-audit-log-added'));
+                }
+                notify('تم تنفيذ التصفير الفوري الكامل للمهام اليومية وقنوات المحادثات الداخلية والرسائل والإشعارات.');
               }}
             />
           </div>

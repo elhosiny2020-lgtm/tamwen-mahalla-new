@@ -37,15 +37,13 @@ interface FactoryResetButtonProps {
   allowClearCustomLists?: boolean;
   onConfirmReset: (options?: { clearCustomLists: boolean }) => void;
   compact?: boolean;
-  /** تنفيذ التصفير الفوري بمجرد الضغط دون نافذة تفصيلية عند الحاجة */
-  instantMode?: boolean;
 }
 
 /**
- * زر استعادة ضبط المصنع الفوري (بدون طلب نسخة احتياطية أو تنزيل ملفات):
- * - يمسح كافة البيانات التشغيلية والمعاملات للقسم المحدد فوراً ويعيد الإعدادات للوضع الافتراضي
- * - مقصور على مدير النظام وأصحاب الصلاحيات الإدارية المعتمدة
- * - يسجل العملية تلقائياً في سجل التدقيق الأمني العام (Audit Log)
+ * زر استعادة ضبط المصنع الفوري لكل قسم:
+ * - لا يطلب نسخة احتياطية ولا يقوم بتنزيل أي ملفات
+ * - ينفذ التصفير الفوري مباشرة عند التأكيد بدون طلب كلمة مرور
+ * - يمسح كافة البيانات التشغيلية للقسم ويعيد الإعدادات للوضع الافتراضي ويوثق العملية في سجل التدقيق
  */
 export default function FactoryResetButton({
   sectionName,
@@ -56,7 +54,6 @@ export default function FactoryResetButton({
   allowClearCustomLists = true,
   onConfirmReset,
   compact = false,
-  instantMode = false,
 }: FactoryResetButtonProps) {
   const { isRtl, t } = useSystemPreferences();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -86,8 +83,17 @@ export default function FactoryResetButton({
 
   const fmtNum = (n: number) => (isRtl ? toArabicNumerals(n) : String(n));
 
-  const executeImmediateWipe = (clearCustom = includeCustomLists) => {
+  const openModal = () => {
     setErrorMsg(null);
+    setResetDone(false);
+    setIncludeCustomLists(true);
+    setConfirmOpen(true);
+  };
+
+  const handleExecuteImmediateWipe = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMsg(null);
+
     if (!effectiveUser || !isAuthorized) {
       setErrorMsg(t('factoryResetAdminOnly'));
       return;
@@ -95,15 +101,19 @@ export default function FactoryResetButton({
 
     setExecuting(true);
     try {
-      onConfirmReset({ clearCustomLists: clearCustom });
+      onConfirmReset({ clearCustomLists: includeCustomLists });
       recordFactoryResetAudit({
         user: effectiveUser,
         sectionName,
         backupId: 'DIRECT-WIPE-NO-BACKUP',
         tableSummary: computedSummary,
-        clearCustomSettings: clearCustom,
+        clearCustomSettings: includeCustomLists,
         status: 'success',
       });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('gharbia-audit-log-added'));
+        window.dispatchEvent(new CustomEvent('gharbia-departments-updated'));
+      }
       setResetDone(true);
     } catch (err) {
       const msg =
@@ -115,7 +125,7 @@ export default function FactoryResetButton({
         sectionName,
         backupId: 'DIRECT-WIPE-NO-BACKUP',
         tableSummary: computedSummary,
-        clearCustomSettings: clearCustom,
+        clearCustomSettings: includeCustomLists,
         status: 'failed',
         errorMessage: msg,
       });
@@ -125,30 +135,18 @@ export default function FactoryResetButton({
     }
   };
 
-  const handleButtonClick = () => {
-    setErrorMsg(null);
-    setResetDone(false);
-    setIncludeCustomLists(true);
-    if (instantMode) {
-      setConfirmOpen(true);
-      executeImmediateWipe(true);
-      return;
-    }
-    setConfirmOpen(true);
-  };
-
   return (
     <RoleGuard user={effectiveUser} requireAdmin>
       <button
         type="button"
-        onClick={handleButtonClick}
+        onClick={openModal}
         className={`${
           compact ? 'px-2.5 py-1.5 text-[11px]' : 'px-3.5 py-2 text-xs'
         } rounded-xl bg-red-700 hover:bg-red-800 text-white font-black flex items-center gap-1.5 cursor-pointer border border-red-400/50 shadow-xs transition-colors whitespace-nowrap shrink-0`}
         title={`استعادة ضبط المصنع وتصفير البيانات فوراً — ${sectionName}`}
       >
         <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-        <span>{isRtl ? 'استعادة ضبط المصنع (تصفير فوري)' : t('factoryResetBtn')}</span>
+        <span>{isRtl ? 'استعادة ضبط المصنع' : t('factoryResetBtn')}</span>
       </button>
 
       {confirmOpen && (
@@ -170,8 +168,8 @@ export default function FactoryResetButton({
                 <div>
                   <span className="text-[10.5px] font-black text-red-700 block">
                     {isRtl
-                      ? 'استعادة ضبط المصنع والتصفير الفوري (بدون نسخة احتياطية)'
-                      : 'Immediate Factory Reset (No Backup Prompt)'}
+                      ? 'استعادة ضبط المصنع والتصفير الفوري المباشر'
+                      : 'Immediate Direct Factory Reset'}
                   </span>
                   <h4 className="text-base font-black text-[#102A43]">{sectionName}</h4>
                 </div>
@@ -198,8 +196,8 @@ export default function FactoryResetButton({
                   </div>
                   <p className="text-xs font-bold text-emerald-900 leading-relaxed">
                     {isRtl
-                      ? `تم مسح كافة السجلات والبيانات التشغيلية لقسم (${sectionName}) وإعادة الإعدادات إلى الوضع الافتراضي فوراً دون إصدار أو تنزيل أي ملفات نسخ احتياطي، وتم توثيق العملية في سجل التدقيق الأمني.`
-                      : `All transactional data for (${sectionName}) has been immediately wiped and settings reset to default without any backup download prompt.`}
+                      ? `تم مسح وتصفير كافة السجلات والبيانات التشغيلية لقسم (${sectionName}) وإعادة الإعدادات إلى الوضع الافتراضي فوراً بدون إصدار نسخة احتياطية، وتم توثيق العملية في سجل التدقيق الأمني.`
+                      : `All transactional data for (${sectionName}) has been immediately wiped and settings reset to default.`}
                   </p>
                 </div>
 
@@ -214,15 +212,15 @@ export default function FactoryResetButton({
                 </div>
               </div>
             ) : (
-              <>
+              <form onSubmit={handleExecuteImmediateWipe} className="space-y-4">
                 {/* تنبيه التصفير الفوري */}
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-xs font-bold text-red-900 leading-relaxed space-y-1.5">
                   <p className="font-black flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-red-700" />
                     <span>
                       {isRtl
-                        ? 'تحذير: سيتم مسح وتصفير كافة البيانات والسجلات التشغيلية لهذا القسم فوراً وإعادة الإعدادات للوضع الافتراضي بدون إنشاء نسخة احتياطية.'
-                        : 'Warning: All transactional records for this module will be wiped immediately and settings reset to default without a backup prompt.'}
+                        ? 'تنبيه: سيتم تصفير كافة جداول وبيانات هذا القسم فوراً وبشكل نهائي بدون نسخة احتياطية بمجرد الضغط على زر التأكيد.'
+                        : 'Warning: All transactional records for this module will be wiped immediately upon confirmation.'}
                     </span>
                   </p>
                   {description && <p className="text-red-800">{description}</p>}
@@ -294,10 +292,9 @@ export default function FactoryResetButton({
                     {t('cancel')}
                   </button>
                   <button
-                    type="button"
+                    type="submit"
                     disabled={executing}
-                    onClick={() => executeImmediateWipe(includeCustomLists)}
-                    className="px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 disabled:bg-slate-300 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
+                    className="px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
                   >
                     <Zap className="w-3.5 h-3.5 text-amber-300" />
                     <Trash2 className="w-3.5 h-3.5" />
@@ -305,14 +302,14 @@ export default function FactoryResetButton({
                       {executing
                         ? isRtl
                           ? 'جاري التصفير الفوري...'
-                          : 'Wiping data...'
+                          : 'Wiping Data...'
                         : isRtl
-                        ? 'تنفيذ التصفير واستعادة ضبط المصنع فوراً'
-                        : 'Execute Immediate Factory Reset'}
+                        ? 'تأكيد وتنفيذ التصفير الفوري الآن'
+                        : 'Confirm & Execute Immediate Reset'}
                     </span>
                   </button>
                 </div>
-              </>
+              </form>
             )}
           </div>
         </div>

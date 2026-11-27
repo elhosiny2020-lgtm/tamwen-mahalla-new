@@ -45,6 +45,7 @@ import {
 import AnimatedStatCard, { StatColorTheme } from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import FactoryResetButton from './FactoryResetButton';
+import { TableActionButtons } from './trade/TradeSharedCrudUi';
 
 export type GrainSubTabCode = 'GRAIN' | 'SILOS' | 'MILLS' | 'COLD';
 
@@ -135,7 +136,18 @@ export default function DepartmentWorkspace({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pinnedCols, setPinnedCols] = useState<string[]>(['code']);
   const [toastMsg, setToastMsg] = useState<string>('');
-  const [wipedCodes, setWipedCodes] = useState<Record<string, boolean>>({});
+  const [wipedCodes, setWipedCodes] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem('gharbia_dept_workspace_wiped_v1');
+      return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [customAddedRows, setCustomAddedRows] = useState<Record<string, WorkspaceRow[]>>({});
+  const [editedRowsMap, setEditedRowsMap] = useState<Record<string, Partial<WorkspaceRow>>>({});
+  const [deletedRowIds, setDeletedRowIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (isGrainDepartment) {
@@ -425,13 +437,17 @@ export default function DepartmentWorkspace({
   }, [effectiveCode, activeBakeries, users, branches, inspections, debtTransactions, auditLogs, currentBranch]);
 
   const filteredRows = useMemo(() => {
-    if (wipedCodes[effectiveCode]) return [];
+    const baseRows = wipedCodes[effectiveCode] ? [] : config.rows;
+    const addedForDept = customAddedRows[effectiveCode] || [];
+    const merged = [...addedForDept, ...baseRows]
+      .filter((r) => !deletedRowIds.includes(r.id))
+      .map((r) => (editedRowsMap[r.id] ? { ...r, ...editedRowsMap[r.id] } : r));
     const q = normalizeSearchText(searchTerm);
-    return config.rows.filter((r) => {
+    return merged.filter((r) => {
       if (!q) return true;
       return normalizeSearchText(`${r.code} ${r.title} ${r.location} ${r.status} ${r.notes}`).includes(q);
     });
-  }, [config.rows, searchTerm, wipedCodes, effectiveCode]);
+  }, [config.rows, searchTerm, wipedCodes, effectiveCode, customAddedRows, deletedRowIds, editedRowsMap]);
 
   const togglePin = (key: string) =>
     setPinnedCols((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -535,28 +551,49 @@ export default function DepartmentWorkspace({
         headerText: 'الإجراءات',
         type: 'actions',
         align: 'center',
-        defaultWidth: 165,
+        defaultWidth: 290,
         render: (r) => (
-          <div className="flex items-center justify-center gap-1">
-            <button
-              type="button"
-              onClick={() => notify(`معاينة السجل: ${r.title} (${r.code}) — الحالة: ${r.status}`)}
-              className="px-2 py-1 rounded bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10px] font-black cursor-pointer"
-            >
-              معاينة
-            </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[#102A43] text-[10px] font-black cursor-pointer"
-            >
-              طباعة
-            </button>
-          </div>
+          <TableActionButtons
+            recordLabel={r.title}
+            onView={() => notify(`معاينة السجل: ${r.title} (${r.code}) — الحالة: ${r.status}`)}
+            onAdd={() => {
+              const created: WorkspaceRow = {
+                id: `ws-${effectiveCode}-${Date.now()}`,
+                code: `${effectiveCode}-${Math.floor(100 + Math.random() * 900)}`,
+                title: `سجل جديد — ${dept.arabicName}`,
+                location: currentBranch?.arabicName || 'إدارة تموين مركز المحلة الكبرى',
+                metricValue: 1,
+                metricUnit: r.metricUnit || 'سجل',
+                financialValue: 0,
+                date: new Date().toISOString().slice(0, 10),
+                status: 'سجل نشط',
+                notes: 'تمت الإضافة المباشرة من جدول القسم',
+              };
+              setCustomAddedRows((prev) => ({
+                ...prev,
+                [effectiveCode]: [created, ...(prev[effectiveCode] || [])],
+              }));
+              notify(`تمت إضافة سجل جديد (${created.code}) بنجاح.`);
+            }}
+            onEdit={() => {
+              setEditedRowsMap((prev) => ({
+                ...prev,
+                [r.id]: {
+                  status: r.status === 'تم المراجعة والتحديث' ? 'سجل نشط' : 'تم المراجعة والتحديث',
+                  notes: `${r.notes} · تم التحديث`,
+                },
+              }));
+              notify(`تم تحديث حالة السجل (${r.title}) بنجاح.`);
+            }}
+            onDelete={() => {
+              setDeletedRowIds((prev) => [...prev, r.id]);
+              notify(`تم حذف السجل (${r.title}) من جدول القسم.`);
+            }}
+          />
         ),
       },
     ],
-    [config.metricColLabel, config.financialColLabel, effectiveCode]
+    [config.metricColLabel, config.financialColLabel, effectiveCode, dept.arabicName, currentBranch]
   );
 
   return (
@@ -593,7 +630,16 @@ export default function DepartmentWorkspace({
               },
             ]}
             onConfirmReset={() => {
-              setWipedCodes((prev) => ({ ...prev, [effectiveCode]: true }));
+              setWipedCodes((prev) => {
+                const next = { ...prev, [effectiveCode]: true };
+                try {
+                  localStorage.setItem('gharbia_dept_workspace_wiped_v1', JSON.stringify(next));
+                } catch {
+                  // ignore storage errors
+                }
+                return next;
+              });
+              setCustomAddedRows((prev) => ({ ...prev, [effectiveCode]: [] }));
               setSearchTerm('');
               setSelectedIds([]);
               setPinnedCols(['code']);

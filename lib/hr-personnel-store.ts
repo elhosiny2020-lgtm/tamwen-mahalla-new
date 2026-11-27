@@ -1657,6 +1657,16 @@ export function wipeHrPersonnelTransactionalData(
   let next: HrPersonnelStoreData;
 
   switch (targetModule) {
+    case 'employees_db':
+    case 'daily_status':
+      next = {
+        ...current,
+        employees: [],
+        documents: [],
+        serviceHistory: [],
+        alertSettings: defaultSettings,
+      };
+      break;
     case 'attendance':
       next = {
         ...current,
@@ -1721,6 +1731,8 @@ export function wipeHrPersonnelTransactionalData(
     default:
       next = {
         ...current,
+        employees: [],
+        documents: [],
         serviceHistory: [],
         attendance: [],
         leaves: [],
@@ -1739,6 +1751,9 @@ export function wipeHrPersonnelTransactionalData(
   }
 
   saveHrPersonnelStore(next);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gharbia-audit-log-added'));
+  }
   return next;
 }
 

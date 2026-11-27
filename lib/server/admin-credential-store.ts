@@ -127,7 +127,7 @@ export function verifyAdminPasscode(password: string): {
 export function setServerUserPassword(
   username: string,
   newPassword: string,
-  actorUsername: string
+  actorUsername: string = 'system'
 ): { ok: boolean } {
   const trimmedUser = username.trim().toLowerCase();
   const trimmedPass = newPassword.trim();
@@ -169,5 +169,44 @@ export function verifyServerUserPasswordOverride(
     hasOverride: true,
     deleted: false,
     valid: verifyPasscodeScrypt(password.trim(), entry.hash),
+  };
+}
+
+export function clearAllServerUserPasswordOverrides(): void {
+  globalForAdminCred.__gharbiaUserPasswordOverrides = {};
+}
+
+/**
+ * Unified server-side Factory Reset passcode verification (applied across all branches & departments).
+ * Precedence:
+ * 1. process.env.FACTORY_RESET_PASSWORD (if explicitly configured on the server)
+ * 2. Fixed salted scrypt digest configured for the organization's Factory Reset authorization
+ */
+const FACTORY_RESET_SCRYPT_RECORD: ScryptHashRecord = {
+  saltHex: '4685003e0c408cb9ef1a7f9a1c809f00',
+  keyHex:
+    'd323c0ab2d76f84291e918ca0e2b8da73115ceda39379e2616f7c8129c8ab518fdee5563a58ac26238dd297cc0540d222345de2b2abf066a3f06cf7ed3c61b8a',
+  claimedAt: '2026-11-27T00:00:00.000Z',
+  claimedBy: 'system-policy',
+};
+
+export function verifyFactoryResetPasscode(password: string): {
+  valid: boolean;
+  source: 'env' | 'fixed';
+} {
+  const clean = password.trim();
+  if (!clean) {
+    return { valid: false, source: 'fixed' };
+  }
+  const envPass = process.env.FACTORY_RESET_PASSWORD?.trim() ?? '';
+  if (envPass.length > 0) {
+    return {
+      valid: timingSafeCompareStrings(clean, envPass),
+      source: 'env',
+    };
+  }
+  return {
+    valid: verifyPasscodeScrypt(clean, FACTORY_RESET_SCRYPT_RECORD),
+    source: 'fixed',
   };
 }

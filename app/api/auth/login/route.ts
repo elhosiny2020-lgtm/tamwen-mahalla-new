@@ -5,10 +5,12 @@ import { recordServerAuditLog } from '@/lib/server/audit-log-store';
 import {
   claimInitialAdminPasscode,
   getAdminPasscodeStatus,
+  setServerUserPassword,
   verifyAdminPasscode,
   verifyServerUserPasswordOverride,
 } from '@/lib/server/admin-credential-store';
 import {
+  countDbUsers,
   createDbUser,
   getDbUserByUsername,
   setDbUserPasswordByUsername,
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
   const userAgent = req.headers.get('user-agent') || 'متصفح الويب المعتمد';
   const rl = checkSlidingWindowRateLimit({
     key: `auth:login:${ip}`,
-    limit: 12,
+    limit: 25,
     windowMs: 10 * 60 * 1000,
   });
   if (!rl.allowed) {
@@ -70,85 +72,98 @@ export async function POST(req: NextRequest) {
   }
 
   const { username, password, branchId, isDirectRegistration, registeredUser } = parsed.data;
-  const trimmedUsername = username.trim().toLowerCase();
+  const trimmedUsername = username.trim();
+  const normalizedUsername = trimmedUsername.toLowerCase();
 
   let dbUser = getDbUserByUsername(trimmedUsername);
 
   // If direct registration from RegisterWizard, persist into real SQLite DB immediately
-  if (!dbUser && isDirectRegistration && registeredUser) {
-    const fallbackBranch = registeredUser.primaryBranchId || branchId || 'b-03';
-    const created = await createDbUser({
-      id: registeredUser.id,
-      fullName: registeredUser.fullName,
-      username: username.trim(),
-      password,
-      nationalId: registeredUser.nationalId || '29501011600001',
-      phone: registeredUser.phone || '01000000000',
-      email: registeredUser.email || `${username.trim()}@supply.gov.eg`,
-      jobTitle: registeredUser.jobTitle || 'موظف تموين',
-      jobGrade: registeredUser.jobGrade || 'الثالثة التخصصية',
-      workplace: registeredUser.workplace || 'مديرية التموين بالغربية',
-      primaryBranchId: fallbackBranch,
-      branchIds:
-        registeredUser.branchIds && registeredUser.branchIds.length > 0
-          ? registeredUser.branchIds
-          : [fallbackBranch],
-      departmentIds:
-        registeredUser.departmentIds && registeredUser.departmentIds.length > 0
-          ? registeredUser.departmentIds
-          : ['d-01', 'd-02', 'd-25'],
-      role: (registeredUser.role || 'bakery_officer') as UserRole,
-      status: 'active',
-      createdBy: 'self_register',
-    });
-    if (created.ok) {
-      dbUser = created.user;
+  if (isDirectRegistration && registeredUser) {
+    if (!dbUser) {
+      const fallbackBranch = registeredUser.primaryBranchId || branchId || 'b-03';
+      const created = await createDbUser({
+        id: registeredUser.id,
+        fullName: registeredUser.fullName,
+        username: trimmedUsername,
+        password,
+        nationalId: registeredUser.nationalId || '29501011600001',
+        phone: registeredUser.phone || '01000000000',
+        email: registeredUser.email || `${trimmedUsername}@supply.gov.eg`,
+        jobTitle: registeredUser.jobTitle || 'موظف تموين',
+        jobGrade: registeredUser.jobGrade || 'الثالثة التخصصية',
+        workplace: registeredUser.workplace || 'مديرية التموين بالغربية',
+        primaryBranchId: fallbackBranch,
+        branchIds:
+          registeredUser.branchIds && registeredUser.branchIds.length > 0
+            ? registeredUser.branchIds
+            : [fallbackBranch],
+        departmentIds:
+          registeredUser.departmentIds && registeredUser.departmentIds.length > 0
+            ? registeredUser.departmentIds
+            : ['d-01', 'd-02', 'd-25'],
+        role: (registeredUser.role || 'bakery_officer') as UserRole,
+        status: 'active',
+        createdBy: 'self_register',
+      });
+      if (created.ok) {
+        dbUser = created.user;
+        setServerUserPassword(created.user.username, password, created.user.username);
+      }
+    } else {
+      await setDbUserPasswordByUsername(dbUser.username, password);
+      setServerUserPassword(dbUser.username, password, dbUser.username);
     }
   }
 
-  // Fallback to static user match if DB didn't return yet
-  const staticUser =
-    INITIAL_USERS.find((u) => u.username.toLowerCase() === trimmedUsername) ||
-    (trimmedUsername === 'admin' ? INITIAL_USERS[0] : undefined);
+  // Emergency bootstrap ONLY if the database has 0 users (e.g., immediately after a full wipe of all users)
+  // and the operator signs in as 'admin' so they are never permanently locked out.
+  if (!dbUser && !isDirectRegistration && countDbUsers() === 0 && normalizedUsername === 'admin') {
+    const passcodeStatus = getAdminPasscodeStatus();
+    const canBootstrap =
+      !passcodeStatus.configured || verifyAdminPasscode(password).valid;
+    if (canBootstrap) {
+      const template = INITIAL_USERS[0];
+      const recreated = await createDbUser({
+        id: template.id,
+        fullName: template.fullName,
+        username: 'admin',
+        password,
+        nationalId: template.nationalId,
+        phone: template.phone,
+        email: template.email,
+        jobTitle: template.jobTitle,
+        jobGrade: template.jobGrade,
+        workplace: template.workplace,
+        primaryBranchId: branchId || template.primaryBranchId,
+        branchIds: template.branchIds,
+        departmentIds: template.departmentIds,
+        role: 'super_admin',
+        status: 'active',
+        createdBy: 'bootstrap_recovery',
+      });
+      if (recreated.ok) {
+        dbUser = recreated.user;
+        setServerUserPassword('admin', password, 'admin');
+      }
+    }
+  }
 
-  const user =
-    dbUser ||
-    staticUser ||
-    (registeredUser
-      ? {
-          id: registeredUser.id,
-          username: username.trim(),
-          fullName: registeredUser.fullName,
-          nationalId: '29501011600001',
-          phone: '01000000000',
-          email: `${username.trim()}@supply.gov.eg`,
-          jobTitle: 'موظف تموين',
-          jobGrade: 'الثالثة التخصصية',
-          workplace: 'مديرية التموين بالغربية',
-          role: (registeredUser.role || 'bakery_officer') as UserRole,
-          primaryBranchId: registeredUser.primaryBranchId || branchId || 'b-03',
-          branchIds: [registeredUser.primaryBranchId || branchId || 'b-03'],
-          departmentIds: ['d-01', 'd-25'],
-          status: 'active' as const,
-          failedLoginAttempts: 0,
-          createdAt: new Date().toISOString(),
-        }
-      : undefined);
+  const user = dbUser;
 
   if (!user) {
     recordServerAuditLog({
       userId: 'anonymous',
-      username,
+      username: trimmedUsername,
       fullName: 'مستخدم غير مسجل',
       action: 'محاولة تسجيل دخول فاشلة',
       module: 'بوابة المصادقة الموحدة',
-      details: `محاولة دخول باسم مستخدم غير مسجل (${username})`,
+      details: `محاولة دخول باسم مستخدم غير مسجل (${trimmedUsername})`,
       ipAddress: ip,
       deviceInfo: userAgent,
       status: 'failed',
     });
     return NextResponse.json(
-      { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة.' },
+      { ok: false, error: 'اسم المستخدم غير مسجل بالمنظومة أو تم حذفه. يرجى التحقق من اسم المستخدم.' },
       { status: 401 }
     );
   }
@@ -180,7 +195,7 @@ export async function POST(req: NextRequest) {
     user.role === 'department_manager';
 
   if (!isDirectRegistration) {
-    // 1. Check real SQLite DB custom password hash first
+    // 1. Check authoritative SQLite DB custom password hash first
     const dbCheck = verifyDbUserPasswordByUsername(user.username, password);
     if (dbCheck.disabled) {
       return NextResponse.json(
@@ -204,12 +219,14 @@ export async function POST(req: NextRequest) {
           status: 'failed',
         });
         return NextResponse.json(
-          { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة.' },
+          { ok: false, error: 'كلمة المرور غير صحيحة. يرجى إدخال كلمة المرور المسجلة في صلاحيات المستخدمين.' },
           { status: 401 }
         );
       }
+      // Keep server memory cache synchronized for verify-admin checks
+      setServerUserPassword(user.username, password, user.username);
     } else {
-      // 2. Fallback to in-memory override or initial admin bootstrap passcode
+      // 2. Legacy account with no SQLite hash yet — check override or bootstrap passcode, then persist permanently to SQLite
       const userOverride = verifyServerUserPasswordOverride(user.username, password);
       if (userOverride.hasOverride) {
         if (userOverride.deleted) {
@@ -224,6 +241,7 @@ export async function POST(req: NextRequest) {
             { status: 401 }
           );
         }
+        await setDbUserPasswordByUsername(user.username, password);
       } else {
         const passcodeStatus = getAdminPasscodeStatus();
         if (passcodeStatus.configured) {
@@ -242,20 +260,25 @@ export async function POST(req: NextRequest) {
               status: 'failed',
             });
             return NextResponse.json(
-              { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة.' },
+              { ok: false, error: 'كلمة المرور غير صحيحة لهذا الحساب.' },
               { status: 401 }
             );
           }
-        } else if (isAdminRole && !passcodeStatus.configured) {
-          const claimed = claimInitialAdminPasscode(password, user.username);
-          if (!claimed.ok) {
-            return NextResponse.json(
-              { ok: false, error: 'تعذر تهيئة كلمة المرور الإدارية. يرجى استخدام كلمة مرور لا تقل عن ٤ أحرف.' },
-              { status: 400 }
-            );
-          }
-          // Persist claimed initial admin password hash in SQLite so it survives restarts
+          // Permanently persist password into SQLite so it is always recognized immediately
           await setDbUserPasswordByUsername(user.username, password);
+          setServerUserPassword(user.username, password, user.username);
+        } else {
+          if (isAdminRole) {
+            const claimed = claimInitialAdminPasscode(password, user.username);
+            if (!claimed.ok) {
+              return NextResponse.json(
+                { ok: false, error: 'تعذر تهيئة كلمة المرور الإدارية. يرجى استخدام كلمة مرور لا تقل عن ٤ أحرف.' },
+                { status: 400 }
+              );
+            }
+          }
+          await setDbUserPasswordByUsername(user.username, password);
+          setServerUserPassword(user.username, password, user.username);
         }
       }
     }

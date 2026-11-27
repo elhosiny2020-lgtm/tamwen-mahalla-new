@@ -332,14 +332,15 @@ export default function DebtsPaymentsTab({
         headerText: 'الإجراءات',
         type: 'actions',
         render: (r) => (
-          <div className="flex items-center gap-1 whitespace-nowrap">
+          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
             <button
               type="button"
               onClick={() => setPrintReceipt(r)}
-              title="طباعة / إعادة طباعة إيصال رسمي"
-              className="p-1 rounded bg-slate-100 hover:bg-[#102A43] hover:text-white text-[#102A43] cursor-pointer"
+              title="عرض وطباعة إيصال رسمي"
+              className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-[#102A43] hover:text-white text-[#164E83] border border-blue-200 text-[10.5px] font-black inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="w-5 h-5" />
+              <span>عرض / طباعة</span>
             </button>
             {r.status === 'معتمد' && (
               <button
@@ -348,10 +349,11 @@ export default function DebtsPaymentsTab({
                   setCancelTarget(r);
                   setCancelReason('');
                 }}
-                title="إلغاء وعكس الدفعة"
-                className="p-1 rounded bg-red-50 hover:bg-red-700 hover:text-white text-red-800 cursor-pointer"
+                title="إلغاء / حذف عكسي للدفعة"
+                className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-700 hover:text-white text-red-800 border border-red-200 text-[10.5px] font-black inline-flex items-center gap-1.5 cursor-pointer transition-colors"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-5 h-5" />
+                <span>إلغاء</span>
               </button>
             )}
           </div>

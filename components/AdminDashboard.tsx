@@ -39,6 +39,7 @@ import {
   getStoredRegistrationRequests,
   saveStoredRegistrationRequests,
   getStoredAuditLogs,
+  saveStoredAuditLogs,
   addAuditLog,
   getCurrentSessionUser,
   setCurrentSessionUser,
@@ -52,6 +53,7 @@ import {
 import { User, Branch, Department, RegistrationRequest, AuditLog, UserRole, EmployeeStatus } from '@/types';
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
+import FactoryResetButton from './FactoryResetButton';
 
 type UserFilterChip = 'all' | 'managers' | 'officers' | 'inspectors' | 'suspended' | 'no_custom_password';
 
@@ -121,8 +123,21 @@ function getStatusBadge(status: EmployeeStatus) {
   }
 }
 
-export default function AdminDashboard({ userId = 'default' }: { userId?: string }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'permissions' | 'requests' | 'branches' | 'audit'>('users');
+export default function AdminDashboard({
+  userId = 'default',
+  initialTab = 'users',
+}: {
+  userId?: string;
+  initialTab?: 'users' | 'permissions' | 'requests' | 'branches' | 'audit';
+}) {
+  const [activeTab, setActiveTab] = useState<'users' | 'permissions' | 'requests' | 'branches' | 'audit'>(initialTab);
+
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      setActiveTab(initialTab);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [initialTab]);
 
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
@@ -187,9 +202,12 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
   // Quick Preview modal
   const [previewUser, setPreviewUser] = useState<User | null>(null);
 
-  // Single Delete & Bulk Confirm modals
+  // Single Delete, Bulk Confirm & Global Wipe All Users modals
   const [deleteTargetUser, setDeleteTargetUser] = useState<User | null>(null);
   const [bulkConfirmAction, setBulkConfirmAction] = useState<'delete' | 'activate' | 'suspend' | null>(null);
+  const [showWipeAllUsersModal, setShowWipeAllUsersModal] = useState(false);
+  const [wipeError, setWipeError] = useState('');
+  const [wipingAllUsers, setWipingAllUsers] = useState(false);
 
   // Departments & permissions state
   const [selectedPermUserId, setSelectedPermUserId] = useState<string>(INITIAL_USERS[1]?.id || INITIAL_USERS[0]?.id || '');
@@ -274,9 +292,15 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       })
       .catch(() => {});
 
+    const onAuditLogAdded = () => {
+      setAuditLogs(getStoredAuditLogs());
+    };
+    window.addEventListener('gharbia-audit-log-added', onAuditLogAdded);
+
     return () => {
       cancelled = true;
       cancelAnimationFrame(frameId);
+      window.removeEventListener('gharbia-audit-log-added', onAuditLogAdded);
     };
   }, []);
 
@@ -295,13 +319,11 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
 
   const normQuery = normalizeSearchText(searchTerm);
 
-  const superAdminCount = useMemo(
-    () => users.filter((u) => u.role === 'super_admin').length,
-    [users]
-  );
-
-  const isProtectedUser = (u: User) =>
-    u.id === userId || (u.role === 'super_admin' && superAdminCount <= 1);
+  // بناءً على طلب الإدارة العليا: يُسمح بحذف أو إيقاف أي مستخدم بما في ذلك super_admin و admin بدون قيود
+  const isProtectedUser = (_u: User) => {
+    void _u;
+    return false;
+  };
 
   const filteredRequests = useMemo(() => {
     return normQuery
@@ -495,7 +517,25 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       await fetch('/api/auth/manage-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'set', username: targetUser.username, password: clean }),
+        body: JSON.stringify({
+          action: 'set',
+          username: targetUser.username,
+          password: clean,
+          fallbackUser: {
+            id: targetUser.id,
+            fullName: targetUser.fullName,
+            nationalId: targetUser.nationalId,
+            phone: targetUser.phone,
+            email: targetUser.email,
+            jobTitle: targetUser.jobTitle,
+            jobGrade: targetUser.jobGrade,
+            workplace: targetUser.workplace,
+            primaryBranchId: targetUser.primaryBranchId,
+            branchIds: targetUser.branchIds,
+            departmentIds: targetUser.departmentIds,
+            role: targetUser.role,
+          },
+        }),
       });
     } catch {
       // ignore network fallback
@@ -863,14 +903,50 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
     setDeleteTargetUser(null);
   };
 
+  const handleWipeAllUsersAcrossBranches = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWipeError('');
+
+    setWipingAllUsers(true);
+    try {
+      const wipeRes = await fetch('/api/users?all=true', { method: 'DELETE' });
+      const wipePayload = (await wipeRes.json().catch(() => ({}))) as {
+        ok?: boolean;
+        deletedCount?: number;
+        error?: string;
+      };
+      if (!wipeRes.ok || !wipePayload.ok) {
+        setWipeError(wipePayload.error || 'تعذر تنفيذ المسح الشامل للمستخدمين.');
+        setWipingAllUsers(false);
+        return;
+      }
+
+      setUsers([]);
+      saveStoredUsers([]);
+      setSelectedIds([]);
+      setSelectedPermUserId('');
+      window.dispatchEvent(new CustomEvent('gharbia-departments-updated'));
+      window.dispatchEvent(new CustomEvent('gharbia-audit-log-added'));
+      setShowWipeAllUsersModal(false);
+      showNotice(
+        `تم المسح الشامل لجميع المستخدمين على جميع الفروع نهائياً (عدد ${toArabicNumerals(
+          wipePayload.deletedCount ?? users.length
+        )} حساب) من قاعدة البيانات.`
+      );
+    } catch {
+      setWipeError('تعذر الاتصال بالخادم لتنفيذ المسح الشامل.');
+    } finally {
+      setWipingAllUsers(false);
+    }
+  };
+
   const handleExecuteBulkAction = async () => {
     if (!bulkConfirmAction || selectedIds.length === 0) return;
     const selectedUsers = users.filter((u) => selectedIds.includes(u.id));
-    const actionable = selectedUsers.filter((u) => !isProtectedUser(u));
-    const skippedCount = selectedUsers.length - actionable.length;
+    const actionable = selectedUsers;
+    const skippedCount = 0;
 
     if (actionable.length === 0) {
-      showNotice('المستخدمون المحددون محميون (الحساب النشط أو آخر مدير أعلى).');
       setBulkConfirmAction(null);
       return;
     }
@@ -1128,27 +1204,55 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       type: 'actions',
       align: 'center',
       sortable: false,
-      defaultWidth: 175,
+      defaultWidth: 230,
       render: (req) =>
         req.status === 'pending' ? (
           <div className="flex items-center justify-center gap-1.5">
             <button
               type="button"
               onClick={() => handleApproveRequest(req)}
-              className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10.5px] font-extrabold shadow-xs cursor-pointer"
+              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+              title="اعتماد وتفعيل"
             >
-              اعتماد وتفعيل
+              <CheckCircle2 className="w-4.5 h-4.5" />
+              <span>اعتماد</span>
             </button>
             <button
               type="button"
               onClick={() => handleRejectRequest(req.id)}
-              className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white rounded-lg text-[10.5px] font-extrabold shadow-xs cursor-pointer"
+              className="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-black shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+              title="رفض الطلب"
             >
-              رفض
+              <Trash2 className="w-4.5 h-4.5" />
+              <span>رفض</span>
             </button>
           </div>
         ) : (
-          <span className="text-slate-400 text-[10.5px]">منجز</span>
+          <div className="flex items-center justify-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => showNotice(`طلب: ${req.fullName} — الحالة: ${req.status === 'approved' ? 'معتمد' : 'مرفوض'}`)}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#1E3346] text-[11px] font-black inline-flex items-center gap-1 cursor-pointer"
+              title="عرض الطلب"
+            >
+              <Eye className="w-4.5 h-4.5" />
+              <span>عرض</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = requests.filter((r) => r.id !== req.id);
+                setRequests(next);
+                saveStoredRegistrationRequests(next);
+                showNotice('تم حذف الطلب من السجل.');
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-900 text-[11px] font-black inline-flex items-center gap-1 cursor-pointer"
+              title="حذف الطلب"
+            >
+              <Trash2 className="w-4.5 h-4.5" />
+              <span>حذف</span>
+            </button>
+          </div>
         ),
     },
   ];
@@ -1244,25 +1348,34 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       type: 'actions',
       align: 'center',
       sortable: false,
-      defaultWidth: 380,
+      defaultWidth: 460,
       render: (u) => (
-        <div className="flex flex-wrap items-center justify-center gap-1">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
           <button
             type="button"
             onClick={() => setPreviewUser(u)}
-            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[#1E3346] text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
-            title="معاينة الملف"
+            className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#1E3346] text-[11px] font-black inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="عرض الملف"
           >
-            <Eye className="w-3 h-3" />
-            <span>معاينة</span>
+            <Eye className="w-4.5 h-4.5" />
+            <span>عرض</span>
+          </button>
+          <button
+            type="button"
+            onClick={openAddUserModal}
+            className="px-2.5 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-[11px] font-black inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="إضافة مستخدم جديد"
+          >
+            <PlusCircle className="w-4.5 h-4.5" />
+            <span>إضافة</span>
           </button>
           <button
             type="button"
             onClick={() => openEditUserModal(u)}
-            className="px-2 py-1 rounded-lg bg-[#253B4F] hover:bg-[#32516D] text-white text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
+            className="px-2.5 py-1.5 rounded-xl bg-[#253B4F] hover:bg-[#32516D] text-white text-[11px] font-black inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="تعديل بيانات المستخدم والصلاحيات"
           >
-            <Pencil className="w-3 h-3 text-[#94C9CE]" />
+            <Pencil className="w-4.5 h-4.5 text-[#94C9CE]" />
             <span>تعديل</span>
           </button>
           <button
@@ -1272,43 +1385,34 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
               setNewPassValue('');
               setShowPassField(true);
             }}
-            className="px-2 py-1 rounded-lg bg-[#DCECEF] hover:bg-[#C3E0E5] text-[#1E3346] text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
+            className="px-2.5 py-1.5 rounded-xl bg-[#DCECEF] hover:bg-[#C3E0E5] text-[#1E3346] text-[11px] font-black inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="إدارة كلمة المرور"
           >
-            <KeyRound className="w-3 h-3" />
+            <KeyRound className="w-4.5 h-4.5" />
             <span>{(u.hasCustomPassword || u.password) && !u.passwordDisabled ? 'تعديل الباسورد' : 'تعيين باسورد'}</span>
           </button>
           <button
             type="button"
-            onClick={() => handleDeleteUserPassword(u)}
-            className="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-950 text-[10px] font-black cursor-pointer"
-            title="تعطيل كلمة المرور"
+            onClick={() => handleToggleUserStatus(u)}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black inline-flex items-center gap-1 cursor-pointer shadow-xs ${
+              u.status === 'active'
+                ? 'bg-orange-100 text-orange-900 hover:bg-orange-200'
+                : 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
+            }`}
+            title={u.status === 'active' ? 'إيقاف الحساب' : 'تفعيل الحساب'}
           >
-            حذف الباسورد
+            <Ban className="w-4.5 h-4.5" />
+            <span>{u.status === 'active' ? 'إيقاف' : 'تفعيل'}</span>
           </button>
-          {!isProtectedUser(u) && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleToggleUserStatus(u)}
-                className={`px-2 py-1 rounded-lg text-[10px] font-black cursor-pointer ${
-                  u.status === 'active'
-                    ? 'bg-orange-100 text-orange-900 hover:bg-orange-200'
-                    : 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
-                }`}
-              >
-                {u.status === 'active' ? 'إيقاف' : 'تفعيل'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteTargetUser(u)}
-                className="px-2 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-900 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
-                title="حذف المستخدم نهائياً"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>حذف</span>
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            onClick={() => setDeleteTargetUser(u)}
+            className="px-2.5 py-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-900 text-[11px] font-black inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="حذف المستخدم نهائياً (حتى مدير النظام)"
+          >
+            <Trash2 className="w-4.5 h-4.5" />
+            <span>حذف</span>
+          </button>
         </div>
       ),
     },
@@ -1389,16 +1493,33 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       type: 'actions',
       align: 'center',
       sortable: false,
-      defaultWidth: 120,
+      defaultWidth: 185,
       render: (l) => (
-        <button
-          type="button"
-          onClick={() => showNotice(`${l.action} — ${l.details}`)}
-          className="px-2.5 py-1 rounded-lg bg-[#253B4F] text-[#94C9CE] text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
-        >
-          <Eye className="w-3 h-3" />
-          <span>معاينة</span>
-        </button>
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => showNotice(`${l.action} — ${l.details}`)}
+            className="px-2.5 py-1.5 rounded-xl bg-[#253B4F] text-[#94C9CE] text-[11px] font-black inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="عرض السجل"
+          >
+            <Eye className="w-4.5 h-4.5" />
+            <span>عرض</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = auditLogs.filter((x) => x.id !== l.id);
+              setAuditLogs(next);
+              saveStoredAuditLogs(next);
+              showNotice('تم حذف سجل التدقيق المحدد.');
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-900 text-[11px] font-black inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="حذف السجل"
+          >
+            <Trash2 className="w-4.5 h-4.5" />
+            <span>حذف</span>
+          </button>
+        </div>
       ),
     },
   ];
@@ -1464,6 +1585,23 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
             <SlidersHorizontal className="w-4 h-4 text-[#94C9CE]" />
             <span>مصفوفة الصلاحيات</span>
           </button>
+          <FactoryResetButton
+            sectionName="إدارة المستخدمين وسجل التدقيق"
+            sectionKey="admin_governance"
+            currentUser={getCurrentSessionUser()}
+            tableSummary={[
+              { tableName: 'طلبات التسجيل قيد المراجعة', count: requests.length },
+              { tableName: 'سجل التدقيق الأمني المحلي', count: auditLogs.length },
+            ]}
+            compact
+            onConfirmReset={() => {
+              setRequests([]);
+              saveStoredRegistrationRequests([]);
+              setAuditLogs([]);
+              saveStoredAuditLogs([]);
+              showNotice('تم تصفير طلبات التسجيل وسجلات التدقيق بالكامل بنجاح.');
+            }}
+          />
         </div>
       </div>
 
@@ -1607,14 +1745,28 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={openAddUserModal}
-              className="px-3.5 py-2 rounded-full bg-[#253B4F] hover:bg-[#1E3142] text-[#94C9CE] text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>إضافة مستخدم جديد + كلمة مرور</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={openAddUserModal}
+                className="px-3.5 py-2 rounded-full bg-[#253B4F] hover:bg-[#1E3142] text-[#94C9CE] text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>إضافة مستخدم جديد + كلمة مرور</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWipeError('');
+                  setShowWipeAllUsersModal(true);
+                }}
+                className="px-3.5 py-2 rounded-full bg-red-700 hover:bg-red-800 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs border border-red-400/50"
+                title="مسح شامل لجميع حسابات المستخدمين على مستوى كافة الفروع والإدارات"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>مسح شامل لجميع المستخدمين على جميع الفروع</span>
+              </button>
+            </div>
           </div>
 
           {/* Bulk Action Toolbar when rows are selected */}
@@ -1757,8 +1909,28 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
       {activeTab === 'audit' && (
         <div className="bg-white/85 backdrop-blur-md rounded-[22px] shadow-xs border border-white/80 p-4 space-y-3">
           <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
-            <h3 className="text-[13px] font-black text-[#1E3346]">سجل النشاط والتدقيق الأمني غير القابل للتعديل</h3>
-            <span className="text-[11px] font-bold text-slate-600">يوثق كافة العمليات والمحاولات</span>
+            <div>
+              <h3 className="text-[13px] font-black text-[#1E3346]">سجل النشاط والتدقيق الأمني (Audit Log Dashboard)</h3>
+              <span className="text-[11px] font-bold text-slate-600">يوثق كافة العمليات والمحاولات والتغييرات الإدارية بالمنظومة</span>
+            </div>
+            <FactoryResetButton
+              sectionName="سجل العمليات والتدقيق الأمني"
+              sectionKey="audit_logs"
+              currentUser={getCurrentSessionUser()}
+              tableSummary={[
+                { tableName: 'سجل العمليات والتدقيق الأمني', count: auditLogs.length },
+              ]}
+              compact
+              onConfirmReset={() => {
+                setAuditLogs([]);
+                try {
+                  localStorage.setItem('gharbia_supply_audit_v3', JSON.stringify([]));
+                } catch {
+                  // ignore
+                }
+                showNotice('تم تصفير سجل العمليات والتدقيق الأمني فوراً.');
+              }}
+            />
           </div>
 
           <SmartAutoFitTable
@@ -2388,7 +2560,7 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
                 : 'تأكيد الإيقاف الجماعي للحسابات'}
             </h4>
             <p className="text-xs font-bold text-slate-600 leading-relaxed">
-              سيتم تطبيق الإجراء على عدد ({toArabicNumerals(selectedIds.length)}) حساباً محدداً (مع استثناء الحساب الحالي أو آخر مدير أعلى تلقائياً لضمان أمان النظام).
+              سيتم تطبيق الإجراء على عدد ({toArabicNumerals(selectedIds.length)}) حساباً محدداً مباشرة في قاعدة البيانات.
             </p>
             <div className="flex items-center justify-end gap-2">
               <button type="button" onClick={() => setBulkConfirmAction(null)} className="px-4 py-2 rounded-full bg-slate-200 text-[#1E3346] text-xs font-black cursor-pointer">إلغاء</button>
@@ -2403,6 +2575,60 @@ export default function AdminDashboard({ userId = 'default' }: { userId?: string
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal: Global Wipe of All Users Across All Branches */}
+      {showWipeAllUsersModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setShowWipeAllUsersModal(false)}
+        >
+          <form
+            onSubmit={handleWipeAllUsersAcrossBranches}
+            className="bg-white rounded-[24px] border-2 border-red-700 shadow-2xl max-w-md w-full p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-red-700">
+              <div className="w-11 h-11 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black">مسح شامل لجميع المستخدمين على جميع الفروع</h4>
+                <p className="text-[11px] font-bold text-slate-600">
+                  سيتم حذف جميع الحسابات ({toArabicNumerals(users.length)} مستخدم) نهائياً بما في ذلك حسابات الإدارة العليا
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-bold text-red-900 leading-relaxed">
+              هذا الإجراء يمسح كافة المستخدمين عبر جميع الإدارات والفروع نهائياً من قاعدة البيانات ولن يتم استعادتهم تلقائياً.
+            </div>
+
+            {wipeError && (
+              <div className="p-2.5 rounded-xl bg-red-100 border border-red-300 text-xs font-black text-red-800">
+                {wipeError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowWipeAllUsersModal(false)}
+                className="px-4 py-2 rounded-full bg-slate-200 text-[#1E3346] text-xs font-black cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                disabled={wipingAllUsers}
+                className="px-5 py-2 rounded-full bg-red-700 hover:bg-red-800 disabled:bg-slate-300 text-white text-xs font-black cursor-pointer inline-flex items-center gap-1.5 shadow-md"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{wipingAllUsers ? 'جاري المسح الشامل...' : 'تأكيد المسح الشامل الآن'}</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

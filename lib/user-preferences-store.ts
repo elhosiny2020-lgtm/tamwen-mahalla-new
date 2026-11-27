@@ -6,6 +6,13 @@ import {
   enableFullEnglishDomTranslation,
   restoreOriginalArabicDom,
 } from './full-ui-translator';
+import {
+  DEFAULT_NOTIFICATION_AUDIO_PREFS,
+  NotificationAudioPreferences,
+  NotificationCategoryAudioSetting,
+  NotificationCategoryId,
+  normalizeNotificationAudioPrefs,
+} from './notification-sound-engine';
 
 export type ThemePresetId =
   | 'frosted_teal'
@@ -22,6 +29,12 @@ export type ThemePresetId =
   | 'dark_mode'
   | 'midnight_aurora'
   | 'eye_comfort'
+  | 'crystal_glass'
+  | 'obsidian_glass'
+  | 'aurora_glass'
+  | 'emerald_glass'
+  | 'sapphire_executive'
+  | 'copper_editorial'
   | 'custom';
 
 export type UiLayoutId =
@@ -30,7 +43,9 @@ export type UiLayoutId =
   | 'bento_mosaic'
   | 'royal_heritage'
   | 'ultra_minimal'
-  | 'operations_cockpit';
+  | 'operations_cockpit'
+  | 'liquid_glass'
+  | 'glass_split';
 
 export type DisplayScalingMode = 'auto' | 'manual';
 export type UiDensity = 'compact' | 'comfortable' | 'spacious';
@@ -49,6 +64,7 @@ export interface UserDisplayPreferences {
   customColors: CustomThemeColors;
   displayMode: DisplayScalingMode;
   density: UiDensity;
+  notificationAudio: NotificationAudioPreferences;
   updatedAt: string;
 }
 
@@ -71,6 +87,7 @@ export interface ThemePresetMeta {
   previewAccent: string;
   previewText: string;
   isDark?: boolean;
+  isGlass?: boolean;
 }
 
 export interface UiLayoutPresetMeta {
@@ -81,7 +98,16 @@ export interface UiLayoutPresetMeta {
   navPositionAr: string;
   navPositionEn: string;
   recommendedTheme: ThemePresetId;
-  wireframeType: 'sidebar_glass' | 'top_ribbon' | 'icon_rail_bento' | 'sovereign_grid' | 'minimal_flat' | 'cockpit_dense';
+  wireframeType:
+    | 'sidebar_glass'
+    | 'top_ribbon'
+    | 'icon_rail_bento'
+    | 'sovereign_grid'
+    | 'minimal_flat'
+    | 'cockpit_dense'
+    | 'liquid_glass'
+    | 'glass_split';
+  isGlass?: boolean;
 }
 
 export interface UxSkinBundleMeta {
@@ -154,6 +180,28 @@ export const UI_LAYOUT_PRESETS: UiLayoutPresetMeta[] = [
     navPositionEn: 'Live Cockpit Deck',
     recommendedTheme: 'midnight_aurora',
     wireframeType: 'cockpit_dense',
+  },
+  {
+    id: 'liquid_glass',
+    labelKey: 'layout_liquid_glass',
+    descAr: 'طبقات زجاجية شفافة ثلاثية الأبعاد مع ضبابية كريستالية وحدود مضيئة',
+    descEn: 'Multi-layer translucent frosted glass canvas with luminous specular borders',
+    navPositionAr: 'زجاج سائل عائم',
+    navPositionEn: 'Floating Liquid Glass',
+    recommendedTheme: 'crystal_glass',
+    wireframeType: 'liquid_glass',
+    isGlass: true,
+  },
+  {
+    id: 'glass_split',
+    labelKey: 'layout_glass_split',
+    descAr: 'شريط قيادة علوي زجاجي مع بطاقات عائمة شفافة وتباين فائق الوضوح',
+    descEn: 'Translucent glass top command bar paired with floating elevated cards',
+    navPositionAr: 'شريط علوي زجاجي',
+    navPositionEn: 'Glass Command Bar',
+    recommendedTheme: 'obsidian_glass',
+    wireframeType: 'glass_split',
+    isGlass: true,
   },
 ];
 
@@ -272,9 +320,99 @@ export const THEME_PRESETS: ThemePresetMeta[] = [
     previewText: '#E2E8F0',
     isDark: true,
   },
+  {
+    id: 'crystal_glass',
+    labelKey: 'theme_crystal_glass',
+    previewBg: '#DCEBFF',
+    previewPrimary: '#133C68',
+    previewAccent: '#38BDF8',
+    previewText: '#0F2942',
+    isGlass: true,
+  },
+  {
+    id: 'obsidian_glass',
+    labelKey: 'theme_obsidian_glass',
+    previewBg: '#090F1E',
+    previewPrimary: '#172542',
+    previewAccent: '#60A5FA',
+    previewText: '#F1F5F9',
+    isDark: true,
+    isGlass: true,
+  },
+  {
+    id: 'aurora_glass',
+    labelKey: 'theme_aurora_glass',
+    previewBg: '#0D132B',
+    previewPrimary: '#241B52',
+    previewAccent: '#2DD4BF',
+    previewText: '#F1F5F9',
+    isDark: true,
+    isGlass: true,
+  },
+  {
+    id: 'emerald_glass',
+    labelKey: 'theme_emerald_glass',
+    previewBg: '#D8EFE5',
+    previewPrimary: '#0E4332',
+    previewAccent: '#D4AF37',
+    previewText: '#0B2B21',
+    isGlass: true,
+  },
+  {
+    id: 'sapphire_executive',
+    labelKey: 'theme_sapphire_executive',
+    previewBg: '#EEF3FA',
+    previewPrimary: '#0B2545',
+    previewAccent: '#D4AF37',
+    previewText: '#0B2545',
+  },
+  {
+    id: 'copper_editorial',
+    labelKey: 'theme_copper_editorial',
+    previewBg: '#F8F2EC',
+    previewPrimary: '#4A251B',
+    previewAccent: '#C87D4B',
+    previewText: '#2F1811',
+  },
 ];
 
 export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
+  {
+    id: 'skin_crystal_liquid',
+    titleAr: 'الكريستال الزجاجي الفاخر',
+    titleEn: 'Crystal Liquid Glass',
+    subtitleAr: 'واجهات زجاجية شفافة بضبابية كريستالية',
+    subtitleEn: 'Translucent glass layers & crisp frost',
+    layoutId: 'liquid_glass',
+    themeId: 'crystal_glass',
+  },
+  {
+    id: 'skin_obsidian_glass',
+    titleAr: 'الأوبسيديان الزجاجي الداكن',
+    titleEn: 'Obsidian Dark Glass',
+    subtitleAr: 'قيادة علوية زجاجية داكنة فائقة الفخامة',
+    subtitleEn: 'Dark smoked glass & luminous blue glow',
+    layoutId: 'glass_split',
+    themeId: 'obsidian_glass',
+  },
+  {
+    id: 'skin_aurora_prism',
+    titleAr: 'الشفق الزجاجي المتلألئ',
+    titleEn: 'Aurora Prism Glass',
+    subtitleAr: 'زجاج ليلي بتدرجات الشفق والتركواز',
+    subtitleEn: 'Aurora mesh backdrop & frosted panels',
+    layoutId: 'liquid_glass',
+    themeId: 'aurora_glass',
+  },
+  {
+    id: 'skin_emerald_glass',
+    titleAr: 'الزمرد الزجاجي السيادي',
+    titleEn: 'Royal Emerald Glass',
+    subtitleAr: 'زجاج زمردي شفاف مع لمسات ذهبية ملكية',
+    subtitleEn: 'Frosted emerald glass & sovereign gold',
+    layoutId: 'liquid_glass',
+    themeId: 'emerald_glass',
+  },
   {
     id: 'skin_glass_modern',
     titleAr: 'الداش بورد الزجاجي العصري',
@@ -288,10 +426,10 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     id: 'skin_exec_ribbon',
     titleAr: 'القيادة التنفيذية الواسعة',
     titleEn: 'Executive Wide Ribbon',
-    subtitleAr: 'شريط أقسام علوي وكحلي حكومي ذهبي',
-    subtitleEn: 'Top ribbon nav & official navy',
+    subtitleAr: 'شريط أقسام علوي وياقوت حكومي ذهبي',
+    subtitleEn: 'Top ribbon nav & sapphire executive',
     layoutId: 'executive_command',
-    themeId: 'gov_navy',
+    themeId: 'sapphire_executive',
   },
   {
     id: 'skin_bento_indigo',
@@ -303,13 +441,13 @@ export const UX_BUNDLE_PRESETS: UxSkinBundleMeta[] = [
     themeId: 'indigo_horizon',
   },
   {
-    id: 'skin_sovereign_emerald',
-    titleAr: 'الطراز السيادي الزمردي',
-    titleEn: 'Sovereign Emerald',
-    subtitleAr: 'أعمدة قيادية رسمية بالزمردي والذهبي',
-    subtitleEn: 'Royal frame & emerald gold',
+    id: 'skin_copper_heritage',
+    titleAr: 'الطراز النحاسي التحريري',
+    titleEn: 'Copper Editorial Sovereign',
+    subtitleAr: 'هيكلة سيادية فاخرة بألوان النحاس الدافئ',
+    subtitleEn: 'Sovereign frame & warm copper tones',
     layoutId: 'royal_heritage',
-    themeId: 'royal_emerald',
+    themeId: 'copper_editorial',
   },
   {
     id: 'skin_minimal_paper',
@@ -343,6 +481,7 @@ export const DEFAULT_USER_PREFERENCES: UserDisplayPreferences = {
   },
   displayMode: 'auto',
   density: 'comfortable',
+  notificationAudio: DEFAULT_NOTIFICATION_AUDIO_PREFS,
   updatedAt: '2026-11-27T00:00:00Z',
 };
 
@@ -359,6 +498,8 @@ const VALID_LAYOUTS = new Set<UiLayoutId>([
   'royal_heritage',
   'ultra_minimal',
   'operations_cockpit',
+  'liquid_glass',
+  'glass_split',
 ]);
 
 function normalizeLayout(v: unknown): UiLayoutId {
@@ -383,6 +524,7 @@ export function loadUserPreferences(userId: string): UserDisplayPreferences {
         ...DEFAULT_USER_PREFERENCES.customColors,
         ...(parsed.customColors || {}),
       },
+      notificationAudio: normalizeNotificationAudioPrefs(parsed.notificationAudio),
     };
   } catch {
     return DEFAULT_USER_PREFERENCES;
@@ -426,6 +568,7 @@ async function fetchRemoteUserPreferences(userId: string): Promise<UserDisplayPr
         ...DEFAULT_USER_PREFERENCES.customColors,
         ...(data.preferences.customColors || {}),
       },
+      notificationAudio: normalizeNotificationAudioPrefs(data.preferences.notificationAudio),
     };
   } catch {
     return null;
@@ -453,6 +596,7 @@ async function syncRemoteUserPreferences(
         customColors: prefs.customColors,
         displayMode: prefs.displayMode,
         density: prefs.density,
+        notificationAudio: prefs.notificationAudio,
         updatedAt: prefs.updatedAt,
       }),
     });
@@ -566,6 +710,13 @@ interface SystemPreferencesContextValue {
   setCustomColors: (colors: CustomThemeColors) => void;
   setDisplayMode: (mode: DisplayScalingMode) => void;
   setDensity: (density: UiDensity) => void;
+  setNotificationAudioPrefs: (audio: NotificationAudioPreferences) => void;
+  setNotificationMasterEnabled: (enabled: boolean) => void;
+  setNotificationVolume: (volume: number) => void;
+  updateNotificationCategoryAudio: (
+    category: NotificationCategoryId,
+    patch: Partial<NotificationCategoryAudioSetting>
+  ) => void;
   resetAllPreferences: () => void;
 }
 
@@ -633,14 +784,29 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
     root.setAttribute('data-ui-layout', prefs.uiLayout);
     root.setAttribute('data-density', effectiveDensity);
 
-    // تفعيل كلاس dark للوضع الداكن أو الشفق الليلي أو اللون المخصص الداكن
+    // تفعيل كلاس dark للثيمات الداكنة والزجاجية الداكنة أو اللون المخصص الداكن
     const isCustomDark =
       prefs.themeId === 'custom' && getLuminance(prefs.customColors.background) < 0.35;
-    if (prefs.themeId === 'dark_mode' || prefs.themeId === 'midnight_aurora' || isCustomDark) {
+    const isDarkTheme =
+      prefs.themeId === 'dark_mode' ||
+      prefs.themeId === 'midnight_aurora' ||
+      prefs.themeId === 'obsidian_glass' ||
+      prefs.themeId === 'aurora_glass' ||
+      isCustomDark;
+    if (isDarkTheme) {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
+
+    const isGlassActive =
+      prefs.themeId === 'crystal_glass' ||
+      prefs.themeId === 'obsidian_glass' ||
+      prefs.themeId === 'aurora_glass' ||
+      prefs.themeId === 'emerald_glass' ||
+      prefs.uiLayout === 'liquid_glass' ||
+      prefs.uiLayout === 'glass_split';
+    root.setAttribute('data-glass-ui', isGlassActive ? 'true' : 'false');
 
     // متغير مقياس الخط المركزي (حقيقي بدون zoom)
     const scaleRatio = Number((effectiveFontScale / 100).toFixed(3));
@@ -800,6 +966,68 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
     [updatePrefs]
   );
 
+  const setNotificationAudioPrefs = useCallback(
+    (audio: NotificationAudioPreferences) => {
+      updatePrefs((p) => ({
+        ...p,
+        notificationAudio: normalizeNotificationAudioPrefs(audio),
+      }));
+    },
+    [updatePrefs]
+  );
+
+  const setNotificationMasterEnabled = useCallback(
+    (enabled: boolean) => {
+      updatePrefs((p) => ({
+        ...p,
+        notificationAudio: {
+          ...normalizeNotificationAudioPrefs(p.notificationAudio),
+          masterEnabled: enabled,
+        },
+      }));
+    },
+    [updatePrefs]
+  );
+
+  const setNotificationVolume = useCallback(
+    (volume: number) => {
+      const clamped = Math.min(1, Math.max(0.1, Number(volume.toFixed(2))));
+      updatePrefs((p) => ({
+        ...p,
+        notificationAudio: {
+          ...normalizeNotificationAudioPrefs(p.notificationAudio),
+          volume: clamped,
+        },
+      }));
+    },
+    [updatePrefs]
+  );
+
+  const updateNotificationCategoryAudio = useCallback(
+    (
+      category: NotificationCategoryId,
+      patch: Partial<NotificationCategoryAudioSetting>
+    ) => {
+      updatePrefs((p) => {
+        const current = normalizeNotificationAudioPrefs(p.notificationAudio);
+        return {
+          ...p,
+          notificationAudio: {
+            ...current,
+            categories: {
+              ...current.categories,
+              [category]: {
+                ...current.categories[category],
+                ...patch,
+              },
+            },
+          },
+        };
+      });
+    },
+    [updatePrefs]
+  );
+
   const resetAllPreferences = useCallback(() => {
     const fresh = { ...DEFAULT_USER_PREFERENCES, updatedAt: new Date().toISOString() };
     setPrefs(fresh);
@@ -831,6 +1059,10 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
       setCustomColors,
       setDisplayMode,
       setDensity,
+      setNotificationAudioPrefs,
+      setNotificationMasterEnabled,
+      setNotificationVolume,
+      updateNotificationCategoryAudio,
       resetAllPreferences,
     }),
     [
@@ -851,6 +1083,10 @@ export function SystemPreferencesProvider({ children }: { children: React.ReactN
       setCustomColors,
       setDisplayMode,
       setDensity,
+      setNotificationAudioPrefs,
+      setNotificationMasterEnabled,
+      setNotificationVolume,
+      updateNotificationCategoryAudio,
       resetAllPreferences,
     ]
   );
@@ -880,6 +1116,10 @@ export function useSystemPreferences(): SystemPreferencesContextValue {
       setCustomColors: () => {},
       setDisplayMode: () => {},
       setDensity: () => {},
+      setNotificationAudioPrefs: () => {},
+      setNotificationMasterEnabled: () => {},
+      setNotificationVolume: () => {},
+      updateNotificationCategoryAudio: () => {},
       resetAllPreferences: () => {},
     };
   }

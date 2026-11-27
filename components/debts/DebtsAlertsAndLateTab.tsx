@@ -231,19 +231,19 @@ export default function DebtsAlertsAndLateTab({
         render: (a) => {
           const parentDebt = debts.find((d) => d.id === a.debtId);
           return (
-            <div className="flex items-center gap-1 whitespace-nowrap">
+            <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
               {parentDebt && (
                 <>
-                  <button type="button" onClick={() => onOpenPayModal(parentDebt)} title="تسجيل سداد فوري" className="p-1 rounded bg-emerald-50 hover:bg-emerald-700 hover:text-white text-emerald-800 cursor-pointer">
-                    <CreditCard className="w-3.5 h-3.5" />
+                  <button type="button" onClick={() => onOpenPayModal(parentDebt)} title="تسجيل سداد فوري" className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-700 hover:text-white text-emerald-800 border border-emerald-200 cursor-pointer transition-colors">
+                    <CreditCard className="w-5 h-5" />
                   </button>
-                  <button type="button" onClick={() => onOpenScheduleModal(parentDebt)} title="جدولة المديونية" className="p-1 rounded bg-blue-50 hover:bg-blue-700 hover:text-white text-blue-800 cursor-pointer">
-                    <CalendarClock className="w-3.5 h-3.5" />
+                  <button type="button" onClick={() => onOpenScheduleModal(parentDebt)} title="جدولة المديونية" className="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-700 hover:text-white text-blue-800 border border-blue-200 cursor-pointer transition-colors">
+                    <CalendarClock className="w-5 h-5" />
                   </button>
                 </>
               )}
-              <button type="button" onClick={() => onOpenBakeryProfile(a.bakeryId)} title="فتح كشف حساب المخبز" className="p-1 rounded bg-slate-100 hover:bg-[#102A43] hover:text-white text-[#102A43] cursor-pointer">
-                <BookOpenText className="w-3.5 h-3.5" />
+              <button type="button" onClick={() => onOpenBakeryProfile(a.bakeryId)} title="فتح كشف حساب المخبز" className="p-1.5 rounded-xl bg-slate-100 hover:bg-[#102A43] hover:text-white text-[#102A43] border border-slate-200 cursor-pointer transition-colors">
+                <BookOpenText className="w-5 h-5" />
               </button>
               <button
                 type="button"
@@ -256,9 +256,9 @@ export default function DebtsAlertsAndLateTab({
                   });
                 }}
                 title="طباعة مطالبة / إنذار رسمي"
-                className="p-1 rounded bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-800 cursor-pointer"
+                className="p-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-800 border border-amber-200 cursor-pointer transition-colors"
               >
-                <Printer className="w-3.5 h-3.5" />
+                <Printer className="w-5 h-5" />
               </button>
               <button
                 type="button"
@@ -268,13 +268,13 @@ export default function DebtsAlertsAndLateTab({
                   setSnoozeReason('');
                 }}
                 title="تأجيل التنبيه بسبب معتمد"
-                className="p-1 rounded bg-slate-100 hover:bg-slate-700 hover:text-white text-slate-700 cursor-pointer"
+                className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-700 hover:text-white text-slate-700 border border-slate-200 cursor-pointer transition-colors"
               >
-                <PauseCircle className="w-3.5 h-3.5" />
+                <PauseCircle className="w-5 h-5" />
               </button>
               {!a.isRead && (
-                <button type="button" onClick={() => onMarkAlertRead(a.id)} title="تحديد كمقروء" className="p-1 rounded bg-teal-50 hover:bg-teal-700 hover:text-white text-teal-800 cursor-pointer">
-                  <CheckCheck className="w-3.5 h-3.5" />
+                <button type="button" onClick={() => onMarkAlertRead(a.id)} title="تحديد كمقروء" className="p-1.5 rounded-xl bg-teal-50 hover:bg-teal-700 hover:text-white text-teal-800 border border-teal-200 cursor-pointer transition-colors">
+                  <CheckCheck className="w-5 h-5" />
                 </button>
               )}
             </div>
@@ -327,9 +327,12 @@ export default function DebtsAlertsAndLateTab({
         headerText: 'الإجراءات',
         type: 'actions',
         render: (r) => (
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => onOpenPayModal(r.primaryDebt)} title="تحصيل" className="p-1 rounded bg-emerald-50 text-emerald-800 hover:bg-emerald-700 hover:text-white cursor-pointer">
-              <CreditCard className="w-3.5 h-3.5" />
+          <div className="flex items-center justify-center gap-1.5">
+            <button type="button" onClick={() => onOpenBakeryProfile(r.bakeryId)} title="عرض ملف المخبز" className="p-1.5 rounded-xl bg-blue-50 text-[#164E83] hover:bg-[#102A43] hover:text-white border border-blue-200 cursor-pointer transition-colors">
+              <BookOpenText className="w-5 h-5" />
+            </button>
+            <button type="button" onClick={() => onOpenPayModal(r.primaryDebt)} title="تحصيل" className="p-1.5 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-700 hover:text-white border border-emerald-200 cursor-pointer transition-colors">
+              <CreditCard className="w-5 h-5" />
             </button>
             <button
               type="button"
@@ -341,9 +344,9 @@ export default function DebtsAlertsAndLateTab({
                 })
               }
               title="طباعة إنذار رسمي"
-              className="p-1 rounded bg-red-50 text-red-800 hover:bg-red-700 hover:text-white cursor-pointer"
+              className="p-1.5 rounded-xl bg-red-50 text-red-800 hover:bg-red-700 hover:text-white border border-red-200 cursor-pointer transition-colors"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="w-5 h-5" />
             </button>
           </div>
         ),
@@ -392,9 +395,9 @@ export default function DebtsAlertsAndLateTab({
                   docNumber: r.noticeNumber,
                 })
               }
-              className="p-1 rounded bg-slate-100 hover:bg-[#102A43] hover:text-white cursor-pointer"
+              className="p-1.5 rounded-xl bg-slate-100 hover:bg-[#102A43] hover:text-white border border-slate-200 cursor-pointer transition-colors"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="w-5 h-5" />
             </button>
           ) : null;
         },

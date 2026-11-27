@@ -1661,14 +1661,6 @@ export function factoryResetRationCommoditiesStore(): void {
   saveCitizenIssues([]);
   saveRationInspections([]);
   saveRationComplaints([]);
-  saveRationAuditLogs([
-    {
-      id: `ral-reset-${Date.now()}`,
-      timestamp: new Date().toLocaleString('ar-EG'),
-      userName: 'مسؤول المنظومة',
-      screenName: 'إعادة ضبط المصنع',
-      actionType: 'إعادة ضبط المصنع',
-      details: 'تم تفريغ جميع جداول قسم السلع التموينية بالكامل لبدء إدخال بيانات جديدة.',
-    },
-  ]);
+  saveRationAuditLogs([]);
+  saveRationSettings(INITIAL_RATION_SETTINGS);
 }

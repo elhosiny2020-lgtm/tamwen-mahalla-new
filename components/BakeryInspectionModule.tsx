@@ -29,6 +29,7 @@ import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import ViolationCalculator, { WeightShortageCalculationOutput } from './ViolationCalculator';
 import OfficialViolationReportBuilder from './OfficialViolationReportBuilder';
 import FactoryResetButton from './FactoryResetButton';
+import { TableActionButtons } from './trade/TradeSharedCrudUi';
 
 interface BakeryInspectionModuleProps {
   bakeries: BakeryRecord[];
@@ -72,6 +73,7 @@ export default function BakeryInspectionModule({
     'posNumber',
   ]);
   const [toastMsg, setToastMsg] = useState<string>('');
+  const [deletedInspectionIds, setDeletedInspectionIds] = useState<string[]>([]);
 
   const [newBakeryId, setNewBakeryId] = useState<string>(bakeries[0]?.id || '');
   const [newType, setNewType] = useState<InspectionRecord['type']>('مخالفة');
@@ -124,17 +126,19 @@ export default function BakeryInspectionModule({
 
   // سحب اسم صاحب المخبز ورقم ماكينة POS تلقائياً من منظومة إدارة المخابز الحالية
   const enrichedInspections: EnrichedInspectionRecord[] = useMemo(() => {
-    return inspections.map((rec) => {
-      const matchedBakery = bakeries.find(
-        (b) => b.id === rec.bakeryId || b.name === rec.bakeryName
-      );
-      return {
-        ...rec,
-        ownerName: matchedBakery?.ownerName || 'غير مسجل',
-        posNumber: matchedBakery?.posNumber || '—',
-      };
-    });
-  }, [inspections, bakeries]);
+    return inspections
+      .filter((rec) => !deletedInspectionIds.includes(rec.id))
+      .map((rec) => {
+        const matchedBakery = bakeries.find(
+          (b) => b.id === rec.bakeryId || b.name === rec.bakeryName
+        );
+        return {
+          ...rec,
+          ownerName: matchedBakery?.ownerName || 'غير مسجل',
+          posNumber: matchedBakery?.posNumber || '—',
+        };
+      });
+  }, [inspections, bakeries, deletedInspectionIds]);
 
   const filteredRecords = useMemo(() => {
     const q = normalizeSearchText(searchTerm);
@@ -524,29 +528,46 @@ export default function BakeryInspectionModule({
       },
       {
         key: 'actions',
-        label: 'إجراء',
-        headerText: 'إجراء',
+        label: 'الإجراءات',
+        headerText: 'الإجراءات',
         type: 'actions',
         align: 'center',
         sortable: false,
-        defaultWidth: 96,
-        render: (rec) =>
-          rec.status !== 'تم التسوية' && rec.status !== 'مطابق' ? (
-            <button
-              type="button"
-              onClick={() => onUpdateStatus(rec.id, 'تم التسوية')}
-              className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer"
-              title="تحديث الحالة إلى تم التسوية"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>تسوية</span>
-            </button>
-          ) : (
-            <span className="text-slate-400 text-xs font-bold">مكتمل</span>
-          ),
+        defaultWidth: 320,
+        render: (rec) => (
+          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <TableActionButtons
+              recordLabel={`${rec.recordNumber} — ${rec.bakeryName}`}
+              onView={() => {
+                const matched = bakeries.find((b) => b.id === rec.bakeryId);
+                if (matched) onSelectBakeryDetails(matched);
+                else {
+                  setToastMsg(`معاينة المحضر رقم ${rec.recordNumber}: ${rec.violationTitle}`);
+                  setTimeout(() => setToastMsg(''), 3000);
+                }
+              }}
+              onAdd={() => setShowAddForm(true)}
+              onEdit={() => {
+                const nextStatus: InspectionRecord['status'] =
+                  rec.status === 'تم التسوية' ? 'قيد التحقيق' : 'تم التسوية';
+                onUpdateStatus(rec.id, nextStatus);
+                setToastMsg(`تم تحديث حالة السجل (${rec.recordNumber}) إلى: ${nextStatus}`);
+                setTimeout(() => setToastMsg(''), 3000);
+              }}
+              onDelete={() => {
+                const nextIds = [...deletedInspectionIds, rec.id];
+                setDeletedInspectionIds(nextIds);
+                saveStoredInspections(inspections.filter((item) => !nextIds.includes(item.id)));
+                window.dispatchEvent(new Event('gharbia-departments-updated'));
+                setToastMsg(`تم حذف السجل الرقابي (${rec.recordNumber}) بنجاح.`);
+                setTimeout(() => setToastMsg(''), 3000);
+              }}
+            />
+          </div>
+        ),
       },
     ],
-    [bakeries, onSelectBakeryDetails, onUpdateStatus]
+    [bakeries, inspections, deletedInspectionIds, onSelectBakeryDetails, onUpdateStatus]
   );
 
   return (

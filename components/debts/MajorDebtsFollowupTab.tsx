@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CalendarClock,
   CalendarPlus,
+  Eye,
   CheckCircle2,
   CreditCard,
   Download,
@@ -866,14 +867,22 @@ export default function MajorDebtsFollowupTab({
         headerText: 'الإجراءات',
         type: 'actions',
         render: (r) => (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => onOpenBakeryProfile(r.bakeryId)}
+              className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#164E83] border border-blue-200 text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            >
+              <Eye className="w-4.5 h-4.5" />
+              <span>عرض</span>
+            </button>
             <button
               type="button"
               onClick={() => handleOpenCreatePlan(r)}
-              className="px-2 py-1 rounded bg-[#164E83] hover:bg-[#102A43] text-white text-[10px] font-black flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2.5 py-1.5 rounded-xl bg-[#164E83] hover:bg-[#102A43] text-white text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
-              <CalendarPlus className="w-3 h-3" />
-              <span>إنشاء جدول سداد</span>
+              <CalendarPlus className="w-4.5 h-4.5" />
+              <span>جدولة سداد</span>
             </button>
             <button
               type="button"
@@ -881,9 +890,9 @@ export default function MajorDebtsFollowupTab({
                 setInspectRowInstallments(r);
                 setPayFeedback(null);
               }}
-              className="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[10.5px] font-black flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
-              <CreditCard className="w-3 h-3" />
+              <CreditCard className="w-4.5 h-4.5" />
               <span>الأقساط والسداد</span>
             </button>
           </div>

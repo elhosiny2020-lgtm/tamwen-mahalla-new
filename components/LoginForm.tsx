@@ -39,7 +39,7 @@ interface LoginFormProps {
 }
 
 interface PasswordResetDeliveryInfo {
-  recipientEmail: string;
+  recipientLabel?: string;
   username: string;
   fullName: string;
   resetToken: string;
@@ -49,6 +49,8 @@ interface PasswordResetDeliveryInfo {
   supabaseAuthSent?: boolean;
   emailProviderSent?: boolean;
 }
+
+const REMEMBER_LOGIN_KEY = 'gharbia_remembered_login_v1';
 
 export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormProps) {
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
@@ -61,11 +63,10 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Automated Password Reset & Email Recovery State (elhosiny2020@gmail.com)
+  // Automated Password Reset & Email Recovery State (server-side protected email)
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetViewMode, setResetViewMode] = useState<'request' | 'email_dispatched' | 'update_view' | 'completed'>('request');
-  const [fpIdentifier, setFpIdentifier] = useState('admin');
-  const [fpEmail, setFpEmail] = useState('elhosiny2020@gmail.com');
+  const [fpIdentifier, setFpIdentifier] = useState('');
   const [fpToken, setFpToken] = useState('');
   const [fpNewPassword, setFpNewPassword] = useState('');
   const [fpConfirmNewPassword, setFpConfirmNewPassword] = useState('');
@@ -77,6 +78,21 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
       setBranches(getStoredBranches());
+      try {
+        const raw = localStorage.getItem(REMEMBER_LOGIN_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { username?: string; branchId?: string };
+          if (parsed.username) {
+            setUsername(parsed.username);
+            setRememberMe(true);
+          }
+          if (parsed.branchId) {
+            setSelectedBranchId(parsed.branchId);
+          }
+        }
+      } catch {
+        // ignore storage read errors
+      }
     });
     return () => cancelAnimationFrame(frameId);
   }, []);
@@ -86,7 +102,11 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('reset_token')?.trim();
-    if (urlToken && urlToken.length >= 16) {
+    if (!urlToken || urlToken.length < 16) return;
+
+    let cancelled = false;
+    const frameId = requestAnimationFrame(() => {
+      if (cancelled) return;
       setFpToken(urlToken);
       setShowForgotPassword(true);
       setResetViewMode('update_view');
@@ -101,21 +121,27 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
             ok?: boolean;
             username?: string;
             fullName?: string;
-            email?: string;
+            recipientLabel?: string;
             error?: string;
           };
+          if (cancelled) return;
           if (res.ok && data.ok) {
             setFpIdentifier(data.username || 'admin');
-            setFpEmail(data.email || 'elhosiny2020@gmail.com');
-            setFpNotice(`تم التحقق من رابط البريد الإلكتروني المرسل إلى (${data.email || 'elhosiny2020@gmail.com'}) لحساب (${data.username}). أدخل كلمة المرور الجديدة أدناه.`);
+            setFpNotice(`تم التحقق من رابط الاستعادة الآمن لحساب (${data.username}). أدخل كلمة المرور الجديدة أدناه.`);
           } else {
             setFpError(data.error || 'رابط استعادة كلمة المرور غير صالح أو منتهي الصلاحية.');
           }
         } catch {
-          setFpError('تعذر التحقق من رابط استعادة كلمة المرور.');
+          if (!cancelled) {
+            setFpError('تعذر التحقق من رابط استعادة كلمة المرور.');
+          }
         }
       })();
-    }
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
   }, []);
 
   const toggleShowPassword = () => {
@@ -144,27 +170,21 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
 
     try {
       const storedUsers = getStoredUsers();
-      const trimmedUser = validated.data.username.toLowerCase();
-      const localMatch =
-        storedUsers.find((u) => u.username.toLowerCase() === trimmedUser) ||
-        (trimmedUser === 'admin' ? storedUsers[0] : undefined);
+      const trimmedUser = validated.data.username.trim().toLowerCase();
+      const localMatch = storedUsers.find(
+        (u) =>
+          u.username.toLowerCase() === trimmedUser ||
+          (u.employeeNumber && u.employeeNumber.toLowerCase() === trimmedUser)
+      );
 
       const activeBranchId = selectedBranchId || localMatch?.primaryBranchId || 'b-03';
       const authRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: localMatch?.username || validated.data.username,
+          username: validated.data.username.trim(),
           password: validated.data.password,
           branchId: activeBranchId,
-          registeredUser: localMatch
-            ? {
-                id: localMatch.id,
-                fullName: localMatch.fullName,
-                role: localMatch.role,
-                primaryBranchId: activeBranchId,
-              }
-            : undefined,
         }),
       });
 
@@ -188,6 +208,19 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         failedLoginAttempts: 0,
         lastLogin: serverUser.lastLogin || new Date().toISOString(),
       };
+
+      try {
+        if (rememberMe) {
+          localStorage.setItem(
+            REMEMBER_LOGIN_KEY,
+            JSON.stringify({ username: updatedUser.username, branchId: activeBranchId })
+          );
+        } else {
+          localStorage.removeItem(REMEMBER_LOGIN_KEY);
+        }
+      } catch {
+        // ignore storage errors
+      }
 
       setLoading(false);
       setSuccessMsg('تم التحقق من الهوية والصلاحيات بنجاح، جاري فتح المنظومة الرقمية...');
@@ -217,7 +250,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     }
   };
 
-  // ١. طلب استعادة كلمة المرور وإرسال كلمة سر + رابط تغيير على elhosiny2020@gmail.com
+  // ١. طلب استعادة كلمة المرور وإرسال كلمة سر + رابط تغيير عبر الخادم إلى البريد الرسمي المعتمد
   const handleRequestPasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setFpError('');
@@ -231,7 +264,6 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         body: JSON.stringify({
           action: 'request',
           identifier: fpIdentifier.trim() || 'admin',
-          email: 'elhosiny2020@gmail.com',
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -250,8 +282,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
       setDeliveryInfo(data.delivery);
       setFpToken(data.delivery.resetToken);
       setFpIdentifier(data.delivery.username);
-      setFpEmail(data.delivery.recipientEmail);
-      setFpNotice(data.message || 'تم إرسال كلمة المرور ورابط التغيير إلى elhosiny2020@gmail.com');
+      setFpNotice(data.message || 'تم إرسال كلمة المرور الجديدة ورابط التغيير إلى البريد الرسمي المعتمد بنجاح.');
       setResetViewMode('email_dispatched');
 
       addAuditLog({
@@ -260,7 +291,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         fullName: data.delivery.fullName,
         action: 'إرسال كلمة مرور ورابط استعادة للبريد الإلكتروني',
         module: 'استعادة كلمة المرور (Supabase Auth)',
-        details: `تم إرسال كلمة المرور المؤقتة ورابط التغيير الآمن إلى البريد الإلكتروني (${data.delivery.recipientEmail})`,
+        details: 'تم إرسال كلمة المرور المؤقتة ورابط التغيير الآمن إلى البريد الرسمي المعتمد لإدارة المنظومة',
         ipAddress: '10.20.30.50',
         deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
         status: 'success',
@@ -302,7 +333,6 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         error?: string;
         username?: string;
         fullName?: string;
-        email?: string;
         message?: string;
       };
 
@@ -328,7 +358,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         fullName: data.fullName || targetUsername,
         action: 'تغيير كلمة المرور من رابط البريد الإلكتروني',
         module: 'استعادة كلمة المرور (Supabase Auth)',
-        details: `تم تغيير وحفظ كلمة المرور الجديدة بنجاح عبر البريد (${data.email || 'elhosiny2020@gmail.com'})`,
+        details: 'تم تغيير وحفظ كلمة المرور الجديدة بنجاح عبر رابط الاستعادة الرسمي',
         ipAddress: '10.20.30.50',
         deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
         status: 'success',
@@ -344,7 +374,6 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
     setFpError('');
     setFpNotice('');
     setFpIdentifier(username.trim() || 'admin');
-    setFpEmail('elhosiny2020@gmail.com');
     setFpNewPassword('');
     setFpConfirmNewPassword('');
     setResetViewMode('request');
@@ -496,7 +525,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                     className="text-[#164E83] font-black hover:underline cursor-pointer flex items-center gap-1"
                   >
                     <Mail className="w-3.5 h-3.5 text-[#C6A15B]" />
-                    <span>استعادة كلمة المرور على البريد (elhosiny2020@gmail.com)؟</span>
+                    <span>هل نسيت كلمة المرور؟ استعادة عبر البريد المعتمد</span>
                   </button>
                 </div>
               </div>
@@ -566,7 +595,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
         </div>
       </div>
 
-      {/* نافذة استعادة وتغيير كلمة المرور عبر البريد الإلكتروني (elhosiny2020@gmail.com) و Supabase Auth */}
+      {/* نافذة استعادة وتغيير كلمة المرور المؤمنة عبر البريد الرسمي المعتمد (مخفي عن العامة) */}
       {showForgotPassword && (
         <div className="fixed inset-0 bg-black/65 backdrop-blur-md z-50 flex items-center justify-center p-4 font-sans overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border-2 border-[#102A43]/20 my-auto max-h-[92vh] overflow-y-auto">
@@ -577,12 +606,12 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                 </div>
                 <div>
                   <span className="text-[10.5px] font-black text-[#164E83] block">
-                    نظام الاستعادة المؤمن عبر البريد الإلكتروني · Supabase Auth
+                    نظام الاستعادة المؤمن عبر البريد الرسمي المسجل
                   </span>
                   <h3 className="text-base sm:text-lg font-black text-[#102A43]">
                     {resetViewMode === 'update_view'
-                      ? 'تغيير كلمة المرور من رابط البريد الإلكتروني'
-                      : 'استعادة وإرسال كلمة المرور على البريد الإلكتروني'}
+                      ? 'تغيير كلمة المرور من رابط الاستعادة'
+                      : 'استعادة وإرسال كلمة المرور على البريد المعتمد'}
                   </h3>
                 </div>
               </div>
@@ -609,16 +638,16 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
               </div>
             )}
 
-            {/* ١. شاشة طلب استعادة كلمة المرور وإرسالها إلى elhosiny2020@gmail.com */}
+            {/* ١. شاشة طلب استعادة كلمة المرور (بدون إظهار البريد الإلكتروني للعامة) */}
             {resetViewMode === 'request' && (
               <form onSubmit={handleRequestPasswordReset} className="space-y-4">
                 <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-xs font-bold text-[#102A43] space-y-1">
                   <div className="font-black text-[#164E83] flex items-center gap-1.5">
-                    <Mail className="w-4 h-4" />
-                    <span>البريد الإلكتروني المعتمد للاستعادة: elhosiny2020@gmail.com</span>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>الإرسال السري إلى البريد الإلكتروني المعتمد بالمنظومة</span>
                   </div>
                   <p className="text-[11px] text-slate-700 leading-relaxed">
-                    عند الضغط على زر الإرسال، سيقوم النظام بتوليد كلمة مرور جديدة ورمز استعادة مشفر (Reset Token) وإرسالها إلى البريد الإلكتروني <strong>elhosiny2020@gmail.com</strong> مع إمكانية تغيير كلمة المرور مباشرة من رابط البريد.
+                    حفاظاً على الخصوصية والأمان، يتم إرسال كلمة المرور المؤقتة ورابط التغيير المشفر تلقائياً من الخادم إلى البريد الإلكتروني المسجل لدى الإدارة دون كشفه في الشاشة العامة.
                   </p>
                 </div>
 
@@ -631,34 +660,15 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                     required
                     value={fpIdentifier}
                     onChange={(e) => setFpIdentifier(e.target.value)}
-                    placeholder="admin"
+                    placeholder="أدخل اسم المستخدم المعتمد (مثال: admin)"
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-[#102A43] focus:outline-none focus:ring-2 focus:ring-[#164E83]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-[#102A43] mb-1.5">
-                    البريد الإلكتروني المستلم لكلمة المرور ورابط التغيير
-                  </label>
-                  <input
-                    type="email"
-                    readOnly
-                    value={fpEmail}
-                    dir="ltr"
-                    className="w-full px-4 py-3 bg-emerald-50/70 border border-emerald-300 rounded-xl text-xs font-black text-emerald-950"
                   />
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (fpToken) {
-                        setResetViewMode('update_view');
-                      } else {
-                        setResetViewMode('update_view');
-                      }
-                    }}
+                    onClick={() => setResetViewMode('update_view')}
                     className="text-xs font-black text-[#164E83] hover:underline cursor-pointer"
                   >
                     لديك رمز استعادة بالفعل؟ انتقل لشاشة تغيير كلمة المرور
@@ -671,15 +681,15 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                     <Mail className="w-4 h-4 text-[#C6A15B]" />
                     <span>
                       {fpLoading
-                        ? 'جاري توليد كلمة المرور وإرسالها إلى elhosiny2020@gmail.com...'
-                        : 'إرسال كلمة المرور ورابط التغيير إلى elhosiny2020@gmail.com'}
+                        ? 'جاري توليد كلمة المرور وإرسالها إلى البريد الرسمي المعتمد...'
+                        : 'إرسال كلمة المرور ورابط التغيير إلى البريد المعتمد'}
                     </span>
                   </button>
                 </div>
               </form>
             )}
 
-            {/* ٢. شاشة رسالة البريد الإلكتروني المرسلة إلى elhosiny2020@gmail.com */}
+            {/* ٢. شاشة تأكيد الإرسال الآمن */}
             {resetViewMode === 'email_dispatched' && deliveryInfo && (
               <div className="space-y-4">
                 <div className="rounded-2xl border-2 border-[#C6A15B] bg-[#FAFBFD] p-4 space-y-3 shadow-sm">
@@ -688,10 +698,10 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                       <Mail className="w-5 h-5 text-[#164E83]" />
                       <div>
                         <span className="text-[10.5px] font-black text-slate-500 block">
-                          رسالة البريد الإلكتروني الصادرة من المنظومة
+                          رسالة الاستعادة الصادرة من الخادم المؤمن
                         </span>
-                        <span className="text-xs font-black text-[#102A43]" dir="ltr">
-                          To: {deliveryInfo.recipientEmail}
+                        <span className="text-xs font-black text-[#102A43]">
+                          إلى: {deliveryInfo.recipientLabel || 'البريد الإلكتروني الرسمي المعتمد للإدارة'}
                         </span>
                       </div>
                     </div>
@@ -706,16 +716,14 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                       <strong className="font-mono text-[#164E83]">{deliveryInfo.username}</strong>)،
                     </p>
                     <p>
-                      بناءً على طلبك لاستعادة كلمة المرور، تم إرسال كلمة المرور الجديدة الخاصة بك على البريد الإلكتروني{' '}
-                      <strong dir="ltr">{deliveryInfo.recipientEmail}</strong> وتفعيلها فوراً:
+                      تم إرسال كلمة المرور الجديدة ورابط الاستعادة المشفر إلى البريد الرسمي المسجل للإدارة وتفعيلها فوراً:
                     </p>
                   </div>
 
-                  {/* كلمة المرور المرسلة على الإيميل */}
                   <div className="p-3.5 rounded-xl bg-white border-2 border-[#164E83]/30 flex items-center justify-between gap-3">
                     <div>
                       <span className="text-[10.5px] font-black text-slate-500 block">
-                        كلمة المرور المرسلة على الإيميل (elhosiny2020@gmail.com):
+                        كلمة المرور المؤقتة المرسلة للبريد الرسمي المعتمد:
                       </span>
                       <span className="text-lg font-mono font-black text-[#102A43] tracking-wider select-all">
                         {deliveryInfo.tempPassword}
@@ -726,7 +734,7 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                       onClick={() => {
                         if (typeof navigator !== 'undefined' && navigator.clipboard) {
                           void navigator.clipboard.writeText(deliveryInfo.tempPassword);
-                          setFpNotice('تم نسخ كلمة المرور المرسلة للبريد الإلكتروني.');
+                          setFpNotice('تم نسخ كلمة المرور المؤقتة بنجاح.');
                         }
                       }}
                       className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[#102A43] text-[11px] font-black flex items-center gap-1 cursor-pointer"
@@ -736,19 +744,18 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                     </button>
                   </div>
 
-                  {/* خياران للمستخدم: إما تغيير الباسورد من رابط الميل الآن أو الدخول بكلمة المرور المرسلة */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
                     <button
                       type="button"
                       onClick={() => {
                         setFpError('');
-                        setFpNotice('أدخل كلمة المرور الجديدة التي ترغب في تعيينها لحسابك عبر رابط البريد الإلكتروني.');
+                        setFpNotice('أدخل كلمة المرور الجديدة التي ترغب في تعيينها لحسابك.');
                         setResetViewMode('update_view');
                       }}
                       className="py-3 px-4 rounded-xl bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      <span>تغيير كلمة المرور من رابط الميل الآن</span>
+                      <span>تغيير كلمة المرور الآن</span>
                     </button>
 
                     <button
@@ -758,29 +765,29 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                         setPassword(deliveryInfo.tempPassword);
                         setShowForgotPassword(false);
                         setSuccessMsg(
-                          `تم تعبئة كلمة المرور المرسلة إلى (${deliveryInfo.recipientEmail}) — اضغط على دخول المنظومة.`
+                          'تم تعبئة كلمة المرور المؤقتة المعتمدة — اضغط على دخول المنظومة.'
                         );
                       }}
                       className="py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>استخدام كلمة المرور المرسلة للدخول</span>
+                      <span>استخدام كلمة المرور للدخول</span>
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ٣. الواجهة المخصصة لتغيير وتحديث كلمة المرور عبر رابط البريد الإلكتروني (Dedicated Password Update View) */}
+            {/* ٣. الواجهة المخصصة لتغيير وتحديث كلمة المرور عبر رابط البريد الإلكتروني */}
             {resetViewMode === 'update_view' && (
               <form onSubmit={handleConfirmNewPasswordFromEmail} className="space-y-4">
                 <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 space-y-1">
                   <div className="font-black text-[#102A43] flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                    <span>تحديث كلمة المرور عبر رابط البريد ({fpEmail})</span>
+                    <span>تحديث كلمة المرور عبر رمز الاستعادة الآمن</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    الحساب المستهدف: <strong className="text-[#164E83] font-mono">{fpIdentifier}</strong> — سيتم تشفير وحفظ كلمة المرور الجديدة في قاعدة البيانات فوراً.
+                    الحساب المستهدف: <strong className="text-[#164E83] font-mono">{fpIdentifier || 'admin'}</strong> — سيتم تشفير وحفظ كلمة المرور الجديدة في قاعدة البيانات فوراً.
                   </p>
                 </div>
 
@@ -855,10 +862,10 @@ export default function LoginForm({ onLoginSuccess, onOpenRegister }: LoginFormP
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-lg font-black text-[#102A43]">
-                    تم تغيير كلمة المرور من البريد الإلكتروني بنجاح
+                    تم تغيير كلمة المرور وحفظها بنجاح
                   </h4>
                   <p className="text-xs text-slate-600 font-bold">
-                    تم حفظ كلمة المرور الجديدة لحساب (<strong className="font-mono">{fpIdentifier}</strong>) المرتبط بالبريد (<strong dir="ltr">{fpEmail}</strong>) في قاعدة البيانات.
+                    تم حفظ كلمة المرور الجديدة لحساب (<strong className="font-mono">{fpIdentifier}</strong>) مشفرة في قاعدة البيانات.
                   </p>
                 </div>
                 <button

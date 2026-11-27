@@ -2954,6 +2954,7 @@ export function factoryResetInternalTradeStore(): void {
   saveCommercialSettlements([]);
   saveCommercialSeizures([]);
   saveSeizureMovements([]);
+  saveMarketCommodities([]);
   savePriceObservations([]);
   saveButaneAllocations([]);
   savePetroleumAllocations([]);
@@ -2964,6 +2965,7 @@ export function factoryResetInternalTradeStore(): void {
   saveButaneWarehouseMovements([]);
   saveButaneDistributors([]);
   saveButaneDistributorMovements([]);
+  saveTradeSettings(INITIAL_INTERNAL_TRADE_SETTINGS);
 }
 
 // ==================== الأدوار الوظيفية الـ ١٧ لقسم التجارة الداخلية ====================

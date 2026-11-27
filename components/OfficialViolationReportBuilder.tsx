@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   Download,
+  Edit3,
+  Eye,
   FilePlus2,
   FileText,
   Paperclip,
@@ -588,32 +590,72 @@ export default function OfficialViolationReportBuilder({
       },
       {
         key: 'actions',
-        label: 'الربط بالمديونيات',
-        headerText: 'الربط بالمديونيات',
+        label: 'الإجراءات',
+        headerText: 'الإجراءات',
         type: 'actions',
-        render: (r) =>
-          r.linkedDebtId ? (
-            <span className="text-[10.5px] font-black text-emerald-700 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>تم الترحيل</span>
-            </span>
-          ) : (
+        render: (r) => (
+          <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
             <button
               type="button"
               onClick={() => {
-                const res = handleTransferReportToDebts(r);
-                if (!res.ok) notify(res.error || 'تعذر الترحيل');
-                else notify(`تم ترحيل المحضر إلى المديونيات برقم ${res.debtNumber}`);
+                const matched = bakeries.find((b) => b.id === r.bakeryId);
+                if (matched && onSelectBakeryDetails) onSelectBakeryDetails(matched);
+                else notify(`عرض محضر رقم ${r.reportNumber} — ${r.bakeryName} (الإجمالي: ${formatArabicCurrency(r.totalFineAmountEgp)})`);
               }}
-              className="px-2.5 py-1 rounded bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10px] font-black flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#164E83] border border-blue-200 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="عرض تفاصيل المحضر"
             >
-              <ArrowLeft className="w-3 h-3" />
-              <span>ترحيل للمديونيات</span>
+              <Eye className="w-4.5 h-4.5 shrink-0" />
+              <span>عرض</span>
             </button>
-          ),
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="px-2 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="إضافة محضر مخالفة جديد"
+            >
+              <Plus className="w-4.5 h-4.5 shrink-0" />
+              <span>إضافة</span>
+            </button>
+            {r.linkedDebtId ? (
+              <span className="px-2 py-1.5 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10.5px] font-black flex items-center gap-1">
+                <CheckCircle2 className="w-4.5 h-4.5 shrink-0" />
+                <span>تم الترحيل</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  const res = handleTransferReportToDebts(r);
+                  if (!res.ok) notify(res.error || 'تعذر الترحيل');
+                  else notify(`تم ترحيل المحضر إلى المديونيات برقم ${res.debtNumber}`);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+                title="تعديل / ترحيل للمديونيات"
+              >
+                <Edit3 className="w-4.5 h-4.5 shrink-0" />
+                <span>ترحيل</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const nextList = reports.filter((x) => x.id !== r.id);
+                setReports(nextList);
+                saveOfficialViolationReports(nextList);
+                notify(`تم حذف المحضر رقم (${r.reportNumber}) بنجاح.`);
+              }}
+              className="px-2 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 text-[10.5px] font-black flex items-center gap-1 cursor-pointer"
+              title="حذف المحضر"
+            >
+              <Trash2 className="w-4.5 h-4.5 shrink-0" />
+              <span>حذف</span>
+            </button>
+          </div>
+        ),
       },
     ],
-    [bakeries, onSelectBakeryDetails, handleTransferReportToDebts, notify]
+    [bakeries, reports, onSelectBakeryDetails, handleTransferReportToDebts, notify]
   );
 
   return (

@@ -6,6 +6,22 @@ import { getValidatedSupabaseAdminConfig } from '@/lib/server/supabase-admin';
 const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
+const NotificationToneEnum = z.enum([
+  'crystal_chime',
+  'executive_bell',
+  'digital_pulse',
+  'soft_marimba',
+  'urgent_radar',
+  'classic_ping',
+]);
+
+const NotificationCategoryAudioSchema = z
+  .object({
+    enabled: z.boolean(),
+    tone: NotificationToneEnum,
+  })
+  .strict();
+
 const PreferencesPayloadSchema = z
   .object({
     userId: z.string().regex(USER_ID_REGEX),
@@ -26,6 +42,12 @@ const PreferencesPayloadSchema = z
       'dark_mode',
       'midnight_aurora',
       'eye_comfort',
+      'crystal_glass',
+      'obsidian_glass',
+      'aurora_glass',
+      'emerald_glass',
+      'sapphire_executive',
+      'copper_editorial',
       'custom',
     ]),
     uiLayout: z
@@ -36,6 +58,8 @@ const PreferencesPayloadSchema = z
         'royal_heritage',
         'ultra_minimal',
         'operations_cockpit',
+        'liquid_glass',
+        'glass_split',
       ])
       .optional()
       .default('frosted_slate'),
@@ -48,6 +72,21 @@ const PreferencesPayloadSchema = z
       .strict(),
     displayMode: z.enum(['auto', 'manual']),
     density: z.enum(['compact', 'comfortable', 'spacious']),
+    notificationAudio: z
+      .object({
+        masterEnabled: z.boolean(),
+        volume: z.number().min(0.1).max(1),
+        categories: z
+          .object({
+            task: NotificationCategoryAudioSchema,
+            approval: NotificationCategoryAudioSchema,
+            system: NotificationCategoryAudioSchema,
+            security: NotificationCategoryAudioSchema,
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     updatedAt: z.string().max(64).optional(),
   })
   .strict();

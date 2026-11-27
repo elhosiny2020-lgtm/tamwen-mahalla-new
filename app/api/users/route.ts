@@ -10,8 +10,10 @@ import {
   getUsersDbEngineInfo,
   listDbUsers,
   updateDbUser,
+  wipeAllDbUsers,
 } from '@/lib/server/users-db';
 import {
+  clearAllServerUserPasswordOverrides,
   deleteServerUserPassword,
   setServerUserPassword,
 } from '@/lib/server/admin-credential-store';
@@ -204,14 +206,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'المستخدم غير موجود.' }, { status: 404 });
   }
 
-  // Prevent locking out oneself or demoting the last super_admin
-  if (data.id === auth.session.userId && (data.status === 'suspended' || data.status === 'inactive')) {
-    return NextResponse.json(
-      { ok: false, error: 'لا يمكن إيقاف حسابك الشخصي النشط حالياً.' },
-      { status: 400 }
-    );
-  }
-
   const result = await updateDbUser({
     id: data.id,
     fullName: data.fullName,
@@ -264,6 +258,36 @@ export async function DELETE(req: NextRequest) {
   const auth = await requireAdminSession(req);
   if (auth.errorResponse) return auth.errorResponse;
 
+  const wipeAll = req.nextUrl.searchParams.get('all') === 'true';
+  if (wipeAll) {
+    const wiped = await wipeAllDbUsers();
+    clearAllServerUserPasswordOverrides();
+
+    recordServerAuditLog({
+      userId: auth.session.userId,
+      username: auth.session.username,
+      fullName: auth.session.username,
+      action: 'مسح شامل لجميع المستخدمين على جميع الفروع',
+      module: 'إدارة المستخدمين والصلاحيات',
+      branchId: auth.session.branchId,
+      details: `تم المسح الشامل لعدد (${wiped.deletedCount}) مستخدم من كافة الإدارات والفروع نهائياً من قاعدة البيانات`,
+      ipAddress: getClientIp(req),
+      deviceInfo: req.headers.get('user-agent') || 'متصفح الويب المعتمد',
+      status: 'warning',
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        wipedAll: true,
+        deletedCount: wiped.deletedCount,
+        deletedIds: wiped.deletedIds,
+        dbInfo: getUsersDbEngineInfo(),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
   const singleId = req.nextUrl.searchParams.get('id')?.trim();
   let idsToDelete: string[] = [];
 
@@ -283,12 +307,16 @@ export async function DELETE(req: NextRequest) {
     idsToDelete = parsed.data.ids;
   }
 
+  // Also clear in-memory password overrides for deleted usernames
+  const targetUsers = idsToDelete
+    .map((id) => getDbUserById(id))
+    .filter((u): u is NonNullable<typeof u> => Boolean(u));
+
   const res = await deleteDbUsersByIds(idsToDelete, auth.session.userId);
-  if (res.deletedIds.length === 0) {
-    return NextResponse.json(
-      { ok: false, error: 'الحسابات المحددة محمية (الحساب النشط أو آخر مدير نظام أعلى).' },
-      { status: 400 }
-    );
+  for (const u of targetUsers) {
+    if (res.deletedIds.includes(u.id)) {
+      deleteServerUserPassword(u.username);
+    }
   }
 
   recordServerAuditLog({

@@ -130,8 +130,17 @@ export default function HrPersonnelModule({ currentUser, todayRef }: HrPersonnel
           { tableName: 'طلبات تصحيح البيانات الوظيفية', count: store.dataCorrectionRequests.length },
           { tableName: 'طلبات التجديد المقدمة', count: store.renewalRequests.length },
         ];
+      case 'employees_db':
+      case 'daily_status':
+        return [
+          { tableName: 'قاعدة بيانات العاملين الموحدة', count: store.employees.length },
+          { tableName: 'ملفات ومستندات العاملين', count: store.documents.length },
+          { tableName: 'سجل التاريخ الوظيفي', count: store.serviceHistory.length },
+        ];
       default:
         return [
+          { tableName: 'قاعدة بيانات العاملين الموحدة', count: store.employees.length },
+          { tableName: 'ملفات ومستندات العاملين', count: store.documents.length },
           { tableName: 'سجلات الحضور والانصراف', count: store.attendance.length },
           { tableName: 'الإجازات والمأموريات', count: store.leaves.length },
           { tableName: 'الإنذارات والجزاءات', count: store.warnings.length + store.disciplinaryActions.length },
@@ -215,8 +224,10 @@ export default function HrPersonnelModule({ currentUser, todayRef }: HrPersonnel
                 sectionName="إدارة الموارد البشرية (جميع الوحدات الـ ١٥)"
                 sectionKey="HR_ALL_MODULES"
                 currentUser={currentUser}
-                description="تصفير شامل وفوري لجميع البيانات التشغيلية عبر كافة وحدات الموارد البشرية (الحضور، الإجازات، الإنذارات، الإعارات، الخدمة العامة، العقود، طلبات التجديد، السجلات) وإعادة الإعدادات للوضع الافتراضي بدون طلب نسخة احتياطية."
+                description="تصفير شامل وفوري لجميع جداول وبيانات الموارد البشرية (العاملين، المستندات، الحضور، الإجازات، الإنذارات، الإعارات، الخدمة العامة، العقود، طلبات التجديد، السجلات) وإعادة الإعدادات للوضع الافتراضي بدون نسخة احتياطية."
                 getTableSummary={() => [
+                  { tableName: 'قاعدة بيانات العاملين الموحدة', count: store.employees.length },
+                  { tableName: 'ملفات ومستندات العاملين', count: store.documents.length },
                   { tableName: 'سجلات الحضور والانصراف', count: store.attendance.length },
                   { tableName: 'الإجازات والمأموريات', count: store.leaves.length },
                   { tableName: 'الإنذارات والجزاءات', count: store.warnings.length + store.disciplinaryActions.length },
@@ -227,7 +238,7 @@ export default function HrPersonnelModule({ currentUser, todayRef }: HrPersonnel
                 onConfirmReset={() => {
                   const wiped = wipeHrPersonnelTransactionalData('ALL');
                   setStore(wiped);
-                  notify('تم تنفيذ استعادة ضبط المصنع والتصفير الشامل الفوري لجميع وحدات الموارد البشرية بدون نسخة احتياطية.');
+                  notify('تم تنفيذ استعادة ضبط المصنع والتصفير الشامل الفوري لجميع جداول الموارد البشرية بالكامل.');
                 }}
               />
               <button

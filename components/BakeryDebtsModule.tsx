@@ -1313,6 +1313,7 @@ export default function BakeryDebtsModule({
                 updateStore((prev) => ({
                   ...prev,
                   debts: [],
+                  items: [],
                   payments: [],
                   schedules: [],
                   installments: [],
@@ -1321,9 +1322,16 @@ export default function BakeryDebtsModule({
                   appeals: [],
                   followups: [],
                   auditLogs: [],
-                  majorDebtFollowups: [],
                 }));
-                notify('تم تنفيذ إعادة ضبط المصنع ومسح جميع المديونيات والسدادات والأقساط والمخالفات بنجاح.');
+                if (typeof window !== 'undefined') {
+                  try {
+                    localStorage.setItem('gharbia_supply_bakery_debts_v1', JSON.stringify([]));
+                  } catch {
+                    // ignore
+                  }
+                  window.dispatchEvent(new CustomEvent('gharbia-audit-log-added'));
+                }
+                notify('تم تنفيذ إعادة ضبط المصنع وتصفير جميع المديونيات والبنود والسدادات والأقساط والمخالفات بالكامل.');
               }}
             />
           </div>

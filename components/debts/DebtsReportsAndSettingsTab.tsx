@@ -236,9 +236,10 @@ export default function DebtsReportsAndSettingsTab({
           <button
             type="button"
             onClick={() => setShowPrint(true)}
-            className="px-2 py-0.5 rounded bg-[#102A43] text-[#C6A15B] text-[10px] font-black cursor-pointer"
+            className="px-2.5 py-1.5 rounded-xl bg-[#102A43] hover:bg-[#164E83] text-[#C6A15B] text-[10.5px] font-black inline-flex items-center gap-1.5 cursor-pointer"
           >
-            طباعة ({toArabicNumerals(r.recordRef)})
+            <Printer className="w-4.5 h-4.5" />
+            <span>عرض / طباعة ({toArabicNumerals(r.recordRef)})</span>
           </button>
         ),
       },
