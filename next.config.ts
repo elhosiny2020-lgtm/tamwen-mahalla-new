@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { PHASE_DEVELOPMENT_SERVER } from 'next/constants';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -73,61 +74,72 @@ const securityHeaders = [
     : []),
 ];
 
-const nextConfig: NextConfig = {
-  reactStrictMode: true,
-  poweredByHeader: false,
-  compress: true,
-  httpAgentOptions: {
-    keepAlive: true,
-  },
-  allowedDevOrigins: [
-    '*.run.app',
-    '*.aistudio.google.com',
-    '*.googleusercontent.com',
-    '*.usercontent.goog',
-    'localhost',
-    '127.0.0.1',
-  ],
-  experimental: {
-    webpackMemoryOptimizations: true,
-    optimizePackageImports: ['lucide-react', 'd3', 'motion'],
-    serverActions: {
-      allowedOrigins: [
-        '*.run.app',
-        '*.aistudio.google.com',
-        '*.googleusercontent.com',
-        '*.usercontent.goog',
-        'localhost:3000',
-      ],
-    },
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: false,
-  },
-  async headers() {
-    return [
-      { source: '/(.*)', headers: securityHeaders },
-      {
-        source: '/api/(.*)',
-        headers: [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
-      },
-    ];
-  },
-  webpack: (config, { dev }) => {
-    // HMR is disabled in AI Studio via DISABLE_HMR env var.
-    if (dev && process.env.DISABLE_HMR === 'true') {
-      config.watchOptions = { ignored: /.*/ };
-    } else if (dev) {
-      config.watchOptions = {
-        ...config.watchOptions,
-        ignored: ['**/node_modules/**', '**/.next/**', '**/data/**', '**/public/assets/**'],
-      };
-    }
-    return config;
-  },
-};
+export default function nextConfig(phase: string): NextConfig {
+  const isDevServer = phase === PHASE_DEVELOPMENT_SERVER;
 
-export default nextConfig;
+  return {
+    // Isolate next dev output from next build / next start (.next) so live dev requests
+    // never overwrite or corrupt production build artifacts during publishing.
+    distDir: isDevServer ? '.next-dev' : '.next',
+    reactStrictMode: true,
+    poweredByHeader: false,
+    compress: true,
+    httpAgentOptions: {
+      keepAlive: true,
+    },
+    allowedDevOrigins: [
+      '*.run.app',
+      '*.aistudio.google.com',
+      '*.googleusercontent.com',
+      '*.usercontent.goog',
+      'localhost',
+      '127.0.0.1',
+    ],
+    experimental: {
+      webpackMemoryOptimizations: true,
+      optimizePackageImports: ['lucide-react', 'd3', 'motion'],
+      serverActions: {
+        allowedOrigins: [
+          '*.run.app',
+          '*.aistudio.google.com',
+          '*.googleusercontent.com',
+          '*.usercontent.goog',
+          'localhost:3000',
+        ],
+      },
+    },
+    eslint: {
+      ignoreDuringBuilds: true,
+    },
+    typescript: {
+      ignoreBuildErrors: false,
+    },
+    async headers() {
+      return [
+        { source: '/(.*)', headers: securityHeaders },
+        {
+          source: '/api/(.*)',
+          headers: [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
+        },
+      ];
+    },
+    webpack: (config, { dev }) => {
+      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      if (dev && process.env.DISABLE_HMR === 'true') {
+        config.watchOptions = { ignored: /.*/ };
+      } else if (dev) {
+        config.watchOptions = {
+          ...config.watchOptions,
+          ignored: [
+            '**/node_modules/**',
+            '**/.next/**',
+            '**/.next-dev/**',
+            '**/data/**',
+            '**/public/assets/**',
+          ],
+        };
+      }
+      return config;
+    },
+  };
+}
