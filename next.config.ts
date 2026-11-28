@@ -84,6 +84,11 @@ export default function nextConfig(phase: string): NextConfig {
     reactStrictMode: true,
     poweredByHeader: false,
     compress: true,
+    productionBrowserSourceMaps: false,
+    images: {
+      formats: ['image/avif', 'image/webp'],
+      minimumCacheTTL: 86400,
+    },
     httpAgentOptions: {
       keepAlive: true,
     },
@@ -117,6 +122,14 @@ export default function nextConfig(phase: string): NextConfig {
     async headers() {
       return [
         { source: '/(.*)', headers: securityHeaders },
+        {
+          source: '/_next/static/(.*)',
+          headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+        },
+        {
+          source: '/assets/(.*)',
+          headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }],
+        },
         {
           source: '/api/(.*)',
           headers: [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],

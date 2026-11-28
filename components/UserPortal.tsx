@@ -102,7 +102,6 @@ import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import FactoryResetButton from './FactoryResetButton';
 import { TableActionButtons } from './trade/TradeSharedCrudUi';
-import AnalyticsDashboardWidget from './AnalyticsDashboardWidget';
 import RealtimeToastNotifications from './RealtimeToastNotifications';
 import { loadDebtsStore } from '@/lib/debts-data';
 
@@ -113,6 +112,14 @@ const ModuleLoadingFallback = () => (
   </div>
 );
 
+const AnalyticsDashboardWidget = dynamic(() => import('./AnalyticsDashboardWidget'), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center text-xs font-bold text-slate-500">
+      جارٍ تحميل الرسوم التحليلية...
+    </div>
+  ),
+});
 const AdminDashboard = dynamic(() => import('./AdminDashboard'), { ssr: false, loading: ModuleLoadingFallback });
 const BakeryManagementSystem = dynamic(() => import('./BakeryManagementSystem'), { ssr: false, loading: ModuleLoadingFallback });
 const BakeryInspectionModule = dynamic(() => import('./BakeryInspectionModule'), { ssr: false, loading: ModuleLoadingFallback });
@@ -124,6 +131,7 @@ const RationCommoditiesModule = dynamic(() => import('./ration/RationCommodities
 const DropdownListsManagerModule = dynamic(() => import('./DropdownListsManagerModule'), { ssr: false, loading: ModuleLoadingFallback });
 const GrainMaintenanceModule = dynamic(() => import('./GrainMaintenanceModule'), { ssr: false, loading: ModuleLoadingFallback });
 const HrPersonnelModule = dynamic(() => import('./hr/HrPersonnelModule'), { ssr: false, loading: ModuleLoadingFallback });
+const FinancialErpModule = dynamic(() => import('./financial/FinancialErpModule'), { ssr: false, loading: ModuleLoadingFallback });
 import {
   loadButaneWarehouses,
   loadCommercialEstablishments,
@@ -603,7 +611,6 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
         'REP',
         'BACK',
         'SETT',
-        'FIN',
         'STORE',
         'ROLES',
         'DOCS',
@@ -696,6 +703,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
       { id: 'grp_ration', title: t('grp_ration'), codes: ['COMM'] },
       { id: 'grp_grain', title: t('grp_grain'), codes: ['GRAIN'] },
       { id: 'grp_hr', title: isRtl ? 'الموارد البشرية وشؤون العاملين' : 'Human Resources & Personnel', codes: ['HR'] },
+      { id: 'grp_fin', title: isRtl ? 'الإدارة المالية والمحاسبية' : 'Financial & Accounting ERP', codes: ['FIN'] },
       { id: 'grp_citizens', title: t('grp_citizens'), codes: ['COMP'] },
       {
         id: 'grp_admin',
@@ -2127,6 +2135,15 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               <HrPersonnelModule currentUser={currentUser} todayRef={todayRef} />
             )}
 
+            {activeDept?.code === 'FIN' && (
+              <FinancialErpModule
+                currentUser={currentUser}
+                branches={branches}
+                bakeries={bakeries}
+                debtTransactions={debtTransactions}
+              />
+            )}
+
             {(activeDept?.code === 'GRAIN' ||
               activeDept?.code === 'SILOS' ||
               activeDept?.code === 'MILLS' ||
@@ -2157,6 +2174,7 @@ export default function UserPortal({ currentUser, activeBranchId }: UserPortalPr
               activeDept.code !== 'COMM' &&
               activeDept.code !== 'LISTS' &&
               activeDept.code !== 'HR' &&
+              activeDept.code !== 'FIN' &&
               activeDept.code !== 'GRAIN' &&
               activeDept.code !== 'SILOS' &&
               activeDept.code !== 'MILLS' &&

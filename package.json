@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=1024 next dev --turbopack -H 0.0.0.0 -p 3000",
     "build": "NODE_OPTIONS=--max-old-space-size=1280 next build",
-    "start": "node server.js",
+    "start": "NODE_ENV=production node server.js",
     "lint": "NODE_OPTIONS=--max-old-space-size=768 eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "check": "npm run lint && npm run typecheck",
+    "prepublish:check": "node scripts/pre-publish-check.mjs",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\""
   },
   "dependencies": {

@@ -1,0 +1,36 @@
+# Exclude local dependencies, dev caches, build artifacts, secrets, and non-runtime files
+# from Docker / Cloud Run build context to drastically speed up Publish uploads and layer caching.
+
+node_modules
+.next
+.next-dev
+.git
+.gitignore
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Local environment & secret files (never bake secrets into container images)
+.env
+.env.*
+!.env.example
+
+# Runtime data & local diagnostic logs
+data/*.db
+data/*.db-*
+data/*.sqlite
+data/server-diagnostics.json
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Unreferenced raw asset archives
+src/assets
+
+# Docs, tests, editor metadata
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+README.md
+supabase/migrations

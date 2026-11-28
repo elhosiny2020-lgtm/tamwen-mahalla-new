@@ -51,9 +51,19 @@ import {
   normalizeSearchText,
 } from '@/lib/utils';
 import { User, Branch, Department, RegistrationRequest, AuditLog, UserRole, EmployeeStatus } from '@/types';
+import dynamic from 'next/dynamic';
 import AnimatedStatCard from './AnimatedStatCard';
 import SmartAutoFitTable, { SmartTableColumn } from './SmartAutoFitTable';
 import FactoryResetButton from './FactoryResetButton';
+
+const AdminDiagnosticsPanel = dynamic(() => import('./AdminDiagnosticsPanel'), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-xs font-black text-[#102A43]">
+      جارٍ تحميل عارض سجلات التشخيص والأخطاء...
+    </div>
+  ),
+});
 
 type UserFilterChip = 'all' | 'managers' | 'officers' | 'inspectors' | 'suspended' | 'no_custom_password';
 
@@ -128,9 +138,9 @@ export default function AdminDashboard({
   initialTab = 'users',
 }: {
   userId?: string;
-  initialTab?: 'users' | 'permissions' | 'requests' | 'branches' | 'audit';
+  initialTab?: 'users' | 'permissions' | 'requests' | 'branches' | 'audit' | 'diagnostics';
 }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'permissions' | 'requests' | 'branches' | 'audit'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'users' | 'permissions' | 'requests' | 'branches' | 'audit' | 'diagnostics'>(initialTab);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -1702,6 +1712,17 @@ export default function AdminDashboard({
           >
             التدقيق الأمني ({toArabicNumerals(auditLogs.length)})
           </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('diagnostics'); setSelectedIds([]); }}
+            className={`px-4 py-2 rounded-full text-[11px] font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'diagnostics' ? 'bg-rose-700 text-white shadow-sm' : 'text-rose-800 hover:bg-white'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>أخطاء التشغيل والبناء</span>
+          </button>
         </div>
 
         <div className="relative min-w-[240px] flex-1 max-w-xs">
@@ -1956,6 +1977,11 @@ export default function AdminDashboard({
             emptyMessage="لا توجد سجلات تدقيق مطابقة."
           />
         </div>
+      )}
+
+      {/* Tab Content: Server, Build & Runtime Diagnostics */}
+      {activeTab === 'diagnostics' && (
+        <AdminDiagnosticsPanel onNotify={showNotice} />
       )}
 
       {/* Tab Content: Permissions & Departments Management */}

@@ -41,7 +41,7 @@ export const INITIAL_DEPARTMENTS: Department[] = [
   { id: 'd-10', code: 'MILLS', name: 'المطاحن', arabicName: 'المطاحن التموينية', description: 'متابعة طحن الدقيق التمويني استخراج ٨٧٫٥٪', iconName: 'Factory', isCore: true },
   { id: 'd-11', code: 'COLD', name: 'الثلاجات', arabicName: 'الثلاجات وحفظ الأغذية', description: 'رقابة السلع الغذائية المجمدة والمبردة', iconName: 'ThermometerSnowflake', isCore: false },
   { id: 'd-12', code: 'HR', name: 'الموارد البشرية', arabicName: 'الموارد البشرية وشؤون العاملين', description: 'ملفات العاملين والانتدابات والإجازات', iconName: 'Users', isCore: true },
-  { id: 'd-13', code: 'FIN', name: 'الشؤون المالية والإدارية', arabicName: 'الشؤون المالية والإدارية', description: 'الموازنة والحسابات والمشتريات الحكومية', iconName: 'Calculator', isCore: true },
+  { id: 'd-13', code: 'FIN', name: 'الإدارة المالية والمحاسبية', arabicName: 'الإدارة المالية والمحاسبية', description: 'النظام المالي والمحاسبي المركزي المتكامل ERP (دليل الحسابات، القيود، الموازنة، الخزينة، المديونيات، الأصول، التقارير)', iconName: 'Calculator', isCore: true },
   { id: 'd-14', code: 'STORE', name: 'المخازن والمشتريات', arabicName: 'المخازن والعهد الحكومية', description: 'إدارة العهد والمستلزمات التشغيلية', iconName: 'Boxes', isCore: false },
   { id: 'd-15', code: 'INSP', name: 'التفتيش والرقابة التموينية', arabicName: 'الحملات والتفتيش التمويني', description: 'تخطيط الحملات الرقابية الميدانية', iconName: 'SearchCheck', isCore: true },
   { id: 'd-16', code: 'VIOL', name: 'المخالفات والمحاضر', arabicName: 'المخالفات والمحاضر والنيابات', description: 'قيد ومتابعة القضايا والمحاضر التموينية', iconName: 'FileText', isCore: true },
