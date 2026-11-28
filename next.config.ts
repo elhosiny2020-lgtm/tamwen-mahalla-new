@@ -101,7 +101,7 @@ export default function nextConfig(phase: string): NextConfig {
       '127.0.0.1',
     ],
     experimental: {
-      webpackMemoryOptimizations: true,
+      webpackBuildWorker: true,
       optimizePackageImports: ['lucide-react', 'd3', 'motion'],
       serverActions: {
         allowedOrigins: [
@@ -137,6 +137,10 @@ export default function nextConfig(phase: string): NextConfig {
       ];
     },
     webpack: (config, { dev }) => {
+      // Avoid writing ~300 MB of single-use webpack filesystem cache during production Publish builds
+      if (!dev) {
+        config.cache = false;
+      }
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       if (dev && process.env.DISABLE_HMR === 'true') {
         config.watchOptions = { ignored: /.*/ };
